@@ -20,7 +20,8 @@ Pre-alpha. Currently in the design/spec phase — see [docs/SPEC.md](docs/SPEC.m
 
 - Single static Go binary, no CGO. SQLite (WAL) storage.
 - `wtc serve` is the daemon (ingest HTTP + query API); every other subcommand is a thin HTTP client.
-- First-class ingest: GitHub webhooks and Flux notification-controller. Anything else via `/ingest/generic`, `wtc record`, or `wtc wrap`.
+- First-class ingest: GitHub (API poller or webhooks) and Flux notification-controller. Anything else via `/ingest/generic`, `wtc record`, or `wtc wrap`.
+- Runs happily inside a private network — no public endpoint required (the GitHub poller pulls instead of waiting for webhooks).
 - At-least-once ingestion with stable dedup keys — webhook loss is recoverable.
 - Secrets redacted before storage.
 
