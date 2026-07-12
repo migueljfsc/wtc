@@ -1,0 +1,8 @@
+# Local development config — `make run`. Do not put real secrets here.
+server:
+  listen: ":8484"
+  db: ./dev/wtc.db
+
+auth:
+  api_tokens:
+    - dev-token

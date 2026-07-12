@@ -1,0 +1,188 @@
+package server
+
+import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"testing"
+
+	"github.com/migueljfsc/wtc/internal/store"
+)
+
+const testToken = "test-token"
+
+func newTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	st, err := store.Open(filepath.Join(t.TempDir(), "wtc.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	srv := New(st, []string{testToken}, slog.New(slog.DiscardHandler))
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(func() {
+		ts.Close()
+		if err := st.Close(); err != nil {
+			t.Errorf("close store: %v", err)
+		}
+	})
+	return ts
+}
+
+func doRequest(t *testing.T, method, url, token string, body []byte) (*http.Response, []byte) {
+	t.Helper()
+	req, err := http.NewRequest(method, url, bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp, data
+}
+
+func TestHealthzNoAuth(t *testing.T) {
+	ts := newTestServer(t)
+	resp, body := doRequest(t, http.MethodGet, ts.URL+"/healthz", "", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("healthz = %d %s, want 200", resp.StatusCode, body)
+	}
+}
+
+func TestAuthRequired(t *testing.T) {
+	ts := newTestServer(t)
+	event := []byte(`{"kind":"manual","title":"x"}`)
+
+	tests := []struct {
+		name, method, path, token string
+		body                      []byte
+	}{
+		{"ingest no token", http.MethodPost, "/ingest/generic", "", event},
+		{"ingest wrong token", http.MethodPost, "/ingest/generic", "nope", event},
+		{"events no token", http.MethodGet, "/api/events", "", nil},
+		{"events wrong token", http.MethodGet, "/api/events", "nope", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, _ := doRequest(t, tt.method, ts.URL+tt.path, tt.token, tt.body)
+			if resp.StatusCode != http.StatusUnauthorized {
+				t.Fatalf("status = %d, want 401", resp.StatusCode)
+			}
+		})
+	}
+}
+
+func TestIngestRoundTripAndDedup(t *testing.T) {
+	ts := newTestServer(t)
+	event := []byte(`{
+		"kind": "manual", "env": "dev", "service": "api",
+		"title": "test deploy note", "dedup_key": "e2e:1"
+	}`)
+
+	// First ingest: created.
+	resp, body := doRequest(t, http.MethodPost, ts.URL+"/ingest/generic", testToken, event)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("first ingest = %d %s, want 201", resp.StatusCode, body)
+	}
+	var first IngestResponse
+	if err := json.Unmarshal(body, &first); err != nil {
+		t.Fatal(err)
+	}
+	if first.Deduped || first.ID == "" {
+		t.Fatalf("first ingest response = %+v", first)
+	}
+
+	// Same dedup_key again: deduped, same id, still one row.
+	resp, body = doRequest(t, http.MethodPost, ts.URL+"/ingest/generic", testToken, event)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("duplicate ingest = %d %s, want 200", resp.StatusCode, body)
+	}
+	var second IngestResponse
+	if err := json.Unmarshal(body, &second); err != nil {
+		t.Fatal(err)
+	}
+	if !second.Deduped || second.ID != first.ID {
+		t.Fatalf("duplicate ingest response = %+v, want deduped onto %s", second, first.ID)
+	}
+
+	resp, body = doRequest(t, http.MethodGet, ts.URL+"/api/events?env=dev", testToken, nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("list = %d %s", resp.StatusCode, body)
+	}
+	var list EventsResponse
+	if err := json.Unmarshal(body, &list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Events) != 1 {
+		t.Fatalf("got %d events, want exactly 1 after duplicate ingest", len(list.Events))
+	}
+	got := list.Events[0]
+	if got.Title != "test deploy note" || got.Service != "api" || string(got.Source) != "generic" {
+		t.Fatalf("event mismatch: %+v", got)
+	}
+}
+
+func TestIngestValidation(t *testing.T) {
+	ts := newTestServer(t)
+	tests := []struct {
+		name string
+		body string
+	}{
+		{"bad json", `{`},
+		{"missing kind", `{"title":"x"}`},
+		{"bad kind", `{"kind":"release","title":"x"}`},
+		{"missing title", `{"kind":"manual"}`},
+		{"bad ts", `{"kind":"manual","title":"x","ts":"yesterday"}`},
+		{"bad status", `{"kind":"manual","title":"x","status":"done"}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, _ := doRequest(t, http.MethodPost, ts.URL+"/ingest/generic", testToken, []byte(tt.body))
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400", resp.StatusCode)
+			}
+		})
+	}
+}
+
+func TestListEventsBadParams(t *testing.T) {
+	ts := newTestServer(t)
+	for _, path := range []string{
+		"/api/events?since=notatime",
+		"/api/events?until=notatime",
+		"/api/events?limit=-1",
+		"/api/events?limit=abc",
+	} {
+		resp, _ := doRequest(t, http.MethodGet, ts.URL+path, testToken, nil)
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("%s = %d, want 400", path, resp.StatusCode)
+		}
+	}
+}
+
+func TestFailClosedWithoutTokens(t *testing.T) {
+	st, err := store.Open(filepath.Join(t.TempDir(), "wtc.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = st.Close() }()
+	srv := httptest.NewServer(New(st, nil, slog.New(slog.DiscardHandler)).Handler())
+	defer srv.Close()
+
+	resp, _ := doRequest(t, http.MethodGet, srv.URL+"/api/events", "anything", nil)
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("no-token server must fail closed, got %d", resp.StatusCode)
+	}
+}

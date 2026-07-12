@@ -1,0 +1,61 @@
+package main
+
+import (
+	"os"
+
+	"github.com/spf13/cobra"
+
+	"github.com/migueljfsc/wtc/internal/client"
+)
+
+// version is stamped via -ldflags "-X main.version=..." at release time.
+var version = "dev"
+
+const defaultServer = "http://localhost:8484"
+
+type clientFlags struct {
+	server string
+	token  string
+}
+
+func (f *clientFlags) resolve() *client.Client {
+	server := f.server
+	if server == "" {
+		server = os.Getenv("WTC_SERVER")
+	}
+	if server == "" {
+		server = defaultServer
+	}
+	token := f.token
+	if token == "" {
+		token = os.Getenv("WTC_API_TOKEN")
+	}
+	return client.New(server, token)
+}
+
+func newRootCmd() *cobra.Command {
+	flags := &clientFlags{}
+
+	root := &cobra.Command{
+		Use:           "wtc",
+		Short:         "wtc — what the change: a vendor-neutral change ledger",
+		Long:          "wtc ingests change events (CI builds, GitOps reconciles, manual changes)\ninto one timeline and answers: what changed, where is this commit,\nand how do two environments differ.",
+		Version:       version,
+		SilenceUsage:  true,
+		SilenceErrors: false,
+	}
+
+	root.PersistentFlags().StringVar(&flags.server, "server", "",
+		"wtc server URL (default WTC_SERVER or "+defaultServer+")")
+	root.PersistentFlags().StringVar(&flags.token, "token", "",
+		"API bearer token (default WTC_API_TOKEN)")
+
+	root.AddCommand(
+		newServeCmd(),
+		newRecordCmd(flags),
+		newLogCmd(flags),
+		newInitCmd(),
+		newDoctorCmd(),
+	)
+	return root
+}
