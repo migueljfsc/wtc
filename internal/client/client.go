@@ -1,0 +1,98 @@
+// Package client is the thin HTTP client every CLI subcommand (except serve)
+// uses to talk to the serve API. The CLI never opens the DB file directly.
+package client
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+
+	"github.com/migueljfsc/wtc/internal/ingest/generic"
+	"github.com/migueljfsc/wtc/internal/server"
+)
+
+// Client talks to a running `wtc serve`.
+type Client struct {
+	base  string
+	token string
+	http  *http.Client
+}
+
+// New builds a client for base (e.g. http://localhost:8484).
+func New(base, token string) *Client {
+	return &Client{
+		base:  strings.TrimRight(base, "/"),
+		token: token,
+		http:  &http.Client{Timeout: 30 * time.Second},
+	}
+}
+
+func (c *Client) do(ctx context.Context, method, path string, body, out any) error {
+	var reader io.Reader
+	if body != nil {
+		data, err := json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("encode request: %w", err)
+		}
+		reader = bytes.NewReader(data)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, c.base+path, reader)
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("wtc server unreachable at %s: %w", c.base, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 400 {
+		var apiErr struct {
+			Error string `json:"error"`
+		}
+		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		if json.Unmarshal(data, &apiErr) == nil && apiErr.Error != "" {
+			return fmt.Errorf("server: %s (HTTP %d)", apiErr.Error, resp.StatusCode)
+		}
+		return fmt.Errorf("server: HTTP %d", resp.StatusCode)
+	}
+
+	if out != nil {
+		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+			return fmt.Errorf("decode response: %w", err)
+		}
+	}
+	return nil
+}
+
+// IngestGeneric posts one event to /ingest/generic.
+func (c *Client) IngestGeneric(ctx context.Context, req generic.Request) (server.IngestResponse, error) {
+	var out server.IngestResponse
+	err := c.do(ctx, http.MethodPost, "/ingest/generic", req, &out)
+	return out, err
+}
+
+// Events queries /api/events with the given query parameters.
+func (c *Client) Events(ctx context.Context, params url.Values) (server.EventsResponse, error) {
+	var out server.EventsResponse
+	path := "/api/events"
+	if len(params) > 0 {
+		path += "?" + params.Encode()
+	}
+	err := c.do(ctx, http.MethodGet, path, nil, &out)
+	return out, err
+}
