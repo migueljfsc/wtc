@@ -1,0 +1,33 @@
+# Binaries
+/wtc
+/dev/wtc
+cmd/wtc/wtc
+*.exe
+*.test
+*.out
+
+# Build / coverage
+/dist/
+/bin/
+coverage.out
+coverage.html
+
+# SQLite (WAL mode: db + sidecar files)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Captured raw ingest payloads (wtc serve --capture-dir)
+/testdata/raw/
+
+# Local dev config with secrets/tokens
+/dev/*.local.yaml
+*.local.yaml
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
