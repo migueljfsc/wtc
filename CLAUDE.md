@@ -14,15 +14,19 @@ Differentiator: vendor-neutral, self-hosted, CLI-first. New Relic, Datadog, and 
 
 ## Operator context (the first user — build for this stack first)
 
-- CI: GitHub Actions.
+- CI: GitHub Actions. Terraform runs in CI only (never locally).
 - Deploys:
   - Feature branches: manual/scripted `helm install` into ephemeral envs (e.g. `pr-123`).
-  - dev: Flux image automation auto-commits new image tags to the manifests repo; Flux reconciles.
-  - staging/prod: a human opens a PR bumping the image tag in the manifests repo; merge → Flux reconciles.
-- IaC: mostly YAML manifests managed by Flux, including Crossplane resources. Occasional Terraform.
-- Infra: Kubernetes on AWS and Hetzner.
+  - dev: Flux image automation auto-commits new image tags; Flux reconciles.
+  - staging/prod: a human opens a PR bumping the image tag; merge → Flux reconciles.
+- Repo layout: **microservices** — one repo per service; each repo carries its deploy/infra manifests under `./infrastructure` (path configurable, `infra_path`), kustomize-style: `infrastructure/base/**` + `infrastructure/overlays/<env>/**`. No central manifests monorepo.
+- Image tags **embed the git sha**: `sha-<shortsha>` and `<semver>-<sha>` both occur. wtc ships a configurable `tag_patterns` list (these two as defaults) — never hardcode one convention.
+- Clusters: **cluster-per-env** — `dev`, `staging`, `prod`. Default mapping: cluster name = env name. Kubernetes on AWS and Hetzner. Flux v2.x everywhere (notification-controller with Provider/Alert CRDs, generic-hmac, image-automation on dev).
+- Network: wtc deploys **inside the org's private environment** (EKS or similar); no public endpoint in v1. GitHub webhooks cannot reach it → the **GitHub API poller is the primary GitHub ingest path**. Webhook handlers are still built (HMAC and all) for deployments that do have a public endpoint. Flux notification traffic is in-cluster and unaffected.
+- IaC: mostly YAML manifests managed by Flux, including Crossplane resources. Occasional Terraform (CI only).
+- Packaging: **Helm chart first** (in-cluster), docker-compose for VMs/local. No systemd unit in v1.
 
-Consequence: the two highest-value ingest paths are **GitHub webhooks** and **Flux notification-controller**. Crossplane changes are covered indirectly (they flow through git + Flux). Helm-for-feature-branches and Terraform are covered by the `wtc wrap` command until later phases.
+Consequence: the two highest-value ingest paths are the **GitHub API poller** and **Flux notification-controller**. Crossplane changes are covered indirectly (they flow through git + Flux). Helm-for-feature-branches and Terraform are covered by the `wtc wrap` command until later phases.
 
 ## Hard decisions — do not relitigate without operator approval
 
@@ -75,11 +79,11 @@ docs/                 SPEC.md, PLAN.md, setup/ (flux-provider.yaml, github-webho
 1. **Flux event spam.** notification-controller re-emits on every reconcile. Dedup on `(object kind/ns/name, revision, reason)`; drop repeats within a suppression window (default 10m, configurable). Without this the timeline is unusable.
 2. **Env/service inference is the product's hard problem.** Never trust payload fields directly; every event passes through the ordered rules engine (see SPEC). Unmatched events get `env=""` and are surfaced by `wtc doctor` — never guess silently.
 3. **GitHub push payloads truncate file lists** on large pushes. Path-based env inference must treat a truncated list as "unknown", not "no match". Accurate backfill via the compare API comes with the phase-4 sweeper (requires an API token).
-4. **Webhook loss.** serve downtime = silent gaps. Mitigations in order: stable dedup keys (done by design), GitHub redelivery, phase-4 sweeper that lists recent workflow runs/PRs via API and re-ingests idempotently.
+4. **Webhook loss.** Not the operator's problem in v1 (the poller is the primary path), but for webhook-mode deployments: stable dedup keys (done by design), GitHub redelivery, and the poller doubling as a sweeper that re-ingests idempotently.
 5. **status lifecycle.** `workflow_run` fires requested → in_progress → completed for the same run id. Model: ONE row per logical change; upsert on dedup_key updates `status`, `ts`, `duration_ms`. Do not create a row per transition.
 6. **Out-of-order arrival and clock skew.** Sort by source `ts`; keep `ingested_at`; if `|ts - ingested_at|` > 10m, flag in doctor output.
 7. **Ephemeral env cardinality** (`pr-123`, `pr-124`, …). Allowed; retention plus an `env LIKE 'pr-%'` archival rule keeps them from polluting `diff`/`handoff` defaults.
-8. **The tag↔sha join** powers `wtc where`. It only works if build events carry produced image tags, or tags embed the sha. Resolution depends on the operator's answer about tagging convention — see PLAN.md open questions. Do not hardcode an assumption.
+8. **The tag↔sha join** powers `wtc where`. Operator's tags embed the git sha (`sha-<shortsha>`, `<semver>-<sha>`), so the join works out of the box via the configurable `tag_patterns` list. Build events should still carry produced tags in `artifacts[]` when available — patterns are the general mechanism, not an excuse to skip explicit artifact reporting.
 9. **Flux payload shape.** Treat the notification event structure (`involvedObject`, `reason`, `message`, `metadata` incl. revision key) as unverified until real fixtures are captured from the operator's cluster. Build parsers against captured fixtures, not documentation memory.
 
 ## Definition of done, per phase (see docs/PLAN.md)

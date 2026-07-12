@@ -76,24 +76,37 @@ auth:
 
 sources:
   github:
-    webhook_secret: ${WTC_GH_WEBHOOK_SECRET}
-    api_token: ${WTC_GH_API_TOKEN}       # optional; enables PR-diff enrichment + phase-4 sweeper
-    repos:                               # sweeper scope; webhooks accept any repo passing HMAC
+    webhook_secret: ${WTC_GH_WEBHOOK_SECRET}   # only needed if webhooks are wired (public endpoint)
+    api_token: ${WTC_GH_API_TOKEN}       # enables the poller (primary ingest when private) + PR-diff enrichment
+    poll_interval: 60s                   # 0 disables the poller (webhook-only mode)
+    repos:                               # poller scope; webhooks accept any repo passing HMAC
       - org/app-api
-      - org/manifests
+      - org/app-web
+    infra_path: infrastructure/          # per-repo manifests dir (microservices layout)
+
   flux:
     hmac_key: ${WTC_FLUX_HMAC_KEY}
     suppression_window: 10m
 
+tag_patterns:                            # ordered; first regex with a <sha> group that matches an image tag wins
+  - '^sha-(?P<sha>[0-9a-f]{7,40})$'                     # sha-abc1234
+  - '^v?\d+\.\d+\.\d+-(?P<sha>[0-9a-f]{7,40})$'         # 1.4.2-abc1234
+
 rules:                                   # ordered; see §3
   - match: { source: flux, cluster: prod }
     set:   { env: prod }
-  - match: { source: github, repo: org/manifests, paths: ["clusters/prod/**"] }
-    set:   { env: prod }
-  - match: { source: github, repo: org/manifests, paths: ["clusters/staging/**"] }
+  - match: { source: flux, cluster: staging }
     set:   { env: staging }
-  - match: { source: github, repo: "org/app-*", event: workflow_run }
-    set:   { kind: build, service: "{{ trimPrefix .Repo \"org/app-\" }}" }
+  - match: { source: flux, cluster: dev }
+    set:   { env: dev }
+  - match: { source: github, event: workflow_run }
+    set:   { kind: build, service: "{{ trimPrefix .Repo \"org/\" }}" }
+  - match: { source: github, paths: ["infrastructure/overlays/prod/**"] }
+    set:   { env: prod, service: "{{ trimPrefix .Repo \"org/\" }}" }
+  - match: { source: github, paths: ["infrastructure/overlays/staging/**"] }
+    set:   { env: staging, service: "{{ trimPrefix .Repo \"org/\" }}" }
+  - match: { source: github, paths: ["infrastructure/overlays/dev/**"] }
+    set:   { env: dev, service: "{{ trimPrefix .Repo \"org/\" }}" }
   - match: { source: flux, object_kind: HelmRelease }
     set:   { service: "{{ .ObjectName }}" }
 
@@ -171,7 +184,7 @@ Filtered scan ordered by `ts desc`. Default `--since 24h`, limit 100. `-q` uses 
 ### `wtc where <ref>`
 Composed picture of a change's journey:
 
-1. **BUILD** — events kind=build with `ref = sha` or sha-prefix match, or `artifact/artifacts[]` containing `<ref>`.
+1. **BUILD** — events kind=build with `ref = sha` or sha-prefix match, or `artifact/artifacts[]` containing `<ref>`. Image tags resolve to shas through the configured `tag_patterns` list (§2), so `where` accepts either form.
 2. **INTENT** — merge/push events whose payload references the sha or the image tag produced by step 1 (tag set comes from build-event `artifacts[]`; enrichment in §7 makes this reliable).
 3. **APPLIED** — deploy events per env whose `ref` equals the manifest-repo revision(s) from step 2, or whose `artifact` matches a step-1 tag.
 
@@ -186,9 +199,11 @@ Digest: deploys per env (count, failures list), infra_changes, rollbacks, unmapp
 ### `wtc doctor`
 Per source: last event age, 24h counts, dedup-drop counts, unmapped (`env=""`) counts with 3 sample titles, clock-skew flags, db size, retention stats. Exit non-zero if any source silent > threshold.
 
-## 7. GitHub enrichment (requires `api_token`)
+## 7. GitHub API integration (requires `api_token`)
 
-On merged PRs in repos matching manifest-repo rules: fetch changed files, extract image-tag bumps via configurable regexes (defaults: `tag:\s*["']?(?P<new>\S+)` on YAML, `newTag:\s*(?P<new>\S+)` for kustomize), store old→new tags in payload. This creates the tag↔manifest-revision link that `where` step 2/3 depends on. Diff bodies beyond matched lines are not stored.
+**Poller — primary ingest when wtc has no public endpoint.** Every `poll_interval`, for each configured repo: list workflow runs, merged PRs, and default-branch commits since the per-repo high-water mark (persisted in the DB); normalize through the same parsers and rules pipeline as webhooks. Idempotent via dedup_key, so poller and webhooks can run simultaneously — the poller doubles as the webhook-loss sweeper. First run backfills a bounded window (default 24h).
+
+**PR-diff enrichment.** On merged PRs touching `infra_path`: fetch changed files, extract image-tag bumps via configurable regexes (defaults: `tag:\s*["']?(?P<new>\S+)` on YAML, `newTag:\s*(?P<new>\S+)` for kustomize), store old→new tags in payload. This creates the tag↔manifest-revision link that `where` step 2/3 depends on. Diff bodies beyond matched lines are not stored.
 
 ## 8. Retention
 
@@ -198,5 +213,5 @@ Daily job: delete events older than `keep` (`ephemeral_keep` for envs matching `
 
 - `github-webhook.md` — org/repo webhook: URL `/ingest/github`, content-type json, secret, events: `workflow_run, push, pull_request` (+ `release` optional).
 - `flux-provider.yaml` — per cluster: `Provider` (type generic-hmac → `/ingest/flux`, secretRef) + `Alert` (eventSeverity: info, sources: Kustomization/*, HelmRelease/*, ImageUpdateAutomation/*) + note to set a cluster identifier (Alert `eventMetadata` or summary) so the fact map carries `cluster`. Validate exact field names against captured fixtures before finalizing.
-- `gha-report-step.md` — optional composite-action/curl step POSTing `/ingest/generic` with `{kind: build, ref: $GITHUB_SHA, artifacts: [...]}` for pipelines whose tags don't embed the sha.
-- `systemd/wtc.service` + `Dockerfile` + minimal kustomize overlay for in-cluster deployment.
+- `gha-report-step.md` — optional composite-action/curl step POSTing `/ingest/generic` with `{kind: build, ref: $GITHUB_SHA, artifacts: [...]}` for pipelines whose tags don't embed the sha (not needed by the operator; kept for generality).
+- `Dockerfile` + Helm chart under `deploy/helm/` (primary, in-cluster) + `deploy/docker-compose.yaml` (VMs/local).
