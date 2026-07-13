@@ -36,7 +36,7 @@ CREATE INDEX idx_events_kind_ts    ON events(kind, ts);
 
 Full-text search: FTS5 external-content table over `(title, service, actor, artifact)` maintained by triggers; backs `wtc log -q <text>`.
 
-Upsert rule: `INSERT ... ON CONFLICT(dedup_key) DO UPDATE SET status, ts, duration_ms, title, url, payload` — only when the incoming status outranks the stored one (`started < succeeded|failed`). Late-arriving `started` after `completed` must not regress the row.
+Upsert rule: `INSERT ... ON CONFLICT(dedup_key) DO UPDATE` — only when the incoming status **strictly outranks** the stored one (`unknown < started < succeeded|failed`; equal rank never overwrites, so a stale terminal replay cannot flip `succeeded↔failed` or move `ts` backward). On update: `status`, `ts`, `title` always; `duration_ms`, `payload`, `url`, and identity fields (`env`, `cluster`, `namespace`, `service`, `actor`, `ref`, `artifact`) follow **non-empty-wins merge** — a later event enriches the row but never blanks what an earlier event recorded. `kind` and `source` are set by the first event and never updated.
 
 ### kind semantics
 
@@ -135,7 +135,9 @@ Ingest (serve only):
 ```
 POST /ingest/github     HMAC X-Hub-Signature-256 (webhook_secret)
 POST /ingest/flux       HMAC X-Signature (flux generic-hmac)
-POST /ingest/generic    Bearer token; body = Event JSON subset (kind, env, service, ts?, ref?, artifact?, title, status?)
+POST /ingest/generic    Bearer token; body = Event JSON subset (kind, title, env?, service?, cluster?, namespace?, actor?, ts?, ref?, artifact?, artifacts?, status?, duration_ms?, url?, source?, dedup_key?)
+                        source restricted to generic|manual|helm|terraform; dedup_key prefixes gh:/flux:/am: rejected (reserved for dedicated ingest paths).
+                        Omitting dedup_key ⇒ server generates a random key: the delivery is NOT idempotent — clients needing retry-safety must send a stable key.
 POST /ingest/alertmanager   Bearer token (phase 5)
 GET  /healthz
 ```

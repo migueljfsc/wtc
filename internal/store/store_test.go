@@ -2,7 +2,10 @@ package store
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -97,12 +100,16 @@ func TestDedupUpsertLifecycle(t *testing.T) {
 		t.Fatalf("started: err=%v deduped=%v", err, deduped)
 	}
 
-	// Same logical change completes: must update the SAME row.
+	// Same logical change completes: must update the SAME row. The
+	// completion omits env/payload — merge semantics must keep the earlier
+	// values, and its non-empty ref must enrich the row.
 	dur := int64(90_000)
 	completed := testEvent("gh:run:org/app:1:1", base.Add(90*time.Second), func(e *model.Event) {
 		e.Status = model.StatusSucceeded
 		e.Title = "build #1 succeeded"
 		e.DurationMS = &dur
+		e.Env = "" // later event lacks env: must not blank the stored one
+		e.Ref = "abc1234"
 	})
 	secondID, deduped, err := s.Ingest(ctx, completed)
 	if err != nil {
@@ -134,6 +141,126 @@ func TestDedupUpsertLifecycle(t *testing.T) {
 	}
 	if got.DurationMS == nil || *got.DurationMS != dur {
 		t.Fatalf("duration_ms = %v, want %d", got.DurationMS, dur)
+	}
+	if got.Env != "dev" {
+		t.Fatalf("env = %q, want %q — completion without env must not blank it", got.Env, "dev")
+	}
+	if got.Ref != "abc1234" {
+		t.Fatalf("ref = %q, want abc1234 — completion's ref must enrich the row", got.Ref)
+	}
+}
+
+func TestUpsertMergePreservesPayload(t *testing.T) {
+	s := openTestStore(t)
+	ctx := context.Background()
+	base := time.Now().UTC()
+
+	started := testEvent("gh:run:org/app:2:1", base, func(e *model.Event) {
+		e.Status = model.StatusStarted
+		e.Payload = `{"artifacts":["reg/app:sha-abc1234"]}`
+	})
+	if _, _, err := s.Ingest(ctx, started); err != nil {
+		t.Fatal(err)
+	}
+
+	// Completion carries no payload: the artifact list must survive (the
+	// tag↔sha join for `wtc where` depends on it — CLAUDE.md trap #8).
+	completed := testEvent("gh:run:org/app:2:1", base.Add(time.Minute), func(e *model.Event) {
+		e.Status = model.StatusSucceeded
+	})
+	if _, _, err := s.Ingest(ctx, completed); err != nil {
+		t.Fatal(err)
+	}
+
+	events, _, err := s.ListEvents(ctx, Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("got %d rows, want 1", len(events))
+	}
+	if events[0].Payload != `{"artifacts":["reg/app:sha-abc1234"]}` {
+		t.Fatalf("payload = %q — completion without payload must not destroy it", events[0].Payload)
+	}
+	if events[0].Status != model.StatusSucceeded {
+		t.Fatalf("status = %s, want succeeded", events[0].Status)
+	}
+}
+
+func TestUpsertStrictRankNoEqualRankFlip(t *testing.T) {
+	s := openTestStore(t)
+	ctx := context.Background()
+	base := time.Now().UTC()
+
+	succeeded := testEvent("gh:run:org/app:3:1", base.Add(time.Minute), func(e *model.Event) {
+		e.Status = model.StatusSucceeded
+		e.Title = "deploy succeeded"
+	})
+	if _, _, err := s.Ingest(ctx, succeeded); err != nil {
+		t.Fatal(err)
+	}
+
+	// A stale equal-rank terminal event redelivered later must NOT flip the
+	// row or move ts backward (SPEC §1: only when the incoming status
+	// OUTRANKS the stored one).
+	staleFailed := testEvent("gh:run:org/app:3:1", base, func(e *model.Event) {
+		e.Status = model.StatusFailed
+		e.Title = "deploy failed"
+	})
+	_, deduped, err := s.Ingest(ctx, staleFailed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !deduped {
+		t.Fatal("stale terminal event must dedup onto the existing row")
+	}
+
+	events, _, err := s.ListEvents(ctx, Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("got %d rows, want 1", len(events))
+	}
+	if events[0].Status != model.StatusSucceeded || events[0].Title != "deploy succeeded" {
+		t.Fatalf("equal-rank replay flipped the row: status=%s title=%q", events[0].Status, events[0].Title)
+	}
+}
+
+func TestIngestAfterCloseAndConcurrentClose(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "wtc.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+
+	// Hammer Ingest from several goroutines while Close runs: must not
+	// panic (send on closed channel); late calls get ErrStoreClosed.
+	var wg sync.WaitGroup
+	for i := range 8 {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			for j := range 50 {
+				ev := testEvent(fmt.Sprintf("race:%d:%d", n, j), time.Now().UTC())
+				if _, _, err := s.Ingest(ctx, ev); err != nil && !errors.Is(err, ErrStoreClosed) {
+					t.Errorf("Ingest: unexpected error %v", err)
+					return
+				}
+			}
+		}(i)
+	}
+	time.Sleep(2 * time.Millisecond) // let some ingests land first
+	if err := s.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	wg.Wait()
+
+	if _, _, err := s.Ingest(ctx, testEvent("race:after", time.Now().UTC())); !errors.Is(err, ErrStoreClosed) {
+		t.Fatalf("Ingest after Close = %v, want ErrStoreClosed", err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatalf("second Close must be idempotent, got %v", err)
 	}
 }
 

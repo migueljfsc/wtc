@@ -61,9 +61,7 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
-		var apiErr struct {
-			Error string `json:"error"`
-		}
+		var apiErr server.ErrorResponse
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		if json.Unmarshal(data, &apiErr) == nil && apiErr.Error != "" {
 			return fmt.Errorf("server: %s (HTTP %d)", apiErr.Error, resp.StatusCode)

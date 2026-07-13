@@ -5,10 +5,25 @@ package generic
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/model"
 )
+
+// allowedSources are the sources a generic-ingest client may claim. github,
+// flux, and alertmanager are reserved for their own ingest paths so a bearer
+// token cannot spoof or overwrite rows those sources own.
+var allowedSources = map[model.Source]bool{
+	model.SourceGeneric:   true,
+	model.SourceManual:    true,
+	model.SourceHelm:      true,
+	model.SourceTerraform: true,
+}
+
+// reservedDedupPrefixes namespace the dedup keys of dedicated ingest paths
+// (SPEC §1). Generic clients may not collide with them.
+var reservedDedupPrefixes = []string{"gh:", "flux:", "am:"}
 
 // Request is the JSON body accepted by POST /ingest/generic — an Event
 // subset; the server fills id, ingested_at, and defaults.
@@ -56,10 +71,21 @@ func (r *Request) ToEvent(now time.Time) (*model.Event, error) {
 	if ev.Source == "" {
 		ev.Source = model.SourceGeneric
 	}
+	if !allowedSources[ev.Source] {
+		return nil, fmt.Errorf("source %q is reserved for its own ingest path (allowed: generic, manual, helm, terraform)", ev.Source)
+	}
 	if ev.Status == "" {
 		ev.Status = model.StatusUnknown
 	}
+	for _, prefix := range reservedDedupPrefixes {
+		if strings.HasPrefix(ev.DedupKey, prefix) {
+			return nil, fmt.Errorf("dedup_key prefix %q is reserved for its ingest path", prefix)
+		}
+	}
 	if ev.DedupKey == "" {
+		// No source-side identifier to derive from: a random key means this
+		// delivery is NOT idempotent — retries create new rows. Clients that
+		// need retry-safety must supply their own stable dedup_key.
 		ev.DedupKey = "generic:" + ev.ID
 	}
 

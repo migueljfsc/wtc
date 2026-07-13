@@ -10,7 +10,10 @@ import (
 )
 
 func newRecordCmd(flags *clientFlags) *cobra.Command {
-	var req generic.Request
+	var (
+		req        generic.Request
+		durationMS int64
+	)
 
 	cmd := &cobra.Command{
 		Use:   "record",
@@ -21,10 +24,14 @@ func newRecordCmd(flags *clientFlags) *cobra.Command {
 			if req.Source == "" {
 				req.Source = string(model.SourceManual)
 			}
-			// Stable client-side key so a retried command updates rather
-			// than duplicates (SPEC: wrap/record derive local:<id>).
+			// Default key is fresh per invocation: re-running the command
+			// creates a NEW event. Pass --dedup-key for idempotent retries
+			// or to update a previously recorded change.
 			if req.DedupKey == "" {
 				req.DedupKey = "local:" + model.NewID()
+			}
+			if cmd.Flags().Changed("duration-ms") {
+				req.DurationMS = &durationMS
 			}
 
 			resp, err := flags.resolve().IngestGeneric(cmd.Context(), req)
@@ -53,8 +60,10 @@ func newRecordCmd(flags *clientFlags) *cobra.Command {
 	f.StringVar(&req.Status, "status", "", "started|succeeded|failed|unknown (default unknown)")
 	f.StringVar(&req.TS, "ts", "", "event time, RFC3339 (default now)")
 	f.StringVar(&req.URL, "url", "", "deep link into the source system")
-	f.StringVar(&req.DedupKey, "dedup-key", "", "stable idempotency key (default local:<ulid>)")
-	f.StringVar(&req.Source, "source", "", "event source (default manual)")
+	f.StringVar(&req.DedupKey, "dedup-key", "", "stable idempotency key; pass the same value on retries to update instead of duplicate (default: fresh local:<ulid> per invocation)")
+	f.StringVar(&req.Source, "source", "", "event source: manual|generic|helm|terraform (default manual)")
+	f.Int64Var(&durationMS, "duration-ms", 0, "how long the change took, in milliseconds")
+	f.StringSliceVar(&req.Artifacts, "artifacts", nil, "produced artifacts, e.g. registry/app:tag (repeatable)")
 	_ = cmd.MarkFlagRequired("kind")
 	_ = cmd.MarkFlagRequired("title")
 

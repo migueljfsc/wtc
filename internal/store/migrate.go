@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -30,11 +29,12 @@ func migrate(db *sql.DB) error {
 		return fmt.Errorf("read schema version: %w", err)
 	}
 
+	// fs.ReadDir guarantees entries sorted by filename, so NNNN_ prefixes
+	// already give numeric application order.
 	entries, err := migrationsFS.ReadDir("migrations")
 	if err != nil {
 		return fmt.Errorf("read embedded migrations: %w", err)
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 
 	for _, entry := range entries {
 		name := entry.Name()

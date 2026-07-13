@@ -8,16 +8,17 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
-// Server holds the serve daemon settings.
+// Server holds the serve daemon settings. Fields for later phases (base_url,
+// capture_dir, sources, rules, retention) are added with the code that reads
+// them — dead config surface is a silent-no-op trap for operators.
 type Server struct {
-	Listen     string `yaml:"listen"`
-	DB         string `yaml:"db"`
-	BaseURL    string `yaml:"base_url"`
-	CaptureDir string `yaml:"capture_dir"`
+	Listen string `yaml:"listen"`
+	DB     string `yaml:"db"`
 }
 
 // Auth holds static bearer tokens accepted on /api/* and /ingest/generic.
@@ -25,8 +26,7 @@ type Auth struct {
 	APITokens []string `yaml:"api_tokens"`
 }
 
-// Config is the full wtc.yaml. Sections for sources/rules/tag_patterns/
-// retention are added in the phases that implement them.
+// Config is the full wtc.yaml.
 type Config struct {
 	Server Server `yaml:"server"`
 	Auth   Auth   `yaml:"auth"`
@@ -45,11 +45,25 @@ func Default() Config {
 // varPattern matches ${VAR} only — a bare $ (e.g. in a regex) is left alone.
 var varPattern = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
 
-func expandVars(raw []byte) []byte {
-	return varPattern.ReplaceAllFunc(raw, func(m []byte) []byte {
-		name := varPattern.FindSubmatch(m)[1]
-		return []byte(os.Getenv(string(name)))
+// expandVars substitutes ${VAR} from the environment. Referencing an UNSET
+// variable is an error: silently expanding to "" turns `db: ${WTC_DB_PATH}`
+// into an ephemeral temp database and the ledger vanishes on restart. A
+// variable explicitly set to the empty string is allowed (e.g. optional
+// tokens, which Load filters out).
+func expandVars(raw []byte) ([]byte, error) {
+	var missing []string
+	expanded := varPattern.ReplaceAllFunc(raw, func(m []byte) []byte {
+		name := string(m[2 : len(m)-1]) // strip "${" and "}"
+		val, ok := os.LookupEnv(name)
+		if !ok {
+			missing = append(missing, name)
+		}
+		return []byte(val)
 	})
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("config references unset environment variable(s): %s", strings.Join(missing, ", "))
+	}
+	return expanded, nil
 }
 
 // Load reads path, expands ${VAR}, unmarshals over defaults, then applies
@@ -61,7 +75,11 @@ func Load(path string, optional bool) (*Config, error) {
 	raw, err := os.ReadFile(path)
 	switch {
 	case err == nil:
-		if err := yaml.Unmarshal(expandVars(raw), &cfg); err != nil {
+		expanded, err := expandVars(raw)
+		if err != nil {
+			return nil, fmt.Errorf("config %s: %w", path, err)
+		}
+		if err := yaml.Unmarshal(expanded, &cfg); err != nil {
 			return nil, fmt.Errorf("parse config %s: %w", path, err)
 		}
 	case os.IsNotExist(err) && optional:
@@ -72,9 +90,16 @@ func Load(path string, optional bool) (*Config, error) {
 
 	applyEnvOverrides(&cfg)
 
-	// Drop tokens that expanded to empty strings so an unset ${VAR} cannot
-	// silently become an accept-anything credential.
+	// Drop tokens that are empty strings so an intentionally-empty ${VAR}
+	// cannot become an accept-anything credential.
 	cfg.Auth.APITokens = slices.DeleteFunc(cfg.Auth.APITokens, func(t string) bool { return t == "" })
+
+	if cfg.Server.Listen == "" {
+		return nil, fmt.Errorf("config %s: server.listen must not be empty", path)
+	}
+	if cfg.Server.DB == "" {
+		return nil, fmt.Errorf("config %s: server.db must not be empty", path)
+	}
 
 	return &cfg, nil
 }
@@ -89,8 +114,6 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	set(&cfg.Server.Listen, "WTC_SERVER_LISTEN")
 	set(&cfg.Server.DB, "WTC_SERVER_DB")
-	set(&cfg.Server.BaseURL, "WTC_SERVER_BASE_URL")
-	set(&cfg.Server.CaptureDir, "WTC_SERVER_CAPTURE_DIR")
 
 	if v, ok := os.LookupEnv("WTC_API_TOKEN"); ok && v != "" {
 		if !slices.Contains(cfg.Auth.APITokens, v) {

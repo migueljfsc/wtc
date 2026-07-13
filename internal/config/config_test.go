@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -36,6 +37,7 @@ func TestLoadMissingRequired(t *testing.T) {
 
 func TestLoadFileAndVarExpansion(t *testing.T) {
 	t.Setenv("TEST_WTC_TOKEN", "sekrit")
+	t.Setenv("TEST_WTC_EMPTY_TOKEN", "") // set-but-empty is allowed and filtered
 	path := writeFile(t, `
 server:
   listen: ":9999"
@@ -43,7 +45,7 @@ server:
 auth:
   api_tokens:
     - ${TEST_WTC_TOKEN}
-    - ${TEST_WTC_UNSET_TOKEN}
+    - ${TEST_WTC_EMPTY_TOKEN}
 `)
 	cfg, err := Load(path, false)
 	if err != nil {
@@ -57,17 +59,55 @@ auth:
 	}
 }
 
+func TestUnsetVarIsError(t *testing.T) {
+	path := writeFile(t, `
+server:
+  db: ${TEST_WTC_DEFINITELY_UNSET_DB}
+`)
+	_, err := Load(path, false)
+	if err == nil {
+		t.Fatal("Load with unset ${VAR}: want error (silent empty expansion loses the ledger), got nil")
+	}
+	if !strings.Contains(err.Error(), "TEST_WTC_DEFINITELY_UNSET_DB") {
+		t.Errorf("error %q must name the unset variable", err)
+	}
+}
+
+func TestEmptyCriticalFieldsRejected(t *testing.T) {
+	for _, body := range []string{
+		"server:\n  db: \"\"\n",
+		"server:\n  listen: \"\"\n",
+	} {
+		path := writeFile(t, body)
+		if _, err := Load(path, false); err == nil {
+			t.Errorf("Load(%q): want error for empty critical field, got nil", body)
+		}
+	}
+
+	// A var set to "" expands to YAML null, which yaml.v3 skips — the
+	// default survives. Safe (never an empty path), just worth pinning.
+	t.Setenv("TEST_WTC_EMPTY", "")
+	path := writeFile(t, "server:\n  db: ${TEST_WTC_EMPTY}\n")
+	cfg, err := Load(path, false)
+	if err != nil {
+		t.Fatalf("Load with empty-expanded db: %v", err)
+	}
+	if cfg.Server.DB != "./wtc.db" {
+		t.Errorf("DB = %q, want default ./wtc.db when expansion yields null", cfg.Server.DB)
+	}
+}
+
 func TestBareDollarUntouched(t *testing.T) {
 	path := writeFile(t, `
 server:
-  base_url: "http://x/$notavar-and-${}-stay"
+  db: "/data/$notavar-and-${}-stay.db"
 `)
 	cfg, err := Load(path, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Server.BaseURL != "http://x/$notavar-and-${}-stay" {
-		t.Errorf("BaseURL = %q, bare $ must be preserved", cfg.Server.BaseURL)
+	if cfg.Server.DB != "/data/$notavar-and-${}-stay.db" {
+		t.Errorf("DB = %q, bare $ must be preserved", cfg.Server.DB)
 	}
 }
 

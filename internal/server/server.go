@@ -37,14 +37,20 @@ func (s *Server) Handler() http.Handler {
 	return s.logRequests(s.mux)
 }
 
-func writeJSON(w http.ResponseWriter, log *slog.Logger, code int, v any) {
+// ErrorResponse is the wire shape of every error reply. Shared with the CLI
+// client so the contract cannot drift.
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+func (s *Server) writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		log.Error("write response", "error", err)
+		s.log.Error("write response", "error", err)
 	}
 }
 
 func (s *Server) writeError(w http.ResponseWriter, code int, msg string) {
-	writeJSON(w, s.log, code, map[string]string{"error": msg})
+	s.writeJSON(w, code, ErrorResponse{Error: msg})
 }
