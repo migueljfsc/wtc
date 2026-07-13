@@ -4,6 +4,38 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 1 (GitHub ingest, poller-primary)
+
+- **GitHub API poller** — primary ingest for private deployments (no public
+  endpoint needed): workflow runs, merged PRs, default-branch commits per
+  configured repo; per-(repo,resource) monotonic watermarks (migration 0002);
+  bounded 24h first-run backfill; 1h overlap re-reads so in-progress runs get
+  their terminal status; idempotent by dedup key, doubling as the
+  webhook-loss sweeper.
+- **Normalizers** built against real captured fixtures (`testdata/github/rest/`,
+  8 payloads incl. a full queued→in_progress→completed lifecycle):
+  `workflow_run` → build (status/conclusion mapping, duration, run_attempt in
+  dedup key), merged PR → merge, commit → push. Parsers never guess env.
+- **Rules engine** (SPEC §3): ordered rules, `*`/`**` globs, first-writer-wins
+  per field, template funcs (`trimPrefix`/`trimSuffix`/`lower`/`regexReplace`),
+  truncated path lists skip path rules instead of mis-routing.
+- `POST /ingest/github`: `X-Hub-Signature-256` verification (constant-time,
+  fail-closed) + delivery capture; envelope normalization deferred until
+  webhook fixtures exist.
+- **Capture mode** (`--capture-dir` / `server.capture_dir`): dumps raw ingest
+  bodies + headers per source for fixture freezing.
+- `wtc doctor` + `GET /api/doctor`: per-source last-event age and 24h counts,
+  unmapped-env count with samples, clock-skew flags, db size, poller
+  watermarks; `--max-silence` exits non-zero for silent sources.
+- `wtc init`: scaffolds a commented wtc.yaml and prints the wiring checklist.
+- `sources.github` config (token, poll interval, repos, infra_path, webhook
+  secret), `rules:` section, YAML duration type.
+- Docs: `docs/setup/github-poller.md`, `docs/setup/github-webhook.md`.
+
+Live-verified against migueljfsc/{wtc,portfolio,aws-app-platform,
+motorcycle-journey}: events visible within one poll interval; a second sweep
+adds zero duplicate rows.
+
 ### Added — Phase 0 (skeleton)
 
 - Go module, Makefile, GitHub Actions CI (build + vet + test + lint).

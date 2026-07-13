@@ -204,6 +204,49 @@ func TestIngestRedactsSecrets(t *testing.T) {
 	}
 }
 
+func TestDoctorEndpoint(t *testing.T) {
+	ts := newTestServer(t)
+
+	// Unauthenticated → 401.
+	resp, _ := doRequest(t, http.MethodGet, ts.URL+"/api/doctor", "", nil)
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("doctor without token = %d, want 401", resp.StatusCode)
+	}
+
+	// Seed one unmapped event, then check the report.
+	event := []byte(`{"kind":"manual","title":"orphan change","dedup_key":"e2e:doc1"}`)
+	if resp, body := doRequest(t, http.MethodPost, ts.URL+"/ingest/generic", testToken, event); resp.StatusCode != http.StatusCreated {
+		t.Fatalf("seed ingest = %d %s", resp.StatusCode, body)
+	}
+
+	resp, body := doRequest(t, http.MethodGet, ts.URL+"/api/doctor", testToken, nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("doctor = %d %s", resp.StatusCode, body)
+	}
+	var report struct {
+		TotalEvents int64 `json:"total_events"`
+		DBSizeBytes int64 `json:"db_size_bytes"`
+		Sources     []struct {
+			Source   string `json:"source"`
+			Count24h int    `json:"count_24h"`
+		} `json:"sources"`
+		Unmapped24h     int      `json:"unmapped_24h"`
+		UnmappedSamples []string `json:"unmapped_samples"`
+	}
+	if err := json.Unmarshal(body, &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.TotalEvents != 1 || report.DBSizeBytes <= 0 {
+		t.Errorf("totals = %+v", report)
+	}
+	if len(report.Sources) != 1 || report.Sources[0].Source != "generic" || report.Sources[0].Count24h != 1 {
+		t.Errorf("sources = %+v", report.Sources)
+	}
+	if report.Unmapped24h != 1 || len(report.UnmappedSamples) != 1 || report.UnmappedSamples[0] != "orphan change" {
+		t.Errorf("unmapped = %d samples=%v, want the env-less event surfaced", report.Unmapped24h, report.UnmappedSamples)
+	}
+}
+
 func TestFailClosedWithoutTokens(t *testing.T) {
 	st, err := store.Open(filepath.Join(t.TempDir(), "wtc.db"))
 	if err != nil {
