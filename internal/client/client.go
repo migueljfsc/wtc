@@ -15,6 +15,7 @@ import (
 
 	"github.com/migueljfsc/wtc/internal/ingest/generic"
 	"github.com/migueljfsc/wtc/internal/server"
+	"github.com/migueljfsc/wtc/internal/store"
 )
 
 // Client talks to a running `wtc serve`.
@@ -92,5 +93,12 @@ func (c *Client) Events(ctx context.Context, params url.Values) (server.EventsRe
 		path += "?" + params.Encode()
 	}
 	err := c.do(ctx, http.MethodGet, path, nil, &out)
+	return out, err
+}
+
+// Doctor fetches the source-health report.
+func (c *Client) Doctor(ctx context.Context) (store.DoctorReport, error) {
+	var out store.DoctorReport
+	err := c.do(ctx, http.MethodGet, "/api/doctor", nil, &out)
 	return out, err
 }

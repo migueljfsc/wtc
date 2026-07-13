@@ -61,6 +61,16 @@ func (s *Server) handleIngestGeneric(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, code, IngestResponse{ID: id, Deduped: deduped})
 }
 
+func (s *Server) handleDoctor(w http.ResponseWriter, r *http.Request) {
+	report, err := s.store.Doctor(r.Context(), time.Now())
+	if err != nil {
+		s.log.Error("doctor", "error", err)
+		s.writeError(w, http.StatusInternalServerError, "doctor query error")
+		return
+	}
+	s.writeJSON(w, http.StatusOK, report)
+}
+
 // EventsResponse is the paginated /api/events reply.
 type EventsResponse struct {
 	Events     []model.Event `json:"events"`
