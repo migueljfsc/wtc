@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
 
+	"github.com/migueljfsc/wtc/internal/ingest/flux"
+	"github.com/migueljfsc/wtc/internal/normalize"
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
@@ -17,18 +20,30 @@ type Options struct {
 	// GitHubWebhookSecret enables /ingest/github HMAC verification; empty
 	// means the endpoint rejects everything (fail closed).
 	GitHubWebhookSecret string
+	// FluxHMACKey enables /ingest/flux generic-hmac verification; empty
+	// means the endpoint rejects everything (fail closed).
+	FluxHMACKey string
+	// FluxSuppression drops repeats of the same flux dedup key inside this
+	// window (trap #1). <= 0 disables.
+	FluxSuppression time.Duration
+	// Engine runs the normalization rules on webhook-ingested events; nil
+	// means an empty rule set.
+	Engine *normalize.Engine
 	// CaptureDir, when non-empty, dumps every raw ingest body to disk.
 	CaptureDir string
 }
 
 // Server routes ingest and query requests onto a Store.
 type Server struct {
-	store         *store.Store
-	tokens        []string
-	webhookSecret string
-	captureDir    string
-	log           *slog.Logger
-	mux           *http.ServeMux
+	store          *store.Store
+	tokens         []string
+	webhookSecret  string
+	fluxHMACKey    string
+	fluxSuppressor *flux.Suppressor
+	engine         *normalize.Engine
+	captureDir     string
+	log            *slog.Logger
+	mux            *http.ServeMux
 }
 
 // New builds the HTTP surface.
@@ -36,18 +51,26 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 	if log == nil {
 		log = slog.Default()
 	}
+	engine := opts.Engine
+	if engine == nil {
+		engine, _ = normalize.NewEngine(nil) // empty rule set cannot fail
+	}
 	s := &Server{
-		store:         st,
-		tokens:        opts.Tokens,
-		webhookSecret: opts.GitHubWebhookSecret,
-		captureDir:    opts.CaptureDir,
-		log:           log,
-		mux:           http.NewServeMux(),
+		store:          st,
+		tokens:         opts.Tokens,
+		webhookSecret:  opts.GitHubWebhookSecret,
+		fluxHMACKey:    opts.FluxHMACKey,
+		fluxSuppressor: flux.NewSuppressor(opts.FluxSuppression),
+		engine:         engine,
+		captureDir:     opts.CaptureDir,
+		log:            log,
+		mux:            http.NewServeMux(),
 	}
 
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
 	s.mux.Handle("POST /ingest/generic", s.requireBearer(http.HandlerFunc(s.handleIngestGeneric)))
 	s.mux.HandleFunc("POST /ingest/github", s.handleIngestGitHub) // HMAC-verified inside
+	s.mux.HandleFunc("POST /ingest/flux", s.handleIngestFlux)     // HMAC-verified inside
 	s.mux.Handle("GET /api/events", s.requireBearer(http.HandlerFunc(s.handleListEvents)))
 	s.mux.Handle("GET /api/doctor", s.requireBearer(http.HandlerFunc(s.handleDoctor)))
 
