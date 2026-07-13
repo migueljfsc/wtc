@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func writeFile(t *testing.T, content string) string {
@@ -108,6 +109,41 @@ server:
 	}
 	if cfg.Server.DB != "/data/$notavar-and-${}-stay.db" {
 		t.Errorf("DB = %q, bare $ must be preserved", cfg.Server.DB)
+	}
+}
+
+func TestGitHubSourceConfig(t *testing.T) {
+	t.Setenv("TEST_WTC_GH_TOKEN", "ghtok")
+	path := writeFile(t, `
+sources:
+  github:
+    api_token: ${TEST_WTC_GH_TOKEN}
+    poll_interval: 90s
+    repos: [org/app-api, org/app-web]
+`)
+	cfg, err := Load(path, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gh := cfg.Sources.GitHub
+	if gh.APIToken != "ghtok" {
+		t.Errorf("APIToken = %q", gh.APIToken)
+	}
+	if gh.PollInterval.Std() != 90*time.Second {
+		t.Errorf("PollInterval = %v, want 90s", gh.PollInterval.Std())
+	}
+	if len(gh.Repos) != 2 || gh.Repos[0] != "org/app-api" {
+		t.Errorf("Repos = %v", gh.Repos)
+	}
+	// Defaults survive partial config.
+	if gh.InfraPath != "infrastructure/" {
+		t.Errorf("InfraPath = %q, want default infrastructure/", gh.InfraPath)
+	}
+
+	// Bad duration is a load error, not a silent zero.
+	bad := writeFile(t, "sources:\n  github:\n    poll_interval: fast\n")
+	if _, err := Load(bad, false); err == nil {
+		t.Error("Load with poll_interval 'fast': want error")
 	}
 }
 

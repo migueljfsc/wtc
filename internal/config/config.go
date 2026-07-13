@@ -9,16 +9,38 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
+// Duration wraps time.Duration with YAML support for "60s"/"10m" strings.
+type Duration time.Duration
+
+// UnmarshalYAML implements yaml.Unmarshaler.
+func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
+	var s string
+	if err := value.Decode(&s); err != nil {
+		return fmt.Errorf("duration must be a string like \"60s\": %w", err)
+	}
+	parsed, err := time.ParseDuration(s)
+	if err != nil {
+		return fmt.Errorf("parse duration %q: %w", s, err)
+	}
+	*d = Duration(parsed)
+	return nil
+}
+
+// Std returns the underlying time.Duration.
+func (d Duration) Std() time.Duration { return time.Duration(d) }
+
 // Server holds the serve daemon settings. Fields for later phases (base_url,
-// capture_dir, sources, rules, retention) are added with the code that reads
-// them — dead config surface is a silent-no-op trap for operators.
+// retention) are added with the code that reads them — dead config surface is
+// a silent-no-op trap for operators.
 type Server struct {
-	Listen string `yaml:"listen"`
-	DB     string `yaml:"db"`
+	Listen     string `yaml:"listen"`
+	DB         string `yaml:"db"`
+	CaptureDir string `yaml:"capture_dir"` // non-empty => dump raw ingest bodies (dev only)
 }
 
 // Auth holds static bearer tokens accepted on /api/* and /ingest/generic.
@@ -26,10 +48,26 @@ type Auth struct {
 	APITokens []string `yaml:"api_tokens"`
 }
 
+// GitHub configures the GitHub ingest paths (SPEC §2). The poller is the
+// primary path for private deployments; webhooks need a public endpoint.
+type GitHub struct {
+	WebhookSecret string   `yaml:"webhook_secret"` // enables /ingest/github HMAC verification
+	APIToken      string   `yaml:"api_token"`      // enables the poller + PR-diff enrichment
+	PollInterval  Duration `yaml:"poll_interval"`  // 0 disables the poller (webhook-only mode)
+	Repos         []string `yaml:"repos"`          // poller scope, owner/name
+	InfraPath     string   `yaml:"infra_path"`     // per-repo manifests dir (microservices layout)
+}
+
+// Sources groups per-source ingest configuration.
+type Sources struct {
+	GitHub GitHub `yaml:"github"`
+}
+
 // Config is the full wtc.yaml.
 type Config struct {
-	Server Server `yaml:"server"`
-	Auth   Auth   `yaml:"auth"`
+	Server  Server  `yaml:"server"`
+	Auth    Auth    `yaml:"auth"`
+	Sources Sources `yaml:"sources"`
 }
 
 // Default returns the config used when no file or overrides are present.
@@ -38,6 +76,12 @@ func Default() Config {
 		Server: Server{
 			Listen: ":8484",
 			DB:     "./wtc.db",
+		},
+		Sources: Sources{
+			GitHub: GitHub{
+				PollInterval: Duration(60 * time.Second),
+				InfraPath:    "infrastructure/",
+			},
 		},
 	}
 }
@@ -114,6 +158,9 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	set(&cfg.Server.Listen, "WTC_SERVER_LISTEN")
 	set(&cfg.Server.DB, "WTC_SERVER_DB")
+	set(&cfg.Server.CaptureDir, "WTC_SERVER_CAPTURE_DIR")
+	set(&cfg.Sources.GitHub.APIToken, "WTC_GH_API_TOKEN")
+	set(&cfg.Sources.GitHub.WebhookSecret, "WTC_GH_WEBHOOK_SECRET")
 
 	if v, ok := os.LookupEnv("WTC_API_TOKEN"); ok && v != "" {
 		if !slices.Contains(cfg.Auth.APITokens, v) {

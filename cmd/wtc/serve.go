@@ -14,12 +14,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/migueljfsc/wtc/internal/config"
+	"github.com/migueljfsc/wtc/internal/ingest/github"
 	"github.com/migueljfsc/wtc/internal/server"
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
 func newServeCmd() *cobra.Command {
-	var configPath string
+	var configPath, captureDir string
 
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -27,19 +28,26 @@ func newServeCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// A config file is optional unless --config was given explicitly.
 			explicit := cmd.Flags().Changed("config")
-			return runServe(configPath, !explicit)
+			return runServe(configPath, !explicit, captureDir)
 		},
 	}
 	cmd.Flags().StringVar(&configPath, "config", "wtc.yaml", "path to wtc.yaml")
+	cmd.Flags().StringVar(&captureDir, "capture-dir", "", "dump raw ingest bodies here for fixture capture (dev only; overrides server.capture_dir)")
 	return cmd
 }
 
-func runServe(configPath string, configOptional bool) error {
+func runServe(configPath string, configOptional bool, captureDir string) error {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 	cfg, err := config.Load(configPath, configOptional)
 	if err != nil {
 		return err
+	}
+	if captureDir != "" {
+		cfg.Server.CaptureDir = captureDir
+	}
+	if cfg.Server.CaptureDir != "" {
+		log.Warn("capture mode ON — raw ingest bodies are written to disk", "dir", cfg.Server.CaptureDir)
 	}
 	if len(cfg.Auth.APITokens) == 0 {
 		log.Warn("no api_tokens configured — /api/* and /ingest/generic will reject all requests")
@@ -57,13 +65,29 @@ func runServe(configPath string, configOptional bool) error {
 	}
 
 	httpSrv := &http.Server{
-		Addr:              cfg.Server.Listen,
-		Handler:           server.New(st, cfg.Auth.APITokens, log).Handler(),
+		Addr: cfg.Server.Listen,
+		Handler: server.New(st, server.Options{
+			Tokens:              cfg.Auth.APITokens,
+			GitHubWebhookSecret: cfg.Sources.GitHub.WebhookSecret,
+			CaptureDir:          cfg.Server.CaptureDir,
+		}, log).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// GitHub API poller — primary GitHub ingest for private deployments.
+	if gh := cfg.Sources.GitHub; gh.APIToken != "" && len(gh.Repos) > 0 && gh.PollInterval.Std() > 0 {
+		poller := github.NewPoller(
+			github.NewClient(gh.APIToken, ""),
+			st, gh.Repos, gh.PollInterval.Std(), cfg.Server.CaptureDir, log,
+		)
+		go poller.Run(ctx)
+	} else {
+		log.Info("github poller disabled",
+			"has_token", gh.APIToken != "", "repos", len(gh.Repos), "interval", gh.PollInterval.Std())
+	}
 
 	errCh := make(chan error, 1)
 	go func() {
