@@ -4,6 +4,24 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 2 (Flux ingest)
+
+- `POST /ingest/flux`: generic-hmac verification (`X-Signature: sha256=<hex>`,
+  constant-time, fail-closed; format pinned by real captured deliveries).
+- Flux normalizer built against fixtures captured from a live kind cluster
+  running Flux v2.9 (`testdata/flux/`): Kustomization reconcile success +
+  failure, HelmRelease install. severity → status; `master@sha1:<sha>`
+  revisions extracted into `ref` (the `wtc where` join); chart versions land
+  in `artifact`; Alert `eventMetadata.cluster` → cluster field → env via rules.
+- Suppression window (trap #1): re-emits of the same (object, revision,
+  reason) are shed in-memory before the write path; the strict-rank dedup
+  upsert remains the correctness backstop. Live-verified: 6 notification
+  deliveries → 1 row.
+- `sources.flux` config (hmac_key, suppression_window), rules applied on the
+  webhook path, docs: `docs/setup/flux.md` + `flux-provider.yaml`.
+- Deferred pending capture on a real cluster: ImageUpdateAutomation events
+  (git side of image automation already covered by GitHub push ingest).
+
 ### Added — Phase 1 (GitHub ingest, poller-primary)
 
 - **GitHub API poller** — primary ingest for private deployments (no public

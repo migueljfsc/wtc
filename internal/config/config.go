@@ -60,9 +60,16 @@ type GitHub struct {
 	InfraPath     string   `yaml:"infra_path"`     // per-repo manifests dir (microservices layout)
 }
 
+// Flux configures the notification-controller ingest path (SPEC §2).
+type Flux struct {
+	HMACKey           string   `yaml:"hmac_key"`           // generic-hmac provider shared key
+	SuppressionWindow Duration `yaml:"suppression_window"` // drop repeats of (object,revision,reason) inside this window
+}
+
 // Sources groups per-source ingest configuration.
 type Sources struct {
 	GitHub GitHub `yaml:"github"`
+	Flux   Flux   `yaml:"flux"`
 }
 
 // Config is the full wtc.yaml.
@@ -84,6 +91,9 @@ func Default() Config {
 			GitHub: GitHub{
 				PollInterval: Duration(60 * time.Second),
 				InfraPath:    "infrastructure/",
+			},
+			Flux: Flux{
+				SuppressionWindow: Duration(10 * time.Minute),
 			},
 		},
 	}
@@ -164,6 +174,7 @@ func applyEnvOverrides(cfg *Config) {
 	set(&cfg.Server.CaptureDir, "WTC_SERVER_CAPTURE_DIR")
 	set(&cfg.Sources.GitHub.APIToken, "WTC_GH_API_TOKEN")
 	set(&cfg.Sources.GitHub.WebhookSecret, "WTC_GH_WEBHOOK_SECRET")
+	set(&cfg.Sources.Flux.HMACKey, "WTC_FLUX_HMAC_KEY")
 
 	if v, ok := os.LookupEnv("WTC_API_TOKEN"); ok && v != "" {
 		if !slices.Contains(cfg.Auth.APITokens, v) {

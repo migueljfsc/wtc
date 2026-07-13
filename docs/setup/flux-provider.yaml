@@ -1,0 +1,45 @@
+# Flux → wtc wiring, one per cluster. Verified against notification-controller
+# v1beta3 (Flux v2.9) with real captured deliveries.
+#
+# 1. Replace CHANGE-ME with the same value as sources.flux.hmac_key in wtc.yaml
+#    (prefer: create the secret out-of-band instead of committing it).
+# 2. Set spec.address to your wtc /ingest/flux URL reachable FROM the cluster.
+# 3. Set eventMetadata.cluster to this cluster's name — it is how wtc knows
+#    which cluster (and via rules, which env) an event belongs to.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: wtc-hmac
+  namespace: flux-system
+stringData:
+  token: CHANGE-ME
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Provider
+metadata:
+  name: wtc
+  namespace: flux-system
+spec:
+  type: generic-hmac
+  address: http://wtc.wtc-system.svc.cluster.local:8484/ingest/flux
+  secretRef:
+    name: wtc-hmac
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Alert
+metadata:
+  name: wtc
+  namespace: flux-system
+spec:
+  providerRef:
+    name: wtc
+  eventSeverity: info        # info includes error events
+  eventSources:
+    - kind: Kustomization
+      name: '*'
+    - kind: HelmRelease
+      name: '*'
+    - kind: ImageUpdateAutomation
+      name: '*'
+  eventMetadata:
+    cluster: prod            # <- this cluster's name; rules map it to env

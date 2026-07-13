@@ -65,19 +65,6 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 		return err
 	}
 
-	httpSrv := &http.Server{
-		Addr: cfg.Server.Listen,
-		Handler: server.New(st, server.Options{
-			Tokens:              cfg.Auth.APITokens,
-			GitHubWebhookSecret: cfg.Sources.GitHub.WebhookSecret,
-			CaptureDir:          cfg.Server.CaptureDir,
-		}, log).Handler(),
-		ReadHeaderTimeout: 10 * time.Second,
-	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
 	// Rules engine — compiled once; config errors surface at startup.
 	engine, err := normalize.NewEngine(cfg.Rules)
 	if err != nil {
@@ -87,6 +74,22 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 	if len(cfg.Rules) == 0 {
 		log.Warn("no rules configured — events will land with env=\"\" (see wtc doctor)")
 	}
+
+	httpSrv := &http.Server{
+		Addr: cfg.Server.Listen,
+		Handler: server.New(st, server.Options{
+			Tokens:              cfg.Auth.APITokens,
+			GitHubWebhookSecret: cfg.Sources.GitHub.WebhookSecret,
+			FluxHMACKey:         cfg.Sources.Flux.HMACKey,
+			FluxSuppression:     cfg.Sources.Flux.SuppressionWindow.Std(),
+			Engine:              engine,
+			CaptureDir:          cfg.Server.CaptureDir,
+		}, log).Handler(),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	// GitHub API poller — primary GitHub ingest for private deployments.
 	if gh := cfg.Sources.GitHub; gh.APIToken != "" && len(gh.Repos) > 0 && gh.PollInterval.Std() > 0 {
