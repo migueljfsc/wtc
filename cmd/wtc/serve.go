@@ -15,6 +15,7 @@ import (
 
 	"github.com/migueljfsc/wtc/internal/config"
 	"github.com/migueljfsc/wtc/internal/ingest/github"
+	"github.com/migueljfsc/wtc/internal/normalize"
 	"github.com/migueljfsc/wtc/internal/server"
 	"github.com/migueljfsc/wtc/internal/store"
 )
@@ -77,11 +78,21 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// Rules engine — compiled once; config errors surface at startup.
+	engine, err := normalize.NewEngine(cfg.Rules)
+	if err != nil {
+		_ = st.Close()
+		return fmt.Errorf("rules: %w", err)
+	}
+	if len(cfg.Rules) == 0 {
+		log.Warn("no rules configured — events will land with env=\"\" (see wtc doctor)")
+	}
+
 	// GitHub API poller — primary GitHub ingest for private deployments.
 	if gh := cfg.Sources.GitHub; gh.APIToken != "" && len(gh.Repos) > 0 && gh.PollInterval.Std() > 0 {
 		poller := github.NewPoller(
 			github.NewClient(gh.APIToken, ""),
-			st, gh.Repos, gh.PollInterval.Std(), cfg.Server.CaptureDir, log,
+			st, engine, gh.Repos, gh.PollInterval.Std(), cfg.Server.CaptureDir, log,
 		)
 		go poller.Run(ctx)
 	} else {

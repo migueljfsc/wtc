@@ -2,27 +2,35 @@ package github
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"time"
 
+	"github.com/migueljfsc/wtc/internal/model"
+	"github.com/migueljfsc/wtc/internal/normalize"
 	"github.com/migueljfsc/wtc/internal/server"
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
-// backfillWindow bounds the first poll of a repo with no stored watermark so
-// a fresh install doesn't try to ingest the repo's whole history.
-const backfillWindow = 24 * time.Hour
+const (
+	// backfillWindow bounds the first poll of a repo with no stored
+	// watermark so a fresh install doesn't ingest the repo's whole history.
+	backfillWindow = 24 * time.Hour
+	// overlap is subtracted from the watermark on every query so runs that
+	// were still in progress when last seen get their terminal state, and
+	// borderline timestamps are never skipped. Dedup makes re-ingest free.
+	overlap = time.Hour
+)
 
 // Poller periodically pulls workflow runs, merged PRs, and default-branch
 // commits for the configured repos and feeds them through the normalization
 // pipeline. Idempotent by dedup_key, so it doubles as the webhook-loss
 // sweeper and can run alongside webhooks.
-//
-// P1 step 0: the loop, watermarking, and capture are live; normalization is
-// wired in step 2 once fixtures are frozen.
 type Poller struct {
 	client     *Client
 	store      *store.Store
+	engine     *normalize.Engine
 	repos      []string
 	interval   time.Duration
 	captureDir string
@@ -30,13 +38,14 @@ type Poller struct {
 }
 
 // NewPoller wires a poller; captureDir "" disables capture.
-func NewPoller(client *Client, st *store.Store, repos []string, interval time.Duration, captureDir string, log *slog.Logger) *Poller {
+func NewPoller(client *Client, st *store.Store, engine *normalize.Engine, repos []string, interval time.Duration, captureDir string, log *slog.Logger) *Poller {
 	if log == nil {
 		log = slog.Default()
 	}
 	return &Poller{
 		client:     client,
 		store:      st,
+		engine:     engine,
 		repos:      repos,
 		interval:   interval,
 		captureDir: captureDir,
@@ -51,7 +60,7 @@ func (p *Poller) Run(ctx context.Context) {
 	defer ticker.Stop()
 
 	for {
-		p.sweep(ctx)
+		p.Sweep(ctx)
 		select {
 		case <-ctx.Done():
 			p.log.Info("github poller stopping")
@@ -61,9 +70,9 @@ func (p *Poller) Run(ctx context.Context) {
 	}
 }
 
-// sweep polls every (repo, resource) pair once. Failures are logged and
+// Sweep polls every (repo, resource) pair once. Failures are logged and
 // skipped — the watermark only advances on success, so nothing is lost.
-func (p *Poller) sweep(ctx context.Context) {
+func (p *Poller) Sweep(ctx context.Context) {
 	for _, repo := range p.repos {
 		for _, res := range []string{"runs", "prs", "commits"} {
 			if err := p.pollResource(ctx, repo, res); err != nil {
@@ -77,13 +86,14 @@ func (p *Poller) sweep(ctx context.Context) {
 }
 
 func (p *Poller) pollResource(ctx context.Context, repo, resource string) error {
-	since, err := p.store.PollWatermark(ctx, repo, resource)
+	watermark, err := p.store.PollWatermark(ctx, repo, resource)
 	if err != nil {
 		return err
 	}
-	if since.IsZero() {
-		since = time.Now().Add(-backfillWindow)
+	if watermark.IsZero() {
+		watermark = time.Now().Add(-backfillWindow)
 	}
+	since := watermark.Add(-overlap)
 
 	var raw []byte
 	switch resource {
@@ -104,9 +114,78 @@ func (p *Poller) pollResource(ctx context.Context, repo, resource string) error 
 		}
 	}
 
-	// Step 2 (post-fixtures): decode raw, normalize each item through the
-	// shared parsers + rules engine, Ingest, then advance the watermark to
-	// the newest source timestamp successfully stored.
-	p.log.Debug("polled", "repo", repo, "resource", resource, "bytes", len(raw))
+	newest, stored, err := p.ingest(ctx, repo, resource, raw, since)
+	if err != nil {
+		return err
+	}
+	if stored > 0 {
+		p.log.Info("polled", "repo", repo, "resource", resource, "stored", stored)
+	}
+	if newest.After(watermark) {
+		return p.store.SetPollWatermark(ctx, repo, resource, newest)
+	}
 	return nil
+}
+
+// ingest decodes raw, normalizes every item through the shared parsers +
+// rules engine, and stores them. Returns the newest source timestamp seen so
+// the watermark can advance.
+func (p *Poller) ingest(ctx context.Context, repo, resource string, raw []byte, since time.Time) (newest time.Time, stored int, err error) {
+	var pairs []eventFacts
+	switch resource {
+	case "runs":
+		var list restWorkflowRunList
+		if err := json.Unmarshal(raw, &list); err != nil {
+			return newest, 0, fmt.Errorf("decode runs: %w", err)
+		}
+		for _, run := range list.WorkflowRuns {
+			ev, facts := NormalizeWorkflowRun(run, time.Now())
+			pairs = append(pairs, eventFacts{ev, facts})
+		}
+	case "prs":
+		var list []restPullRequest
+		if err := json.Unmarshal(raw, &list); err != nil {
+			return newest, 0, fmt.Errorf("decode prs: %w", err)
+		}
+		for _, pr := range list {
+			// No server-side merged/since filter exists: drop unmerged and
+			// pre-window PRs here.
+			if pr.MergedAt == nil || pr.MergedAt.Before(since) {
+				continue
+			}
+			ev, facts := NormalizeMergedPR(pr, repo, time.Now())
+			if ev != nil {
+				pairs = append(pairs, eventFacts{ev, facts})
+			}
+		}
+	case "commits":
+		var list []restCommit
+		if err := json.Unmarshal(raw, &list); err != nil {
+			return newest, 0, fmt.Errorf("decode commits: %w", err)
+		}
+		for _, c := range list {
+			ev, facts := NormalizeCommit(c, repo, time.Now())
+			pairs = append(pairs, eventFacts{ev, facts})
+		}
+	}
+
+	for _, pf := range pairs {
+		if err := p.engine.Apply(pf.ev, pf.facts); err != nil {
+			p.log.Error("rules apply", "dedup_key", pf.ev.DedupKey, "error", err)
+			// Rules failing must not drop the event; it lands unenriched.
+		}
+		if _, _, err := p.store.Ingest(ctx, pf.ev); err != nil {
+			return newest, stored, fmt.Errorf("ingest %s: %w", pf.ev.DedupKey, err)
+		}
+		stored++
+		if pf.ev.TS.After(newest) {
+			newest = pf.ev.TS
+		}
+	}
+	return newest, stored, nil
+}
+
+type eventFacts struct {
+	ev    *model.Event
+	facts normalize.Facts
 }
