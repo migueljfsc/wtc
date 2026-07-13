@@ -1,8 +1,10 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -28,6 +30,25 @@ func newLogCmd(flags *clientFlags) *cobra.Command {
 		Example: `  wtc log --env prod --since 2h
   wtc log --service api --since 7d --json`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			now := time.Now()
+
+			sinceTS, err := parseTimeRef(since, now)
+			if err != nil {
+				return fmt.Errorf("--since: %w", err)
+			}
+
+			var untilTS time.Time
+			if until != "" {
+				untilTS, err = parseTimeRef(until, now)
+				if err != nil {
+					return fmt.Errorf("--until: %w", err)
+				}
+				if untilTS.Before(sinceTS) {
+					return fmt.Errorf("empty window: --until (%s) is older than --since (%s, default 24h) — set --since explicitly",
+						untilTS.Local().Format(time.RFC3339), sinceTS.Local().Format(time.RFC3339))
+				}
+			}
+
 			params := url.Values{}
 			set := func(k, v string) {
 				if v != "" {
@@ -39,18 +60,8 @@ func newLogCmd(flags *clientFlags) *cobra.Command {
 			set("kind", kind)
 			set("status", status)
 			params.Set("limit", strconv.Itoa(limit))
-
-			sinceTS, err := parseTimeRef(since, time.Now())
-			if err != nil {
-				return fmt.Errorf("--since: %w", err)
-			}
 			params.Set("since", model.FormatTS(sinceTS))
-
-			if until != "" {
-				untilTS, err := parseTimeRef(until, time.Now())
-				if err != nil {
-					return fmt.Errorf("--until: %w", err)
-				}
+			if !untilTS.IsZero() {
 				params.Set("until", model.FormatTS(untilTS))
 			}
 
@@ -60,9 +71,11 @@ func newLogCmd(flags *clientFlags) *cobra.Command {
 			}
 
 			if asJSON {
+				// Full response object: scripted consumers need next_cursor
+				// to detect truncation and paginate.
 				enc := json.NewEncoder(cmd.OutOrStdout())
 				enc.SetIndent("", "  ")
-				return enc.Encode(resp.Events)
+				return enc.Encode(resp)
 			}
 
 			if len(resp.Events) == 0 {
@@ -75,8 +88,8 @@ func newLogCmd(flags *clientFlags) *cobra.Command {
 			for _, ev := range resp.Events {
 				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 					ev.TS.Local().Format("2006-01-02 15:04"),
-					orDash(ev.Env), ev.Kind, ev.Status,
-					orDash(ev.Service), ev.Title, orDash(ev.Actor),
+					cmp.Or(ev.Env, "-"), ev.Kind, ev.Status,
+					cmp.Or(ev.Service, "-"), ev.Title, cmp.Or(ev.Actor, "-"),
 				)
 			}
 			if err := w.Flush(); err != nil {
@@ -101,13 +114,6 @@ func newLogCmd(flags *clientFlags) *cobra.Command {
 	return cmd
 }
 
-func orDash(s string) string {
-	if s == "" {
-		return "-"
-	}
-	return s
-}
-
 var relPattern = regexp.MustCompile(`^(\d+)([smhdw])$`)
 
 // parseTimeRef accepts a relative age ("2h", "30m", "7d", "1w") or an
@@ -130,6 +136,11 @@ func parseTimeRef(s string, now time.Time) (time.Time, error) {
 			unit = 24 * time.Hour
 		case "w":
 			unit = 7 * 24 * time.Hour
+		}
+		// Guard int64 overflow: a huge value would silently wrap into a
+		// nonsense instant instead of erroring.
+		if int64(n) > math.MaxInt64/int64(unit) {
+			return time.Time{}, fmt.Errorf("duration %q is too large", s)
 		}
 		return now.Add(-time.Duration(n) * unit), nil
 	}

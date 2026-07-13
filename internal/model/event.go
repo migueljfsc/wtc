@@ -3,7 +3,6 @@
 package model
 
 import (
-	"crypto/rand"
 	"fmt"
 	"time"
 
@@ -72,9 +71,12 @@ var validStatuses = map[Status]bool{
 // ValidStatus reports whether s is a known status.
 func ValidStatus(s Status) bool { return validStatuses[s] }
 
-// StatusRank orders statuses for the upsert rule: an incoming event may only
-// overwrite a stored one when its rank is >= the stored rank, so a
-// late-arriving "started" never regresses a completed row.
+// StatusRank orders statuses for the upsert rule (SPEC §1): an incoming event
+// overwrites a stored one only when its rank STRICTLY outranks the stored
+// rank, so a late-arriving "started" never regresses a completed row and a
+// stale equal-rank terminal event never flips succeeded↔failed. The incoming
+// side is bound as a query parameter; the stored side is the SQL CASE in
+// store.upsertSQL — keep the two in sync.
 func StatusRank(s Status) int {
 	switch s {
 	case StatusSucceeded, StatusFailed:
@@ -135,9 +137,11 @@ func (e *Event) Validate() error {
 	return nil
 }
 
-// NewID returns a fresh ULID string.
+// NewID returns a fresh ULID string. ulid.Make uses the library's pooled
+// monotonic entropy — no per-call crypto/rand read, and same-millisecond IDs
+// stay ordered, which stabilizes the (ts, id) pagination tiebreak.
 func NewID() string {
-	return ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader).String()
+	return ulid.Make().String()
 }
 
 // tsLayout is RFC3339 with fixed millisecond precision so stored strings sort

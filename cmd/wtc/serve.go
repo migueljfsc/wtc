@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -82,9 +81,10 @@ func runServe(configPath string, configOptional bool) error {
 	log.Info("shutting down")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	// Order matters: stop accepting requests first, then drain the store's
-	// writer — Ingest must never race Store.Close.
-	if err := httpSrv.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	// Stop accepting requests first so most events drain cleanly; if
+	// Shutdown times out with handlers still in flight, Store.Close is safe
+	// anyway — stragglers get ErrStoreClosed instead of racing the writer.
+	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 		log.Error("http shutdown", "error", err)
 	}
 	if err := st.Close(); err != nil {

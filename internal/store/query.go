@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -15,6 +16,10 @@ const (
 	defaultLimit = 100
 	maxLimit     = 1000
 )
+
+// ErrInvalidCursor marks a malformed pagination cursor — client input error,
+// not a storage failure. Handlers map it to 400.
+var ErrInvalidCursor = errors.New("invalid cursor")
 
 // Filter selects events for ListEvents. Zero values mean "no constraint".
 type Filter struct {
@@ -146,11 +151,11 @@ func encodeCursor(ts, id string) string {
 func decodeCursor(c string) (ts, id string, err error) {
 	raw, err := base64.RawURLEncoding.DecodeString(c)
 	if err != nil {
-		return "", "", fmt.Errorf("invalid cursor: %w", err)
+		return "", "", fmt.Errorf("%w: %v", ErrInvalidCursor, err)
 	}
 	ts, id, ok := strings.Cut(string(raw), "\x00")
 	if !ok || ts == "" || id == "" {
-		return "", "", fmt.Errorf("invalid cursor")
+		return "", "", ErrInvalidCursor
 	}
 	return ts, id, nil
 }

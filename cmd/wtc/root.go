@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -18,19 +19,12 @@ type clientFlags struct {
 	token  string
 }
 
+// resolve builds the API client with flag > env > default precedence.
 func (f *clientFlags) resolve() *client.Client {
-	server := f.server
-	if server == "" {
-		server = os.Getenv("WTC_SERVER")
-	}
-	if server == "" {
-		server = defaultServer
-	}
-	token := f.token
-	if token == "" {
-		token = os.Getenv("WTC_API_TOKEN")
-	}
-	return client.New(server, token)
+	return client.New(
+		cmp.Or(f.server, os.Getenv("WTC_SERVER"), defaultServer),
+		cmp.Or(f.token, os.Getenv("WTC_API_TOKEN")),
+	)
 }
 
 func newRootCmd() *cobra.Command {

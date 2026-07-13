@@ -9,13 +9,14 @@ import (
 
 	"github.com/migueljfsc/wtc/internal/ingest/generic"
 	"github.com/migueljfsc/wtc/internal/model"
+	"github.com/migueljfsc/wtc/internal/normalize"
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
 const maxBodyBytes = 1 << 20 // 1 MiB
 
 func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, s.log, http.StatusOK, map[string]string{"status": "ok"})
+	s.writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // IngestResponse is returned by all ingest endpoints.
@@ -37,21 +38,27 @@ func (s *Server) handleIngestGeneric(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	// Redaction before storage — hard rule, every ingest path.
+	normalize.RedactEvent(ev)
 
 	id, deduped, err := s.store.Ingest(r.Context(), ev)
 	if err != nil {
-		if errors.Is(err, r.Context().Err()) {
-			return // client went away
+		switch {
+		case errors.Is(err, r.Context().Err()):
+			return // client went away; nobody to answer
+		case errors.Is(err, store.ErrStoreClosed):
+			s.writeError(w, http.StatusServiceUnavailable, "server is shutting down")
+		default:
+			s.log.Error("ingest generic", "error", err)
+			s.writeError(w, http.StatusInternalServerError, "storage error")
 		}
-		s.log.Error("ingest generic", "error", err)
-		s.writeError(w, http.StatusInternalServerError, "storage error")
 		return
 	}
 	code := http.StatusCreated
 	if deduped {
 		code = http.StatusOK
 	}
-	writeJSON(w, s.log, code, IngestResponse{ID: id, Deduped: deduped})
+	s.writeJSON(w, code, IngestResponse{ID: id, Deduped: deduped})
 }
 
 // EventsResponse is the paginated /api/events reply.
@@ -62,6 +69,13 @@ type EventsResponse struct {
 
 func (s *Server) handleListEvents(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
+	if q.Get("q") != "" {
+		// SPEC §4 lists q (FTS) but it lands in Phase 3; silently returning
+		// unfiltered results would be wrong data, so reject loudly.
+		s.writeError(w, http.StatusBadRequest, "q (full-text search) is not implemented yet — lands in phase 3")
+		return
+	}
+
 	f := store.Filter{
 		Env:     q.Get("env"),
 		Service: q.Get("service"),
@@ -97,9 +111,13 @@ func (s *Server) handleListEvents(w http.ResponseWriter, r *http.Request) {
 
 	events, next, err := s.store.ListEvents(r.Context(), f)
 	if err != nil {
+		if errors.Is(err, store.ErrInvalidCursor) {
+			s.writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		s.log.Error("list events", "error", err)
 		s.writeError(w, http.StatusInternalServerError, "query error")
 		return
 	}
-	writeJSON(w, s.log, http.StatusOK, EventsResponse{Events: events, NextCursor: next})
+	s.writeJSON(w, http.StatusOK, EventsResponse{Events: events, NextCursor: next})
 }

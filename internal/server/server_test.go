@@ -146,6 +146,11 @@ func TestIngestValidation(t *testing.T) {
 		{"missing title", `{"kind":"manual"}`},
 		{"bad ts", `{"kind":"manual","title":"x","ts":"yesterday"}`},
 		{"bad status", `{"kind":"manual","title":"x","status":"done"}`},
+		// generic ingest must not spoof dedicated ingest paths
+		{"reserved source github", `{"kind":"build","title":"x","source":"github"}`},
+		{"reserved source flux", `{"kind":"deploy","title":"x","source":"flux"}`},
+		{"reserved dedup prefix gh", `{"kind":"build","title":"x","dedup_key":"gh:run:org/app:1:1"}`},
+		{"reserved dedup prefix flux", `{"kind":"deploy","title":"x","dedup_key":"flux:prod:Kustomization/x:1:r"}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -164,11 +169,38 @@ func TestListEventsBadParams(t *testing.T) {
 		"/api/events?until=notatime",
 		"/api/events?limit=-1",
 		"/api/events?limit=abc",
+		"/api/events?cursor=%21%21not-base64", // client input error, not 500
+		"/api/events?q=payments",              // FTS is phase 3: reject, don't ignore
 	} {
 		resp, _ := doRequest(t, http.MethodGet, ts.URL+path, testToken, nil)
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Fatalf("%s = %d, want 400", path, resp.StatusCode)
 		}
+	}
+}
+
+func TestIngestRedactsSecrets(t *testing.T) {
+	ts := newTestServer(t)
+	event := []byte(`{
+		"kind": "manual", "env": "prod",
+		"title": "hotfix: set password=hunter2 and used ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+		"artifacts": ["reg/app:v1"],
+		"dedup_key": "e2e:redact"
+	}`)
+	resp, body := doRequest(t, http.MethodPost, ts.URL+"/ingest/generic", testToken, event)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("ingest = %d %s", resp.StatusCode, body)
+	}
+
+	_, body = doRequest(t, http.MethodGet, ts.URL+"/api/events?env=prod", testToken, nil)
+	if bytes.Contains(body, []byte("hunter2")) || bytes.Contains(body, []byte("ghp_abcdefghijklmnopqrstuvwxyz")) {
+		t.Fatalf("stored event still contains secrets: %s", body)
+	}
+	if !bytes.Contains(body, []byte("[REDACTED]")) {
+		t.Fatalf("expected redaction placeholder in stored event: %s", body)
+	}
+	if !bytes.Contains(body, []byte("reg/app:v1")) {
+		t.Fatalf("artifacts payload must survive redaction: %s", body)
 	}
 }
 
