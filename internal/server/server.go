@@ -9,24 +9,45 @@ import (
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
-// Server routes ingest and query requests onto a Store.
-type Server struct {
-	store  *store.Store
-	tokens []string
-	log    *slog.Logger
-	mux    *http.ServeMux
+// Options configures the HTTP surface beyond the store itself.
+type Options struct {
+	// Tokens are the static bearer tokens accepted on /api/* and
+	// /ingest/generic; an empty list fails closed (all denied).
+	Tokens []string
+	// GitHubWebhookSecret enables /ingest/github HMAC verification; empty
+	// means the endpoint rejects everything (fail closed).
+	GitHubWebhookSecret string
+	// CaptureDir, when non-empty, dumps every raw ingest body to disk.
+	CaptureDir string
 }
 
-// New builds the HTTP surface. tokens are the static bearer tokens accepted
-// on /api/* and /ingest/generic; an empty list fails closed (all denied).
-func New(st *store.Store, tokens []string, log *slog.Logger) *Server {
+// Server routes ingest and query requests onto a Store.
+type Server struct {
+	store         *store.Store
+	tokens        []string
+	webhookSecret string
+	captureDir    string
+	log           *slog.Logger
+	mux           *http.ServeMux
+}
+
+// New builds the HTTP surface.
+func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 	if log == nil {
 		log = slog.Default()
 	}
-	s := &Server{store: st, tokens: tokens, log: log, mux: http.NewServeMux()}
+	s := &Server{
+		store:         st,
+		tokens:        opts.Tokens,
+		webhookSecret: opts.GitHubWebhookSecret,
+		captureDir:    opts.CaptureDir,
+		log:           log,
+		mux:           http.NewServeMux(),
+	}
 
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
 	s.mux.Handle("POST /ingest/generic", s.requireBearer(http.HandlerFunc(s.handleIngestGeneric)))
+	s.mux.HandleFunc("POST /ingest/github", s.handleIngestGitHub) // HMAC-verified inside
 	s.mux.Handle("GET /api/events", s.requireBearer(http.HandlerFunc(s.handleListEvents)))
 
 	return s

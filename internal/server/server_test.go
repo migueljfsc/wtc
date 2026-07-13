@@ -21,7 +21,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
-	srv := New(st, []string{testToken}, slog.New(slog.DiscardHandler))
+	srv := New(st, Options{Tokens: []string{testToken}}, slog.New(slog.DiscardHandler))
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(func() {
 		ts.Close()
@@ -210,7 +210,7 @@ func TestFailClosedWithoutTokens(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = st.Close() }()
-	srv := httptest.NewServer(New(st, nil, slog.New(slog.DiscardHandler)).Handler())
+	srv := httptest.NewServer(New(st, Options{}, slog.New(slog.DiscardHandler)).Handler())
 	defer srv.Close()
 
 	resp, _ := doRequest(t, http.MethodGet, srv.URL+"/api/events", "anything", nil)
