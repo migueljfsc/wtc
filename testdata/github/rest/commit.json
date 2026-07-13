@@ -1,0 +1,82 @@
+{
+  "sha": "f1945371e63a7556860fad1555be40a4a0d736a8",
+  "node_id": "C_kwDOTWgC5toAKGYxOTQ1MzcxZTYzYTc1NTY4NjBmYWQxNTU1YmU0MGE0YTBkNzM2YTg",
+  "commit": {
+    "author": {
+      "name": "Miguel Cardoso",
+      "email": "migueljfscardoso@gmail.com",
+      "date": "2026-07-13T15:11:42Z"
+    },
+    "committer": {
+      "name": "Miguel Cardoso",
+      "email": "migueljfscardoso@gmail.com",
+      "date": "2026-07-13T15:11:42Z"
+    },
+    "message": "feat(github): phase 1 step 0 — capture mode, HMAC webhooks, poller skeleton\n\n- config: sources.github (api_token, webhook_secret, poll_interval, repos,\n  infra_path), Duration YAML type, capture_dir returns with its reader,\n  WTC_GH_* env overrides\n- store: migration 0002 github_poll_state + monotonic watermark accessors\n- server: POST /ingest/github with X-Hub-Signature-256 verification\n  (constant-time, body-bound, fail-closed when unconfigured); capture mode\n  dumps raw bodies+headers per source for fixture freezing\n- ingest/github: hand-rolled REST client (runs/prs/commits — no SDK dep)\n  and poller loop with bounded 24h first-run backfill; normalization lands\n  in step 2 once real fixtures are frozen (fixture-first rule)\n- serve: --capture-dir flag, poller wired behind token+repos+interval config\n\nNormalizers intentionally absent: no parser without golden fixtures.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>",
+    "tree": {
+      "sha": "e7f813328281ebbc3ba675cbde5a6011453a822b",
+      "url": "https://api.github.com/repos/migueljfsc/wtc/git/trees/e7f813328281ebbc3ba675cbde5a6011453a822b"
+    },
+    "url": "https://api.github.com/repos/migueljfsc/wtc/git/commits/f1945371e63a7556860fad1555be40a4a0d736a8",
+    "comment_count": 0,
+    "verification": {
+      "verified": false,
+      "reason": "unsigned",
+      "signature": null,
+      "payload": null,
+      "verified_at": null
+    }
+  },
+  "url": "https://api.github.com/repos/migueljfsc/wtc/commits/f1945371e63a7556860fad1555be40a4a0d736a8",
+  "html_url": "https://github.com/migueljfsc/wtc/commit/f1945371e63a7556860fad1555be40a4a0d736a8",
+  "comments_url": "https://api.github.com/repos/migueljfsc/wtc/commits/f1945371e63a7556860fad1555be40a4a0d736a8/comments",
+  "author": {
+    "login": "migueljfsc",
+    "id": 25540481,
+    "node_id": "MDQ6VXNlcjI1NTQwNDgx",
+    "avatar_url": "https://avatars.githubusercontent.com/u/25540481?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/migueljfsc",
+    "html_url": "https://github.com/migueljfsc",
+    "followers_url": "https://api.github.com/users/migueljfsc/followers",
+    "following_url": "https://api.github.com/users/migueljfsc/following{/other_user}",
+    "gists_url": "https://api.github.com/users/migueljfsc/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/migueljfsc/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/migueljfsc/subscriptions",
+    "organizations_url": "https://api.github.com/users/migueljfsc/orgs",
+    "repos_url": "https://api.github.com/users/migueljfsc/repos",
+    "events_url": "https://api.github.com/users/migueljfsc/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/migueljfsc/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+  },
+  "committer": {
+    "login": "migueljfsc",
+    "id": 25540481,
+    "node_id": "MDQ6VXNlcjI1NTQwNDgx",
+    "avatar_url": "https://avatars.githubusercontent.com/u/25540481?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/migueljfsc",
+    "html_url": "https://github.com/migueljfsc",
+    "followers_url": "https://api.github.com/users/migueljfsc/followers",
+    "following_url": "https://api.github.com/users/migueljfsc/following{/other_user}",
+    "gists_url": "https://api.github.com/users/migueljfsc/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/migueljfsc/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/migueljfsc/subscriptions",
+    "organizations_url": "https://api.github.com/users/migueljfsc/orgs",
+    "repos_url": "https://api.github.com/users/migueljfsc/repos",
+    "events_url": "https://api.github.com/users/migueljfsc/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/migueljfsc/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+  },
+  "parents": [
+    {
+      "sha": "f973aa02bfac7eb53590af5084b9f497b9110e8b",
+      "url": "https://api.github.com/repos/migueljfsc/wtc/commits/f973aa02bfac7eb53590af5084b9f497b9110e8b",
+      "html_url": "https://github.com/migueljfsc/wtc/commit/f973aa02bfac7eb53590af5084b9f497b9110e8b"
+    }
+  ]
+}
