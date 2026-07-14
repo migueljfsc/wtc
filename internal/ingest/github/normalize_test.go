@@ -167,6 +167,27 @@ func TestGoldenMergedPR(t *testing.T) {
 	}
 }
 
+func TestRevertPRBecomesRollback(t *testing.T) {
+	var pr restPullRequest
+	loadFixture(t, "pull_request_merged.json", &pr)
+
+	for _, title := range []string{
+		`Revert "feat: enable new billing path"`, // GitHub UI convention
+		"revert: bump image to sha-abc1234",
+	} {
+		pr.Title = title
+		ev, _ := NormalizeMergedPR(pr, "o/r", testNow)
+		if ev == nil || ev.Kind != model.KindRollback {
+			t.Errorf("title %q → kind %v, want rollback", title, ev.Kind)
+		}
+	}
+
+	pr.Title = "feat: irreversible improvements"
+	if ev, _ := NormalizeMergedPR(pr, "o/r", testNow); ev.Kind != model.KindMerge {
+		t.Errorf("normal PR → kind %v, want merge", ev.Kind)
+	}
+}
+
 func TestGoldenCommit(t *testing.T) {
 	var c restCommit
 	loadFixture(t, "commit.json", &c)

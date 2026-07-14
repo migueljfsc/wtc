@@ -2,6 +2,7 @@ package github
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -147,9 +148,14 @@ func NormalizeWorkflowRun(run restWorkflowRun, now time.Time) (*model.Event, nor
 	return ev, facts
 }
 
+// revertTitle spots GitHub's revert-PR convention: the UI generates titles
+// like `Revert "original title"` and branches like revert-123-branch.
+var revertTitle = regexp.MustCompile(`(?i)^revert\b`)
+
 // NormalizeMergedPR maps a merged pull request onto an Event + facts. Returns
 // nil for unmerged PRs (closed-without-merge is not a change intent).
 // repo comes from the poller scope; list payloads carry it in base.repo too.
+// Revert PRs land as kind=rollback (PLAN P4 heuristic).
 func NormalizeMergedPR(pr restPullRequest, repo string, now time.Time) (*model.Event, normalize.Facts) {
 	if pr.MergedAt == nil {
 		return nil, normalize.Facts{}
@@ -158,12 +164,17 @@ func NormalizeMergedPR(pr restPullRequest, repo string, now time.Time) (*model.E
 		repo = pr.Base.Repo.FullName
 	}
 
+	kind := model.KindMerge
+	if revertTitle.MatchString(pr.Title) {
+		kind = model.KindRollback
+	}
+
 	ev := &model.Event{
 		ID:         model.NewID(),
 		TS:         pr.MergedAt.UTC(),
 		IngestedAt: now.UTC(),
 		Source:     model.SourceGitHub,
-		Kind:       model.KindMerge,
+		Kind:       kind,
 		Status:     model.StatusSucceeded,
 		Actor:      pr.User.Login,
 		Ref:        pr.MergeCommitSHA,

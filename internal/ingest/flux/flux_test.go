@@ -87,6 +87,16 @@ func TestGoldenHelmReleaseInstalled(t *testing.T) {
 	}
 }
 
+func TestProgressingDropped(t *testing.T) {
+	// Reason string observed live on the demo stack; payload shape identical
+	// to the captured success fixture.
+	fe := loadEvent(t, "kustomization_reconcile_succeeded.json")
+	fe.Reason = "Progressing"
+	if ev, _ := Normalize(fe, testNow); ev != nil {
+		t.Fatalf("Progressing must be dropped, got %+v", ev)
+	}
+}
+
 func TestParseRejectsGarbage(t *testing.T) {
 	if _, err := Parse([]byte(`{"severity":"info"}`)); err == nil {
 		t.Error("event without involvedObject must be rejected")

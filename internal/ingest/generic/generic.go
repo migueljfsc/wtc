@@ -44,6 +44,9 @@ type Request struct {
 	TS         string   `json:"ts,omitempty"` // RFC3339; default now
 	DurationMS *int64   `json:"duration_ms,omitempty"`
 	DedupKey   string   `json:"dedup_key,omitempty"` // default "generic:<id>"
+	// Details are small structured facts (exit codes, change counts) stored
+	// in the event payload alongside artifacts. Redacted before storage.
+	Details map[string]any `json:"details,omitempty"`
 }
 
 // ToEvent converts the request into a validated Event. now is used for
@@ -99,10 +102,17 @@ func (r *Request) ToEvent(now time.Time) (*model.Event, error) {
 		ev.TS = ts
 	}
 
-	if len(r.Artifacts) > 0 {
-		payload, err := json.Marshal(map[string]any{"artifacts": r.Artifacts})
+	if len(r.Artifacts) > 0 || len(r.Details) > 0 {
+		body := map[string]any{}
+		for k, v := range r.Details {
+			body[k] = v
+		}
+		if len(r.Artifacts) > 0 {
+			body["artifacts"] = r.Artifacts
+		}
+		payload, err := json.Marshal(body)
 		if err != nil {
-			return nil, fmt.Errorf("encode artifacts payload: %w", err)
+			return nil, fmt.Errorf("encode payload: %w", err)
 		}
 		ev.Payload = string(payload)
 	}
