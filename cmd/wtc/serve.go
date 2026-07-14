@@ -109,6 +109,12 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 			"has_token", gh.APIToken != "", "repos", len(gh.Repos), "interval", gh.PollInterval.Std())
 	}
 
+	// Optional scheduled Slack digest (nil when unconfigured).
+	if ds := server.NewDigestScheduler(st, cfg.Digest.SlackWebhook,
+		cfg.Digest.Interval.Std(), cfg.Digest.Window.Std(), log); ds != nil {
+		go ds.Run(ctx)
+	}
+
 	errCh := make(chan error, 1)
 	go func() {
 		log.Info("wtc serve listening", "addr", cfg.Server.Listen, "db", cfg.Server.DB, "version", version)

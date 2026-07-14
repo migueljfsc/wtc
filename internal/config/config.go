@@ -72,6 +72,14 @@ type Sources struct {
 	Flux   Flux   `yaml:"flux"`
 }
 
+// Digest configures the optional serve-side scheduled Slack digest. Enabled
+// only when both interval and slack_webhook are set.
+type Digest struct {
+	Interval     Duration `yaml:"interval"`      // e.g. 24h; 0 disables
+	Window       Duration `yaml:"window"`        // how far back each digest looks (default = interval)
+	SlackWebhook string   `yaml:"slack_webhook"` // incoming-webhook URL (secret; use ${VAR})
+}
+
 // Config is the full wtc.yaml.
 type Config struct {
 	Server      Server           `yaml:"server"`
@@ -79,6 +87,7 @@ type Config struct {
 	Sources     Sources          `yaml:"sources"`
 	Rules       []normalize.Rule `yaml:"rules"`        // ordered env/service inference rules (SPEC §3)
 	TagPatterns []string         `yaml:"tag_patterns"` // tag→sha extraction; empty = defaults (SPEC §2)
+	Digest      Digest           `yaml:"digest"`       // optional scheduled Slack digest
 }
 
 // Default returns the config used when no file or overrides are present.
@@ -176,6 +185,7 @@ func applyEnvOverrides(cfg *Config) {
 	set(&cfg.Sources.GitHub.APIToken, "WTC_GH_API_TOKEN")
 	set(&cfg.Sources.GitHub.WebhookSecret, "WTC_GH_WEBHOOK_SECRET")
 	set(&cfg.Sources.Flux.HMACKey, "WTC_FLUX_HMAC_KEY")
+	set(&cfg.Digest.SlackWebhook, "WTC_SLACK_WEBHOOK")
 
 	if v, ok := os.LookupEnv("WTC_API_TOKEN"); ok && v != "" {
 		if !slices.Contains(cfg.Auth.APITokens, v) {
