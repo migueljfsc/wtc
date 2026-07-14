@@ -45,6 +45,12 @@ func (s *Server) handleIngestFlux(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ev, facts := flux.Normalize(fe, time.Now())
+	if ev == nil {
+		// Progressing pre-events carry no outcome; the reconcile result
+		// arrives seconds later.
+		s.writeJSON(w, http.StatusAccepted, map[string]string{"status": "ignored"})
+		return
+	}
 	if err := s.engine.Apply(ev, facts); err != nil {
 		// Rules failing must not drop the event; it lands unenriched.
 		s.log.Error("rules apply", "dedup_key", ev.DedupKey, "error", err)

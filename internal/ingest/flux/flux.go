@@ -48,7 +48,14 @@ var gitRevision = regexp.MustCompile(`@sha1:([0-9a-f]{7,40})$`)
 // Normalize maps a notification event onto the Event schema + facts.
 // kind=deploy: a reconcile applies change to a runtime env. severity info →
 // succeeded, error → failed (reconciles report outcomes, never "started").
+// Progressing events return nil: they precede every reconcile outcome by
+// seconds and — because reason is part of the dedup key — would otherwise
+// leave a permanent phantom row per revision (observed live on the demo
+// stack; the outcome event carries all the signal).
 func Normalize(fe *Event, now time.Time) (*model.Event, normalize.Facts) {
+	if fe.Reason == "Progressing" {
+		return nil, normalize.Facts{}
+	}
 	status := model.StatusUnknown
 	switch fe.Severity {
 	case "info":
