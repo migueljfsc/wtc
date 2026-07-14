@@ -60,6 +60,28 @@ auth:
 	}
 }
 
+func TestVarInCommentIsIgnored(t *testing.T) {
+	// A ${VAR} in a commented-out line must NOT be treated as a live
+	// reference — this is exactly `make run` with the sources block disabled.
+	path := writeFile(t, `
+server:
+  db: /data/wtc.db
+auth:
+  api_tokens: [dev-token]
+# sources:
+#   github:
+#     api_token: ${WTC_GH_API_TOKEN}   # unset, but commented — must not error
+  db2: value # trailing ${ALSO_UNSET} in a comment
+`)
+	cfg, err := Load(path, false)
+	if err != nil {
+		t.Fatalf("commented ${VAR} must not error: %v", err)
+	}
+	if cfg.Server.DB != "/data/wtc.db" {
+		t.Errorf("DB = %q", cfg.Server.DB)
+	}
+}
+
 func TestUnsetVarIsError(t *testing.T) {
 	path := writeFile(t, `
 server:
