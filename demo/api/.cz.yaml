@@ -1,7 +1,8 @@
+---
 commitizen:
+  bump_message: 'bump(demo-api): $current_version -> $new_version [skip ci]'
   name: cz_conventional_commits
-  version: 0.2.1
   tag_format: demo-api-v$version
-  bump_message: "bump(demo-api): $current_version -> $new_version [skip ci]"
+  version: 0.2.2
   version_files:
-    - .cz.yaml:version
+  - .cz.yaml:version
