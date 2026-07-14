@@ -106,6 +106,55 @@ func (s *Server) handleHandoff(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusOK, report)
 }
 
+// handleAround returns the changes in a window BEFORE an instant — the
+// "what changed right before this alert fired" question. Anchor by ts= or by
+// an event id= (typically an alert's).
+func (s *Server) handleAround(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+
+	var anchor time.Time
+	switch {
+	case q.Get("id") != "":
+		ev, err := s.store.EventByID(r.Context(), q.Get("id"))
+		if err != nil {
+			s.writeError(w, http.StatusNotFound, "no event with id "+q.Get("id"))
+			return
+		}
+		anchor = ev.TS
+	case q.Get("ts") != "":
+		ts, err := model.ParseTS(q.Get("ts"))
+		if err != nil {
+			s.writeError(w, http.StatusBadRequest, "ts: "+err.Error())
+			return
+		}
+		anchor = ts
+	default:
+		s.writeError(w, http.StatusBadRequest, "around needs ?ts= or ?id=")
+		return
+	}
+
+	window := 30 * time.Minute
+	if v := q.Get("window"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			s.writeError(w, http.StatusBadRequest, "window must be a positive duration")
+			return
+		}
+		window = d
+	}
+
+	events, next, err := s.store.ListEvents(r.Context(), store.Filter{
+		Since: anchor.Add(-window),
+		Until: anchor,
+	})
+	if err != nil {
+		s.log.Error("around", "error", err)
+		s.writeError(w, http.StatusInternalServerError, "query error")
+		return
+	}
+	s.writeJSON(w, http.StatusOK, EventsResponse{Events: events, NextCursor: next})
+}
+
 func (s *Server) handleDoctor(w http.ResponseWriter, r *http.Request) {
 	report, err := s.store.Doctor(r.Context(), time.Now())
 	if err != nil {

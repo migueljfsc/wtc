@@ -4,6 +4,8 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"regexp"
 	"text/tabwriter"
 	"time"
 
@@ -123,6 +125,54 @@ func newDiffCmd(flags *clientFlags) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
+	return cmd
+}
+
+var ulidLike = regexp.MustCompile(`^[0-9A-HJKMNP-TV-Z]{26}$`)
+
+func newAroundCmd(flags *clientFlags) *cobra.Command {
+	var window time.Duration
+	var asJSON bool
+	cmd := &cobra.Command{
+		Use:   "around <ts|event-id>",
+		Short: "What changed in the window before an instant (or an alert event)",
+		Args:  cobra.ExactArgs(1),
+		Example: `  wtc around 2026-07-14T13:41:34Z --window 30m
+  wtc around 01KXGA0ZP6QQ9M129XYAR1KTSY     # an alert's event id`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			params := url.Values{"window": {window.String()}}
+			if ulidLike.MatchString(args[0]) {
+				params.Set("id", args[0])
+			} else {
+				ts, err := parseTimeRef(args[0], time.Now())
+				if err != nil {
+					return fmt.Errorf("anchor: %w", err)
+				}
+				params.Set("ts", model.FormatTS(ts))
+			}
+			resp, err := flags.resolve().Around(cmd.Context(), params)
+			if err != nil {
+				return err
+			}
+			if asJSON {
+				return jsonOut(cmd, resp)
+			}
+			if len(resp.Events) == 0 {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "no changes in the window")
+				return nil
+			}
+			w := tabwriter.NewWriter(cmd.OutOrStdout(), 2, 4, 2, ' ', 0)
+			_, _ = fmt.Fprintln(w, "TIME\tENV\tKIND\tSTATUS\tSERVICE\tTITLE")
+			for _, ev := range resp.Events {
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+					ev.TS.Local().Format("15:04:05"),
+					cmp.Or(ev.Env, "-"), ev.Kind, ev.Status, cmp.Or(ev.Service, "-"), ev.Title)
+			}
+			return w.Flush()
+		},
+	}
+	cmd.Flags().DurationVar(&window, "window", 30*time.Minute, "how far back to look")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
 	return cmd
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/ingest/flux"
 	"github.com/migueljfsc/wtc/internal/normalize"
 	"github.com/migueljfsc/wtc/internal/store"
+	"github.com/migueljfsc/wtc/web"
 )
 
 // Options configures the HTTP surface beyond the store itself.
@@ -75,13 +76,20 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 		mux:            http.NewServeMux(),
 	}
 
+	// Embedded UI at the root. Registered routes below win over this
+	// catch-all (Go 1.22 mux precedence), so the API is never shadowed.
+	// Static assets are public; every data call they make is bearer-authed.
+	s.mux.Handle("GET /", http.FileServerFS(web.FS()))
+
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
 	s.mux.Handle("POST /ingest/generic", s.requireBearer(http.HandlerFunc(s.handleIngestGeneric)))
+	s.mux.Handle("POST /ingest/alertmanager", s.requireBearer(http.HandlerFunc(s.handleIngestAlertmanager)))
 	s.mux.HandleFunc("POST /ingest/github", s.handleIngestGitHub) // HMAC-verified inside
 	s.mux.HandleFunc("POST /ingest/flux", s.handleIngestFlux)     // HMAC-verified inside
 	s.mux.Handle("GET /api/events", s.requireBearer(http.HandlerFunc(s.handleListEvents)))
 	s.mux.Handle("GET /api/doctor", s.requireBearer(http.HandlerFunc(s.handleDoctor)))
 	s.mux.Handle("GET /api/where/{ref}", s.requireBearer(http.HandlerFunc(s.handleWhere)))
+	s.mux.Handle("GET /api/around", s.requireBearer(http.HandlerFunc(s.handleAround)))
 	s.mux.Handle("GET /api/diff", s.requireBearer(http.HandlerFunc(s.handleDiff)))
 	s.mux.Handle("GET /api/handoff", s.requireBearer(http.HandlerFunc(s.handleHandoff)))
 

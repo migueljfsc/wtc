@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -107,6 +108,19 @@ func (s *Store) LatestSucceededDeploys(ctx context.Context, envs []string) ([]mo
 func escapeLike(s string) string {
 	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 	return r.Replace(s)
+}
+
+// EventByID fetches one event; sql.ErrNoRows when absent.
+func (s *Store) EventByID(ctx context.Context, id string) (*model.Event, error) {
+	events, err := s.queryEvents(ctx,
+		`SELECT `+eventColumns+` FROM events WHERE id = ?`, id)
+	if err != nil {
+		return nil, err
+	}
+	if len(events) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return &events[0], nil
 }
 
 // ServicesFirstSeenSince lists services whose earliest event ever falls

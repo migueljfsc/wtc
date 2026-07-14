@@ -119,6 +119,14 @@ func (c *Client) Diff(ctx context.Context, a, b string) (query.DiffReport, error
 	return out, err
 }
 
+// Around fetches the changes in a window before an instant (ts) or before
+// an event (id) — typically an alert.
+func (c *Client) Around(ctx context.Context, params url.Values) (server.EventsResponse, error) {
+	var out server.EventsResponse
+	err := c.do(ctx, http.MethodGet, "/api/around?"+params.Encode(), nil, &out)
+	return out, err
+}
+
 // Handoff fetches the activity digest since the given instant.
 func (c *Client) Handoff(ctx context.Context, since string) (query.HandoffReport, error) {
 	var out query.HandoffReport

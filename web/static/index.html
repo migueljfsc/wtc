@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>wtc — what the change</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>Δ</text></svg>">
+</head>
+<body>
+  <header>
+    <h1>Δ wtc</h1>
+    <div class="filters">
+      <input id="f-q" type="search" placeholder="search…" autocomplete="off">
+      <input id="f-env" type="text" placeholder="env" list="envs" autocomplete="off">
+      <datalist id="envs"><option>prod</option><option>staging</option><option>dev</option></datalist>
+      <input id="f-service" type="text" placeholder="service" autocomplete="off">
+      <select id="f-kind">
+        <option value="">any kind</option>
+        <option>build</option><option>merge</option><option>push</option>
+        <option>deploy</option><option>config_change</option><option>infra_change</option>
+        <option>rollback</option><option>alert</option><option>manual</option>
+      </select>
+      <select id="f-since">
+        <option value="24">24h</option>
+        <option value="168" selected>7d</option>
+        <option value="720">30d</option>
+      </select>
+      <button id="refresh" title="refresh">↻</button>
+    </div>
+    <div class="token-row">
+      <input id="token" type="password" placeholder="API token" autocomplete="off">
+      <span id="status"></span>
+    </div>
+  </header>
+
+  <main id="timeline" aria-live="polite"></main>
+  <button id="more" hidden>load more</button>
+
+  <footer>wtc · vendor-neutral change ledger · <a href="https://github.com/migueljfsc/wtc">source</a></footer>
+  <script src="app.js"></script>
+</body>
+</html>
