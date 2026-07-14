@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-worker
+  labels:
+    app: demo-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-worker
+  template:
+    metadata:
+      labels:
+        app: demo-worker
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/migueljfsc/wtc-demo-worker
+          ports:
+            - containerPort: 8080
