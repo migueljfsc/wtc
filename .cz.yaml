@@ -1,11 +1,11 @@
 # Commitizen config for the wtc application itself (the root Go module).
 # Standard semver tags `vX.Y.Z` — what Go tooling and goreleaser expect.
 #
-# Releases are cut MANUALLY via the release workflow (workflow_dispatch), not
-# on every push: this is a monorepo, so demo-service commits share main's
-# history and cz computes its increment from all commits since the last tag.
-# Auto-bumping would inflate wtc's version on demo noise. Cut a release when
-# wtc is ready; override the increment in the dispatch if the auto guess is off.
+# The ci.yml `publish` job bumps this automatically on pushes to main that
+# touch wtc's own code/chart (demo- and docs-only pushes are skipped — this is
+# a monorepo and cz can't scope commits by path). Note: cz still computes its
+# increment from ALL commits since the last v-tag, so demo feat commits can
+# nudge the increment; force it in a commit's type if that ever matters.
 #
 # The demo services have their own .cz.yaml under demo/<svc>/ with a distinct
 # tag_format, so their tags never collide with these.
