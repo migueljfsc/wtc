@@ -1,3 +1,19 @@
+## demo-web-v0.5.0 (2026-07-14)
+
+### Feat
+
+- phase 5 slack digest + docs — surfaces complete
+- phase 5 — embedded web timeline + alertmanager ingest + wtc around
+- phase 4 packaging — Dockerfile, Helm chart, compose, CI publish
+- **wrap**: wtc wrap with helm/terraform sniffers + rollback heuristic
+- **demo-worker**: add healthz endpoint
+
+### Fix
+
+- **docker**: multi-arch images (linux/amd64 + linux/arm64)
+- **config**: don't treat ${VAR} inside YAML comments as live references
+- **docker**: keep web/ in build context — go:embed needs it
+
 ## demo-web-v0.4.1 (2026-07-14)
 
 ### Feat
