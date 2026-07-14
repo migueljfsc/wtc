@@ -31,3 +31,6 @@ coverage.html
 .idea/
 .vscode/
 *.swp
+
+# compose operator config (real tokens live in env)
+/deploy/wtc.yaml

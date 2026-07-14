@@ -7,6 +7,7 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
         args: [--allow-multiple-documents]
+        exclude: ^deploy/helm/.*/templates/  # Go-templated YAML; helm lint covers these
       - id: check-added-large-files
       - id: check-merge-conflict
       - id: mixed-line-ending

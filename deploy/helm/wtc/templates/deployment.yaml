@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1                # SQLite single writer — never scale this
+  strategy:
+    type: Recreate           # RWO volume + single writer: no rolling overlap
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Chart.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Chart.Name }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+      annotations:
+        checksum/config: {{ toYaml .Values.config | sha256sum }}
+    spec:
+      containers:
+        - name: wtc
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["serve", "--config", "/etc/wtc/wtc.yaml"]
+          ports:
+            - name: http
+              containerPort: 8484
+          {{- with .Values.existingSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ . }}
+          {{- end }}
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/wtc
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Release.Name }}-config
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
