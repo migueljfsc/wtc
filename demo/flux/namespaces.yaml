@@ -1,0 +1,16 @@
+# Three namespaces posing as three clusters (the operator's real topology is
+# cluster-per-env; per-env Alerts fake the cluster metadata).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: staging
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prod

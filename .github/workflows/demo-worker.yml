@@ -1,0 +1,89 @@
+name: demo-worker
+
+# Dummy-service pipeline feeding wtc real events. Push to main touching this
+# service (manifests excluded — promotion PRs must not rebuild): commitizen
+# bumps demo-worker-vX.Y.Z ([skip ci]), image pushed to GHCR tagged sha-<sha7>
+# and <version>-<sha7> (wtc's two default tag_patterns). The cron adds
+# random background builds so the ledger stays alive between real changes.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'demo/worker/**'
+      - '!demo/worker/infrastructure/**'
+  schedule:
+    - cron: '5 */9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # commitizen pushes bump commit + tag
+  packages: write   # GHCR push
+
+concurrency:
+  group: demo-release        # serialize bump pushes across all demo workflows
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: coin flip (scheduled runs only)
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] && [ $((RANDOM % 2)) -eq 0 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "tails — sitting this one out"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v6.0.3
+        if: steps.gate.outputs.skip == 'false'
+        with:
+          ref: main       # a branch, not the detached trigger sha — cz needs
+          fetch-depth: 0  # to be ON main to commit/push the bump
+
+      - name: bump version
+        id: cz
+        if: steps.gate.outputs.skip == 'false' && github.event_name == 'push'
+        uses: commitizen-tools/commitizen-action@0.27.1
+        continue-on-error: true   # cz exits nonzero when nothing to bump
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          working_directory: demo/worker
+
+      - uses: docker/setup-buildx-action@v4.2.0
+        if: steps.gate.outputs.skip == 'false'
+
+      - uses: docker/login-action@v4.4.0
+        if: steps.gate.outputs.skip == 'false'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: image metadata
+        id: image
+        if: steps.gate.outputs.skip == 'false'
+        uses: docker/metadata-action@v6.1.0
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/wtc-demo-worker
+          tags: |
+            type=sha,priority=1000
+            # <version>-<sha7>: wtc's second default tag_pattern needs the sha embedded
+            type=raw,value=${{ steps.cz.outputs.version }}-{{sha}},enable=${{ steps.cz.outputs.version != '' }}
+            type=raw,value=latest
+
+      - name: build and push
+        if: steps.gate.outputs.skip == 'false'
+        uses: docker/build-push-action@v7.3.0
+        with:
+          context: demo/worker
+          push: true
+          tags: ${{ steps.image.outputs.tags }}
+          labels: ${{ steps.image.outputs.labels }}
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,mode=max,scope=worker
+          build-args: |
+            VERSION=${{ steps.cz.outputs.version || 'dev' }}

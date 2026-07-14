@@ -1,0 +1,59 @@
+# Kustomizations for the 'prod' fake cluster.
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: demo-api-prod
+  namespace: flux-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: wtc
+  path: ./demo/api/infrastructure/overlays/prod
+  prune: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: demo-web-prod
+  namespace: flux-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: wtc
+  path: ./demo/web/infrastructure/overlays/prod
+  prune: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: demo-worker-prod
+  namespace: flux-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: wtc
+  path: ./demo/worker/infrastructure/overlays/prod
+  prune: true
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Alert
+metadata:
+  name: wtc-prod
+  namespace: flux-system
+spec:
+  providerRef:
+    name: wtc
+  eventSeverity: info
+  eventSources:
+    - kind: Kustomization
+      name: demo-api-prod
+    - kind: Kustomization
+      name: demo-web-prod
+    - kind: Kustomization
+      name: demo-worker-prod
+  eventMetadata:
+    cluster: prod

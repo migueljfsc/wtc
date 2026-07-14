@@ -1,0 +1,59 @@
+# Kustomizations for the 'dev' fake cluster.
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: demo-api-dev
+  namespace: flux-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: wtc
+  path: ./demo/api/infrastructure/overlays/dev
+  prune: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: demo-web-dev
+  namespace: flux-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: wtc
+  path: ./demo/web/infrastructure/overlays/dev
+  prune: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: demo-worker-dev
+  namespace: flux-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: wtc
+  path: ./demo/worker/infrastructure/overlays/dev
+  prune: true
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Alert
+metadata:
+  name: wtc-dev
+  namespace: flux-system
+spec:
+  providerRef:
+    name: wtc
+  eventSeverity: info
+  eventSources:
+    - kind: Kustomization
+      name: demo-api-dev
+    - kind: Kustomization
+      name: demo-web-dev
+    - kind: Kustomization
+      name: demo-worker-dev
+  eventMetadata:
+    cluster: dev

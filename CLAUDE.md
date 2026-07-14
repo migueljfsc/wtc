@@ -61,6 +61,9 @@ internal/query/       log, where, diff, handoff, doctor logic
 internal/wrap/        `wtc wrap` command runner + helm/terraform arg sniffers
 web/                  phase 5 embedded UI
 testdata/             captured real payloads as golden fixtures, per source
+demo/                 dummy services (api/web/worker) that feed wtc real events:
+                      own go modules (invisible to root build), commitizen
+                      lifecycles, kustomize overlays, flux/ cluster wiring
 docs/                 SPEC.md, PLAN.md, setup/ (flux-provider.yaml, github-webhook.md)
 ```
 
