@@ -38,7 +38,7 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v7
         if: steps.gate.outputs.skip == 'false'
         with:
           ref: main       # a branch, not the detached trigger sha — cz needs
@@ -71,7 +71,7 @@ jobs:
       - name: image metadata
         id: image
         if: steps.gate.outputs.skip == 'false'
-        uses: docker/metadata-action@v6.1.0
+        uses: docker/metadata-action@v6.2.0
         with:
           images: ghcr.io/${{ github.repository_owner }}/wtc-demo-worker
           tags: |
