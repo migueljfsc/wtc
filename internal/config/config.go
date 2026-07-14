@@ -4,6 +4,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"regexp"
@@ -112,25 +113,63 @@ func Default() Config {
 // varPattern matches ${VAR} only — a bare $ (e.g. in a regex) is left alone.
 var varPattern = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
 
+// commentIndex returns the byte offset of the YAML comment on a line, or
+// len(line) if there is none. A '#' starts a comment only when it is at the
+// line start or preceded by whitespace, and not inside quotes — enough to
+// tell a real ${VAR} reference from one sitting in a comment.
+func commentIndex(line []byte) int {
+	var inSingle, inDouble bool
+	for i := 0; i < len(line); i++ {
+		switch c := line[i]; c {
+		case '\'':
+			if !inDouble {
+				inSingle = !inSingle
+			}
+		case '"':
+			if !inSingle {
+				inDouble = !inDouble
+			}
+		case '#':
+			if !inSingle && !inDouble && (i == 0 || line[i-1] == ' ' || line[i-1] == '\t') {
+				return i
+			}
+		}
+	}
+	return len(line)
+}
+
 // expandVars substitutes ${VAR} from the environment. Referencing an UNSET
 // variable is an error: silently expanding to "" turns `db: ${WTC_DB_PATH}`
 // into an ephemeral temp database and the ledger vanishes on restart. A
 // variable explicitly set to the empty string is allowed (e.g. optional
 // tokens, which Load filters out).
+//
+// Runs line-by-line and ignores the comment portion of each line, so a
+// commented-out example like `#   api_token: ${WTC_GH_API_TOKEN}` is not
+// treated as a live reference (that would make disabling a source by
+// commenting it out fail with a confusing "unset variable" error).
 func expandVars(raw []byte) ([]byte, error) {
 	var missing []string
-	expanded := varPattern.ReplaceAllFunc(raw, func(m []byte) []byte {
-		name := string(m[2 : len(m)-1]) // strip "${" and "}"
-		val, ok := os.LookupEnv(name)
-		if !ok {
-			missing = append(missing, name)
-		}
-		return []byte(val)
-	})
+	replace := func(code []byte) []byte {
+		return varPattern.ReplaceAllFunc(code, func(m []byte) []byte {
+			name := string(m[2 : len(m)-1]) // strip "${" and "}"
+			val, ok := os.LookupEnv(name)
+			if !ok {
+				missing = append(missing, name)
+			}
+			return []byte(val)
+		})
+	}
+
+	lines := bytes.Split(raw, []byte("\n"))
+	for i, line := range lines {
+		c := commentIndex(line)
+		lines[i] = append(replace(line[:c]), line[c:]...) // comment part kept verbatim
+	}
 	if len(missing) > 0 {
 		return nil, fmt.Errorf("config references unset environment variable(s): %s", strings.Join(missing, ", "))
 	}
-	return expanded, nil
+	return bytes.Join(lines, []byte("\n")), nil
 }
 
 // Load reads path, expands ${VAR}, unmarshals over defaults, then applies
