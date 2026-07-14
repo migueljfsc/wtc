@@ -21,6 +21,11 @@ const (
 // not a storage failure. Handlers map it to 400.
 var ErrInvalidCursor = errors.New("invalid cursor")
 
+// eventColumns is the canonical select list scanEvent expects.
+const eventColumns = `id, ts, ingested_at, source, kind, status, env, cluster,
+	namespace, service, actor, ref, artifact, title, url,
+	duration_ms, dedup_key, payload`
+
 // Filter selects events for ListEvents. Zero values mean "no constraint".
 type Filter struct {
 	Env     string
@@ -81,10 +86,7 @@ func (s *Store) ListEvents(ctx context.Context, f Filter) (events []model.Event,
 		add("(ts < ? OR (ts = ? AND id < ?))", ts, ts, id)
 	}
 
-	q := `SELECT id, ts, ingested_at, source, kind, status, env, cluster,
-	             namespace, service, actor, ref, artifact, title, url,
-	             duration_ms, dedup_key, payload
-	      FROM events`
+	q := `SELECT ` + eventColumns + ` FROM events`
 	if len(conds) > 0 {
 		q += " WHERE " + strings.Join(conds, " AND ")
 	}

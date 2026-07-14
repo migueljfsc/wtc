@@ -48,6 +48,9 @@ func newRootCmd() *cobra.Command {
 		newServeCmd(),
 		newRecordCmd(flags),
 		newLogCmd(flags),
+		newWhereCmd(flags),
+		newDiffCmd(flags),
+		newHandoffCmd(flags),
 		newInitCmd(),
 		newDoctorCmd(flags),
 	)

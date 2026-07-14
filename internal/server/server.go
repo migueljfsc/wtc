@@ -29,6 +29,8 @@ type Options struct {
 	// Engine runs the normalization rules on webhook-ingested events; nil
 	// means an empty rule set.
 	Engine *normalize.Engine
+	// Tags resolves image tags to shas for /api/where; nil means defaults.
+	Tags *normalize.TagResolver
 	// CaptureDir, when non-empty, dumps every raw ingest body to disk.
 	CaptureDir string
 }
@@ -41,6 +43,7 @@ type Server struct {
 	fluxHMACKey    string
 	fluxSuppressor *flux.Suppressor
 	engine         *normalize.Engine
+	tags           *normalize.TagResolver
 	captureDir     string
 	log            *slog.Logger
 	mux            *http.ServeMux
@@ -55,6 +58,10 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 	if engine == nil {
 		engine, _ = normalize.NewEngine(nil) // empty rule set cannot fail
 	}
+	tags := opts.Tags
+	if tags == nil {
+		tags, _ = normalize.NewTagResolver(nil) // defaults cannot fail
+	}
 	s := &Server{
 		store:          st,
 		tokens:         opts.Tokens,
@@ -62,6 +69,7 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 		fluxHMACKey:    opts.FluxHMACKey,
 		fluxSuppressor: flux.NewSuppressor(opts.FluxSuppression),
 		engine:         engine,
+		tags:           tags,
 		captureDir:     opts.CaptureDir,
 		log:            log,
 		mux:            http.NewServeMux(),
@@ -73,6 +81,9 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 	s.mux.HandleFunc("POST /ingest/flux", s.handleIngestFlux)     // HMAC-verified inside
 	s.mux.Handle("GET /api/events", s.requireBearer(http.HandlerFunc(s.handleListEvents)))
 	s.mux.Handle("GET /api/doctor", s.requireBearer(http.HandlerFunc(s.handleDoctor)))
+	s.mux.Handle("GET /api/where/{ref}", s.requireBearer(http.HandlerFunc(s.handleWhere)))
+	s.mux.Handle("GET /api/diff", s.requireBearer(http.HandlerFunc(s.handleDiff)))
+	s.mux.Handle("GET /api/handoff", s.requireBearer(http.HandlerFunc(s.handleHandoff)))
 
 	return s
 }

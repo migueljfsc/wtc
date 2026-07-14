@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/ingest/generic"
+	"github.com/migueljfsc/wtc/internal/query"
 	"github.com/migueljfsc/wtc/internal/server"
 	"github.com/migueljfsc/wtc/internal/store"
 )
@@ -100,5 +101,28 @@ func (c *Client) Events(ctx context.Context, params url.Values) (server.EventsRe
 func (c *Client) Doctor(ctx context.Context) (store.DoctorReport, error) {
 	var out store.DoctorReport
 	err := c.do(ctx, http.MethodGet, "/api/doctor", nil, &out)
+	return out, err
+}
+
+// Where fetches a change's BUILD → INTENT → APPLIED journey.
+func (c *Client) Where(ctx context.Context, ref string) (query.WhereReport, error) {
+	var out query.WhereReport
+	err := c.do(ctx, http.MethodGet, "/api/where/"+url.PathEscape(ref), nil, &out)
+	return out, err
+}
+
+// Diff compares two environments.
+func (c *Client) Diff(ctx context.Context, a, b string) (query.DiffReport, error) {
+	var out query.DiffReport
+	params := url.Values{"a": {a}, "b": {b}}
+	err := c.do(ctx, http.MethodGet, "/api/diff?"+params.Encode(), nil, &out)
+	return out, err
+}
+
+// Handoff fetches the activity digest since the given instant.
+func (c *Client) Handoff(ctx context.Context, since string) (query.HandoffReport, error) {
+	var out query.HandoffReport
+	params := url.Values{"since": {since}}
+	err := c.do(ctx, http.MethodGet, "/api/handoff?"+params.Encode(), nil, &out)
 	return out, err
 }

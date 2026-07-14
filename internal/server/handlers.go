@@ -10,6 +10,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/ingest/generic"
 	"github.com/migueljfsc/wtc/internal/model"
 	"github.com/migueljfsc/wtc/internal/normalize"
+	"github.com/migueljfsc/wtc/internal/query"
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
@@ -59,6 +60,50 @@ func (s *Server) handleIngestGeneric(w http.ResponseWriter, r *http.Request) {
 		code = http.StatusOK
 	}
 	s.writeJSON(w, code, IngestResponse{ID: id, Deduped: deduped})
+}
+
+func (s *Server) handleWhere(w http.ResponseWriter, r *http.Request) {
+	report, err := query.Where(r.Context(), s.store, s.tags, r.PathValue("ref"))
+	if err != nil {
+		// Input-shaped errors (unresolvable ref) are the client's problem.
+		s.writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	s.writeJSON(w, http.StatusOK, report)
+}
+
+func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
+	a, b := r.URL.Query().Get("a"), r.URL.Query().Get("b")
+	if a == "" || b == "" || a == b {
+		s.writeError(w, http.StatusBadRequest, "diff needs two distinct envs: ?a=staging&b=prod")
+		return
+	}
+	report, err := query.Diff(r.Context(), s.store, a, b)
+	if err != nil {
+		s.log.Error("diff", "error", err)
+		s.writeError(w, http.StatusInternalServerError, "query error")
+		return
+	}
+	s.writeJSON(w, http.StatusOK, report)
+}
+
+func (s *Server) handleHandoff(w http.ResponseWriter, r *http.Request) {
+	since := time.Now().Add(-7 * 24 * time.Hour)
+	if v := r.URL.Query().Get("since"); v != "" {
+		ts, err := model.ParseTS(v)
+		if err != nil {
+			s.writeError(w, http.StatusBadRequest, "since: "+err.Error())
+			return
+		}
+		since = ts
+	}
+	report, err := query.Handoff(r.Context(), s.store, since)
+	if err != nil {
+		s.log.Error("handoff", "error", err)
+		s.writeError(w, http.StatusInternalServerError, "query error")
+		return
+	}
+	s.writeJSON(w, http.StatusOK, report)
 }
 
 func (s *Server) handleDoctor(w http.ResponseWriter, r *http.Request) {
