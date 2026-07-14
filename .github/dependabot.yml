@@ -1,19 +1,50 @@
 version: 2
+
 updates:
+  # Go modules (root). The demo/ services are separate modules, left out to
+  # keep PR volume low; add "/demo/*" here if they need tracking too.
   - package-ecosystem: gomod
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
     groups:
       go-deps:
         patterns:
           - "*"
 
+  # GitHub Actions across .github/workflows (ci, release, demo-*). This is what
+  # keeps actions off deprecated runtimes — e.g. the checkout/setup-go Node 20
+  # notice that surfaced on the v0.3.0 release run.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+      include: scope
     groups:
       actions:
+        patterns:
+          - "*"
+
+  # Container base images (root Dockerfile + the three demo service images) —
+  # bumps golang:<ver>-alpine as new releases land.
+  - package-ecosystem: docker
+    directories:
+      - "/"
+      - "/demo/*"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      docker:
         patterns:
           - "*"
