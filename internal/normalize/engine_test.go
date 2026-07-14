@@ -40,6 +40,20 @@ func TestEngineRules(t *testing.T) {
 		}
 	})
 
+	t.Run("workflow fact matches and templates", func(t *testing.T) {
+		e := mustEngine(t, []Rule{
+			{Match: RuleMatch{Source: "github", Workflow: "demo-*"}, Set: RuleSet{Service: "{{ .Workflow }}"}},
+		})
+		ev := apply(t, e, &model.Event{}, Facts{Source: "github", Workflow: "demo-api"})
+		if ev.Service != "demo-api" {
+			t.Errorf("Service = %q, want demo-api", ev.Service)
+		}
+		ev = apply(t, e, &model.Event{}, Facts{Source: "github", Workflow: "ci"})
+		if ev.Service != "" {
+			t.Errorf("Service = %q, non-demo workflow must not match", ev.Service)
+		}
+	})
+
 	t.Run("template service from repo", func(t *testing.T) {
 		ev := apply(t, e, &model.Event{}, Facts{Source: "github", Repo: "org/app-api", Event: "workflow_run"})
 		if ev.Kind != model.KindBuild || ev.Service != "app-api" {

@@ -17,6 +17,7 @@ type Facts struct {
 	Repo       string
 	Branch     string
 	Event      string
+	Workflow   string // CI workflow name — the service signal in monorepos
 	Actor      string
 	Cluster    string
 	ObjectKind string
@@ -37,6 +38,7 @@ type RuleMatch struct {
 	Repo       string   `yaml:"repo"`
 	Branch     string   `yaml:"branch"`
 	Event      string   `yaml:"event"`
+	Workflow   string   `yaml:"workflow"`
 	Cluster    string   `yaml:"cluster"`
 	ObjectKind string   `yaml:"object_kind"`
 	Paths      []string `yaml:"paths"`
@@ -62,8 +64,8 @@ type Rule struct {
 type compiledRule struct {
 	match RuleMatch
 	globs struct {
-		source, repo, branch, event, cluster, objectKind *regexp.Regexp
-		paths                                            []*regexp.Regexp
+		source, repo, branch, event, workflow, cluster, objectKind *regexp.Regexp
+		paths                                                      []*regexp.Regexp
 	}
 	set map[string]*template.Template // field name → value template
 }
@@ -106,6 +108,7 @@ func NewEngine(rules []Rule) (*Engine, error) {
 		compile(&c.globs.repo, r.Match.Repo)
 		compile(&c.globs.branch, r.Match.Branch)
 		compile(&c.globs.event, r.Match.Event)
+		compile(&c.globs.workflow, r.Match.Workflow)
 		compile(&c.globs.cluster, r.Match.Cluster)
 		compile(&c.globs.objectKind, r.Match.ObjectKind)
 		for _, p := range r.Match.Paths {
@@ -167,6 +170,7 @@ func (r *compiledRule) matches(f Facts) bool {
 	check := func(re *regexp.Regexp, val string) bool { return re == nil || re.MatchString(val) }
 	if !check(r.globs.source, f.Source) || !check(r.globs.repo, f.Repo) ||
 		!check(r.globs.branch, f.Branch) || !check(r.globs.event, f.Event) ||
+		!check(r.globs.workflow, f.Workflow) ||
 		!check(r.globs.cluster, f.Cluster) || !check(r.globs.objectKind, f.ObjectKind) {
 		return false
 	}

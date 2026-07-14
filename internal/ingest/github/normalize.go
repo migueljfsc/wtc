@@ -135,11 +135,12 @@ func NormalizeWorkflowRun(run restWorkflowRun, now time.Time) (*model.Event, nor
 		DedupKey:   fmt.Sprintf("gh:run:%s:%d:%d", repo, run.ID, run.RunAttempt),
 	}
 	facts := normalize.Facts{
-		Source: "github",
-		Repo:   repo,
-		Branch: run.HeadBranch,
-		Event:  "workflow_run",
-		Actor:  actor,
+		Source:   "github",
+		Repo:     repo,
+		Branch:   run.HeadBranch,
+		Event:    "workflow_run",
+		Workflow: run.Name, // service signal for monorepos (per-service workflows)
+		Actor:    actor,
 		// Changed files are not part of run payloads.
 		PathsTruncated: true,
 	}
