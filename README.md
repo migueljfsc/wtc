@@ -17,21 +17,24 @@ private network — the GitHub poller pulls instead of waiting for webhooks.
 
 ## Status
 
-**Phases 0–4 of 6 complete** (see [docs/PLAN.md](docs/PLAN.md)). Working today,
+**Phases 0–5 of 6 complete** (see [docs/PLAN.md](docs/PLAN.md)). Working today,
 each verified against live infrastructure:
 
 - **Ingest**: GitHub (API poller primary, HMAC webhooks for public endpoints),
-  Flux notification-controller (generic-hmac), `/ingest/generic`, `wtc record`,
-  `wtc wrap` (helm/terraform sniffers)
+  Flux notification-controller (generic-hmac), Alertmanager, `/ingest/generic`,
+  `wtc record`, `wtc wrap` (helm/terraform sniffers)
 - **Queries**: `log` (FTS5 `-q`), `where` (build → intent → applied per env,
-  tag↔sha via configurable `tag_patterns`), `diff`, `handoff`, `doctor`
+  tag↔sha via configurable `tag_patterns`), `diff`, `handoff`, `around`, `doctor`
 - **Engine**: ordered env/service inference rules with globs + templates;
   strict-outrank dedup upsert (at-least-once ingestion, zero duplicates);
   PR-diff enrichment; redaction before storage
-- **Packaging**: `ghcr.io/migueljfsc/wtc` image, Helm chart, docker-compose
+- **Surfaces**: embedded timeline UI at `/`, Slack digest
+- **Packaging**: `ghcr.io/migueljfsc/wtc` multi-arch image (auto-versioned),
+  Helm chart, docker-compose
 
-Remaining: embedded web UI + Alertmanager + Slack digest (P5), release
-hygiene (P6).
+Remaining: release hygiene (P6 — goreleaser, `wtc demo` seed, load sanity), and
+a **rich portal UI** track (P7–P10: dashboards, metrics, change-intelligence
+views) built as a separate SPA alongside the embedded timeline.
 
 ## Quickstart (local)
 
