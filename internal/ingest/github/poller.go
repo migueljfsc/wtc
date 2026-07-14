@@ -154,9 +154,22 @@ func (p *Poller) ingest(ctx context.Context, repo, resource string, raw []byte, 
 				continue
 			}
 			ev, facts := NormalizeMergedPR(pr, repo, time.Now())
-			if ev != nil {
-				pairs = append(pairs, eventFacts{ev, facts})
+			if ev == nil {
+				continue
 			}
+			// PR-diff enrichment (SPEC §7): real paths facts (env inference
+			// for promotion PRs) + image-bump payload (the tag↔revision
+			// link). Failure degrades to an unenriched event, never a drop.
+			if enr, err := p.client.EnrichPR(ctx, repo, pr.Number); err != nil {
+				p.log.Error("pr enrichment", "repo", repo, "pr", pr.Number, "error", err)
+			} else {
+				facts.Paths = enr.Paths
+				facts.PathsTruncated = enr.PathsTruncated
+				if enr.Payload != "" {
+					ev.Payload = enr.Payload
+				}
+			}
+			pairs = append(pairs, eventFacts{ev, facts})
 		}
 	case "commits":
 		var list []restCommit

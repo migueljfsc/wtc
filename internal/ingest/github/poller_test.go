@@ -47,6 +47,7 @@ func fakeGitHub(t *testing.T) *httptest.Server {
 	}
 	mux.HandleFunc("GET /repos/migueljfsc/wtc/actions/runs", serveRaw(runs))
 	mux.HandleFunc("GET /repos/migueljfsc/wtc/pulls", serveRaw(prs))
+	mux.HandleFunc("GET /repos/migueljfsc/wtc/pulls/1/files", serveRaw(read("pull_request_files.json")))
 	mux.HandleFunc("GET /repos/migueljfsc/wtc/commits", serveRaw(commits))
 
 	srv := httptest.NewServer(mux)
