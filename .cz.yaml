@@ -1,22 +1,10 @@
-# Commitizen config for the wtc application itself (the root Go module).
-# Standard semver tags `vX.Y.Z` — what Go tooling and goreleaser expect.
-#
-# The ci.yml `publish` job bumps this automatically on pushes to main that
-# touch wtc's own code/chart (demo- and docs-only pushes are skipped — this is
-# a monorepo and cz can't scope commits by path). Note: cz still computes its
-# increment from ALL commits since the last v-tag, so demo feat commits can
-# nudge the increment; force it in a commit's type if that ever matters.
-#
-# The demo services have their own .cz.yaml under demo/<svc>/ with a distinct
-# tag_format, so their tags never collide with these.
+---
 commitizen:
   name: cz_conventional_commits
-  version: 0.1.0
   tag_format: v$version
-  version_scheme: semver
-  # Keep the curated, phase-organized CHANGELOG.md hand-maintained — do not
-  # let cz prepend generated entries to it.
   update_changelog_on_bump: false
+  version: 0.2.0
   version_files:
-    - .cz.yaml:version
-    - deploy/helm/wtc/Chart.yaml:appVersion
+  - .cz.yaml:version
+  - deploy/helm/wtc/Chart.yaml:appVersion
+  version_scheme: semver
