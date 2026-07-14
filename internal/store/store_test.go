@@ -375,6 +375,82 @@ func TestCursorPagination(t *testing.T) {
 	}
 }
 
+func TestFullTextSearch(t *testing.T) {
+	s := openTestStore(t)
+	ctx := context.Background()
+	base := time.Date(2026, 7, 14, 9, 0, 0, 0, time.UTC)
+
+	seed := []*model.Event{
+		testEvent("q:1", base, func(e *model.Event) {
+			e.Title = "rotated payments database credentials"
+			e.Service = "payments-api"
+		}),
+		testEvent("q:2", base.Add(time.Minute), func(e *model.Event) {
+			e.Title = "deploy web frontend"
+			e.Service = "web"
+			e.Actor = "alice"
+		}),
+		testEvent("q:3", base.Add(2*time.Minute), func(e *model.Event) {
+			e.Title = "bump image"
+			e.Artifact = "reg/payments-api:sha-abc1234"
+		}),
+	}
+	for _, ev := range seed {
+		if _, _, err := s.Ingest(ctx, ev); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tests := []struct {
+		q    string
+		want []string
+	}{
+		{"payments", []string{"q:3", "q:1"}}, // title + artifact, prefix-tokenized
+		{"alice", []string{"q:2"}},
+		{"credentials", []string{"q:1"}},
+		{"rot", []string{"q:1"}}, // prefix match
+		{"nosuchterm", nil},
+		{`weird"quote`, nil}, // FTS metachars must not error
+	}
+	for _, tt := range tests {
+		t.Run(tt.q, func(t *testing.T) {
+			events, _, err := s.ListEvents(ctx, Filter{Query: tt.q})
+			if err != nil {
+				t.Fatalf("ListEvents(q=%q): %v", tt.q, err)
+			}
+			var got []string
+			for _, ev := range events {
+				got = append(got, ev.DedupKey)
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("got %v, want %v", got, tt.want)
+				}
+			}
+		})
+	}
+
+	// Upsert keeps the index in sync (UPDATE trigger).
+	upd := testEvent("q:1", base.Add(3*time.Minute), func(e *model.Event) {
+		e.Status = model.StatusSucceeded
+		e.Title = "renamed to billing creds rotation"
+	})
+	if _, _, err := s.Ingest(ctx, upd); err != nil {
+		t.Fatal(err)
+	}
+	events, _, _ := s.ListEvents(ctx, Filter{Query: "billing"})
+	if len(events) != 1 || events[0].DedupKey != "q:1" {
+		t.Fatalf("post-update search failed: %v", events)
+	}
+	events, _, _ = s.ListEvents(ctx, Filter{Query: "credentials"})
+	if len(events) != 0 {
+		t.Fatalf("stale index entry survived update: %v", events)
+	}
+}
+
 func TestMigrationsIdempotent(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "wtc.db")
 	s1, err := Open(path)

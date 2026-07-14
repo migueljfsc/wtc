@@ -19,7 +19,7 @@ import (
 func newLogCmd(flags *clientFlags) *cobra.Command {
 	var (
 		env, service, kind, status string
-		since, until               string
+		since, until, query        string
 		limit                      int
 		asJSON                     bool
 	)
@@ -59,6 +59,7 @@ func newLogCmd(flags *clientFlags) *cobra.Command {
 			set("service", service)
 			set("kind", kind)
 			set("status", status)
+			set("q", query)
 			params.Set("limit", strconv.Itoa(limit))
 			params.Set("since", model.FormatTS(sinceTS))
 			if !untilTS.IsZero() {
@@ -107,6 +108,7 @@ func newLogCmd(flags *clientFlags) *cobra.Command {
 	f.StringVar(&service, "service", "", "filter by service")
 	f.StringVar(&kind, "kind", "", "filter by kind")
 	f.StringVar(&status, "status", "", "filter by status")
+	f.StringVarP(&query, "query", "q", "", "full-text search over title/service/actor/artifact")
 	f.StringVar(&since, "since", "24h", "how far back: 2h, 7d, 1w, or RFC3339")
 	f.StringVar(&until, "until", "", "upper bound: duration ago or RFC3339")
 	f.IntVar(&limit, "limit", 100, "max events")
