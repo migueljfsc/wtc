@@ -4,6 +4,26 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 3 (the three killer queries)
+
+- **`wtc where <sha|tag>`** — BUILD → INTENT → APPLIED per environment with
+  intent→applied lag. Accepts short/full shas or image tags via the
+  configurable `tag_patterns` (defaults: `sha-<sha>`, `<semver>-<sha>`).
+  Explicit unknown markers; wtc never guesses.
+- **`wtc diff <a> <b>`** — latest successful deploy per service across two
+  envs; artifact comparison with flagged revision-only fallback, drift age,
+  only-in-one-env detection.
+- **`wtc handoff --since 7d`** — markdown digest: deploys/failures per env,
+  infra changes, rollbacks, unmapped counts, top actors, first-seen services.
+- **Full-text search**: `wtc log -q <text>` / `?q=` over
+  title/service/actor/artifact (FTS5, prefix matching, injection-safe).
+- **PR-diff enrichment**: merged PRs gain changed-file facts (path rules can
+  now infer env for promotion PRs) and `image_bumps` payload extracted from
+  kustomize/helm patches — the tag↔manifest-revision link `where` traverses.
+- `demo/`: three dummy services with commitizen lifecycles, GHCR pipelines,
+  kustomize overlays, and Flux wiring posing as three clusters — the living
+  test bed generating real events.
+
 ### Added — Phase 2 (Flux ingest)
 
 - `POST /ingest/flux`: generic-hmac verification (`X-Signature: sha256=<hex>`,
