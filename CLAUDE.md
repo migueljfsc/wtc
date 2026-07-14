@@ -26,7 +26,7 @@ Differentiator: vendor-neutral, self-hosted, CLI-first. New Relic, Datadog, and 
 - IaC: mostly YAML manifests managed by Flux, including Crossplane resources. Occasional Terraform (CI only).
 - Packaging: **Helm chart first** (in-cluster), docker-compose for VMs/local. No systemd unit in v1.
 
-Consequence: the two highest-value ingest paths are the **GitHub API poller** and **Flux notification-controller**. Crossplane changes are covered indirectly (they flow through git + Flux). Helm-for-feature-branches and Terraform are covered by the `wtc wrap` command until later phases.
+Consequence: the two highest-value ingest paths are the **GitHub API poller** and **Flux notification-controller**. Crossplane changes are covered indirectly (they flow through git + Flux). Helm-for-feature-branches and Terraform are covered by `wtc wrap` (shipped in P4).
 
 ## Hard decisions — do not relitigate without operator approval
 
@@ -50,21 +50,24 @@ Postgres backend, multi-tenancy/RBAC, DORA dashboards, feature-flag providers, i
 ```
 cmd/wtc/              main.go + cobra command definitions
 internal/model/       Event struct, kind/status enums, validation
-internal/store/       sqlite open/pragmas, migrations/, write queue, queries
-internal/server/      http server, routing, middleware (hmac, bearer, ratelimit), capture mode
+internal/config/      wtc.yaml loader, ${VAR} expansion (unset = fatal), WTC_* overrides
+internal/store/       sqlite open/pragmas, migrations/, write queue, queries, watermarks
+internal/server/      http server, routing, middleware (hmac, bearer), capture mode
 internal/ingest/
-    github/           payload structs, handlers per event type, normalizer
+    github/           REST payload structs, normalizers, API poller, PR enrichment
     flux/             eventv1 payload, dedup/suppression, normalizer
-    generic/          /ingest/generic + `wtc record` schema
-internal/normalize/   rules engine (env/service/cluster inference), redaction
-internal/query/       log, where, diff, handoff, doctor logic
+    generic/          /ingest/generic + `wtc record`/`wrap` schema
+internal/normalize/   rules engine (env/service/cluster inference), redaction, tag_patterns
+internal/query/       where, diff, handoff logic
+internal/client/      thin HTTP client for all non-serve subcommands
 internal/wrap/        `wtc wrap` command runner + helm/terraform arg sniffers
+deploy/               Dockerfile context, helm chart, docker-compose
 web/                  phase 5 embedded UI
 testdata/             captured real payloads as golden fixtures, per source
 demo/                 dummy services (api/web/worker) that feed wtc real events:
                       own go modules (invisible to root build), commitizen
                       lifecycles, kustomize overlays, flux/ cluster wiring
-docs/                 SPEC.md, PLAN.md, setup/ (flux-provider.yaml, github-webhook.md)
+docs/                 SPEC.md, PLAN.md, setup/ wiring guides
 ```
 
 ## Engineering conventions

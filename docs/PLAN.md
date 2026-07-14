@@ -2,6 +2,22 @@
 
 Lives at `docs/PLAN.md`. Each phase ≈ 1–3 Claude Code sessions. A phase is done only when its acceptance criteria pass and the operator can wire it to real infrastructure using only `docs/setup/`.
 
+## Status
+
+| Phase | State | Notes |
+|---|---|---|
+| P0 skeleton | ✅ 2026-07-13 | + multi-agent review pass: 22 confirmed findings fixed same day |
+| P1 GitHub ingest | ✅ 2026-07-13 | poller-primary (Q3 re-order); webhook envelope parsing deferred with fixtures |
+| P2 Flux ingest | ✅ 2026-07-13 | captured from a local kind cluster (Flux v2.9); ImageUpdateAutomation fixtures deferred |
+| P3 killer queries | ✅ 2026-07-14 | live-validated on the demo stack: real PR promotion traced end-to-end, 37s lag |
+| P4 gap closers | ✅ 2026-07-14 | wrap verified against a live helm install; chart+compose verified; image on GHCR |
+| P5 surfaces | ⬜ | web UI, Alertmanager + `wtc around`, Slack digest |
+| P6 release hygiene | ⬜ | goreleaser, quickstart, `wtc demo` seed, load sanity |
+
+Unplanned addition: `demo/` — three dummy services + fake three-cluster Flux
+wiring generating real events continuously (operator-requested test bed;
+doubles as the P3 live-acceptance rig and portfolio demo).
+
 ## Decisions (operator answers, 2026-07-12 — previously "open questions")
 
 | # | Decision |

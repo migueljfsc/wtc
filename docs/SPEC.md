@@ -58,7 +58,7 @@ Upsert rule: `INSERT ... ON CONFLICT(dedup_key) DO UPDATE` — only when the inc
 - github pull_request merged → `gh:pr:<repo>:<number>:merged`
 - github push → `gh:push:<repo>:<after_sha>`
 - flux → `flux:<cluster>:<kind>/<ns>/<name>:<revision>:<reason>`
-- wrap/record → `local:<uuid>` generated at start, reused for the completion update
+- wrap/record → `local:<ulid>` generated at start, reused for the completion update (a `wtc record` retry without an explicit `--dedup-key` is a NEW event)
 - alertmanager → `am:<fingerprint>:<startsAt>`
 
 ## 2. Configuration (`wtc.yaml`)
@@ -172,7 +172,7 @@ Client resolution: `--server`/`WTC_SERVER` + `WTC_API_TOKEN`; default `http://lo
 
 ### `wtc wrap` behavior
 
-1. Emits `started` event (dedup_key `local:<uuid>`), runs the command inheriting stdio, then upserts `succeeded|failed` with `duration_ms` and exit code in payload.
+1. Emits `started` event (dedup_key `local:<ulid>`), runs the command inheriting stdio, then upserts `succeeded|failed` with `duration_ms` and exit code in payload.
 2. Arg sniffers prefill fields when flags are absent:
    - `helm upgrade|install <release> <chart>` → kind=deploy, service=release, namespace from `-n`, artifact=chart, plus `--set image.tag=...` if present.
    - `terraform apply|destroy` → kind=infra_change; if stdout is the `-json` stream, count add/change/destroy into the title; **never** store plan/resource bodies.
