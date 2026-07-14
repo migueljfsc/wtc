@@ -19,6 +19,10 @@ func main() {
 			"pod":     os.Getenv("HOSTNAME"),
 		})
 	})
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
 	log.Printf("wtc-demo-worker %s listening on :8080", version)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
