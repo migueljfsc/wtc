@@ -55,6 +55,7 @@ func newRootCmd() *cobra.Command {
 		newWrapCmd(flags),
 		newInitCmd(),
 		newDoctorCmd(flags),
+		newDemoCmd(flags),
 	)
 	return root
 }

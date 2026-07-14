@@ -115,6 +115,13 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 		go ds.Run(ctx)
 	}
 
+	// Optional retention prune job (nil unless retention.keep is set).
+	if rs := server.NewRetentionScheduler(st,
+		cfg.Retention.Keep.Std(), cfg.Retention.EphemeralKeep.Std(),
+		cfg.Retention.Interval.Std(), cfg.Retention.EphemeralEnvPattern, log); rs != nil {
+		go rs.Run(ctx)
+	}
+
 	errCh := make(chan error, 1)
 	go func() {
 		log.Info("wtc serve listening", "addr", cfg.Server.Listen, "db", cfg.Server.DB, "version", version)

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -23,11 +24,13 @@ type PollState struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// DoctorReport is the /api/doctor payload (SPEC §6, P1 scope: no retention
-// stats or dedup-drop counters yet).
+// DoctorReport is the /api/doctor payload (SPEC §6). OldestEvent lets an
+// operator eyeball retention (how far back the ledger reaches vs. keep); a
+// dedup-drop counter is still not tracked.
 type DoctorReport struct {
 	TotalEvents     int64          `json:"total_events"`
 	DBSizeBytes     int64          `json:"db_size_bytes"`
+	OldestEvent     *time.Time     `json:"oldest_event,omitempty"` // nil on an empty ledger
 	Sources         []SourceHealth `json:"sources"`
 	Unmapped24h     int            `json:"unmapped_24h"`
 	UnmappedSamples []string       `json:"unmapped_samples,omitempty"`
@@ -48,6 +51,19 @@ func (s *Store) Doctor(ctx context.Context, now time.Time) (*DoctorReport, error
 		`SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()`,
 	).Scan(&r.DBSizeBytes); err != nil {
 		return nil, fmt.Errorf("doctor: db size: %w", err)
+	}
+
+	// Oldest retained event (NULL on an empty ledger) — a quick retention gauge.
+	var oldest sql.NullString
+	if err := s.readDB.QueryRowContext(ctx, `SELECT MIN(ts) FROM events`).Scan(&oldest); err != nil {
+		return nil, fmt.Errorf("doctor: oldest: %w", err)
+	}
+	if oldest.Valid {
+		t, err := model.ParseTS(oldest.String)
+		if err != nil {
+			return nil, err
+		}
+		r.OldestEvent = &t
 	}
 
 	rows, err := s.readDB.QueryContext(ctx, `

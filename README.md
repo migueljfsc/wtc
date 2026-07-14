@@ -17,7 +17,7 @@ private network — the GitHub poller pulls instead of waiting for webhooks.
 
 ## Status
 
-**Phases 0–5 of 6 complete** (see [docs/PLAN.md](docs/PLAN.md)). Working today,
+**Phases 0–6 complete** (see [docs/PLAN.md](docs/PLAN.md)). Working today,
 each verified against live infrastructure:
 
 - **Ingest**: GitHub (API poller primary, HMAC webhooks for public endpoints),
@@ -28,13 +28,14 @@ each verified against live infrastructure:
 - **Engine**: ordered env/service inference rules with globs + templates;
   strict-outrank dedup upsert (at-least-once ingestion, zero duplicates);
   PR-diff enrichment; redaction before storage
-- **Surfaces**: embedded timeline UI at `/`, Slack digest
+- **Surfaces**: embedded timeline UI at `/`, Slack digest, `wtc demo` seed
+- **Ops**: opt-in retention prune (`pr-*` ephemeral windows + `incremental_vacuum`)
 - **Packaging**: `ghcr.io/migueljfsc/wtc` multi-arch image (auto-versioned),
-  Helm chart, docker-compose
+  goreleaser binaries (linux/darwin × amd64/arm64), Helm chart, docker-compose
 
-Remaining: release hygiene (P6 — goreleaser, `wtc demo` seed, load sanity), and
-a **rich portal UI** track (P7–P10: dashboards, metrics, change-intelligence
-views) built as a separate SPA alongside the embedded timeline.
+Remaining: a **rich portal UI** track (P7–P10: dashboards, metrics,
+change-intelligence views) built as a separate SPA alongside the embedded
+timeline.
 
 ## Quickstart (local)
 
@@ -45,14 +46,20 @@ export WTC_API_TOKEN=$(openssl rand -hex 16)
 export WTC_GH_API_TOKEN=<github PAT>  # read-only: Actions/Contents/PRs
 ./bin/wtc serve --config wtc.yaml &
 
+# Fastest way to see it work — seed a synthetic week (no real sources needed):
+./bin/wtc demo
+./bin/wtc log --since 7d
+./bin/wtc diff staging prod
+
+# Or record a change by hand:
 ./bin/wtc record --kind manual --env prod --title "rotated db creds"
-./bin/wtc log --since 1h
 ./bin/wtc doctor
 ```
 
 Wiring real sources: [docs/setup/github-poller.md](docs/setup/github-poller.md) ·
 [docs/setup/flux.md](docs/setup/flux.md) · [docs/setup/wrap.md](docs/setup/wrap.md) ·
-deploy via [docs/setup/deploy.md](docs/setup/deploy.md).
+deploy via [docs/setup/deploy.md](docs/setup/deploy.md) ·
+[retention](docs/setup/retention.md).
 
 ## How it works
 

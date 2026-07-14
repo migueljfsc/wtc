@@ -1,0 +1,45 @@
+# goreleaser v2 — cross-platform binary archives for wtc.
+# Fires from .github/workflows/release.yml on a v* tag (pushed by the CI
+# commitizen bump). The multi-arch container image is built separately in
+# ci.yml; this produces the standalone binaries operators download for VMs.
+version: 2
+
+project_name: wtc
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: wtc
+    main: ./cmd/wtc
+    binary: wtc
+    env:
+      - CGO_ENABLED=0 # pure-Go sqlite (modernc); no cgo toolchain per platform
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - id: wtc
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+
+checksum:
+  name_template: "checksums.txt"
+
+# CHANGELOG.md is curated by hand; don't let goreleaser generate release notes
+# from commit subjects.
+changelog:
+  disable: true
+
+release:
+  draft: false
+  prerelease: auto

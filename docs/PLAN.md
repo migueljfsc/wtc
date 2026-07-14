@@ -12,7 +12,7 @@ Lives at `docs/PLAN.md`. Each phase ≈ 1–3 Claude Code sessions. A phase is d
 | P3 killer queries | ✅ 2026-07-14 | live-validated on the demo stack: real PR promotion traced end-to-end, 37s lag |
 | P4 gap closers | ✅ 2026-07-14 | wrap verified against a live helm install; chart+compose verified; image on GHCR |
 | P5 surfaces | ✅ 2026-07-14 | embedded timeline UI, Alertmanager + `wtc around`, Slack digest — all live-verified |
-| P6 release hygiene | 🟡 partial | auto cz-versioning + multi-arch images done; goreleaser, `wtc demo` seed, load sanity remain |
+| P6 release hygiene | ✅ done | auto cz-versioning, multi-arch images, goreleaser binaries, retention job, `wtc demo` seed, load sanity, LICENSE |
 | **P7 portal foundation** | ⬜ | separate SPA + API hardening (CORS, versioning, aggregation endpoints) |
 | **P8 portal core views** | ⬜ | dashboard, rich timeline, service pages |
 | **P9 change-intelligence views** | ⬜ | `where`/`diff`/`around` visualized; env matrix |
@@ -81,11 +81,19 @@ Embedded web timeline (toolchain-free per CLAUDE.md): filter bar (env/service/ki
 
 **Accept:** UI served from the single binary, usable on mobile width, no external asset downloads; alert fixture correlates to the deploy that preceded it; digest posts to a real Slack webhook.
 
-## Phase 6 — Release hygiene
+## Phase 6 — Release hygiene ✅
 
 goreleaser (linux/darwin, amd64/arm64), versioned migrations check, README with 5-minute quickstart, demo seed command (`wtc demo` loads a synthetic week), retention job verified, basic load sanity (10k events: log/diff < 100ms).
 
-Done so far: auto commitizen versioning in CI (tags `vX.Y.Z`, bumps Helm appVersion) and multi-arch images (linux/amd64+arm64). Remaining: goreleaser binaries, `wtc demo` seed, retention verification, load sanity.
+**Delivered:**
+- Auto commitizen versioning in CI (tags `vX.Y.Z`, bumps Helm appVersion) + multi-arch images (linux/amd64+arm64).
+- **goreleaser** — `.goreleaser.yaml` + `release.yml` fire on `v*` tags, attaching static cross-platform binary archives (linux/darwin × amd64/arm64, no CGO) + checksums to the GitHub Release. Demo services tag `demo-<svc>-v*` and are excluded.
+- **Retention job** — opt-in `retention:` config; single-writer DELETE (normal vs `pr-*` ephemeral windows) + `incremental_vacuum`; prunes on start then every `interval`; table-driven test covers normal/ephemeral/unmapped splits + FTS consistency. `wtc doctor` surfaces `oldest_event`.
+- **`wtc demo`** — seeds a synthetic week via `/ingest/generic` (CLI never opens the DB); showcases `log`/`where`/`diff`/`around` + drift with zero real wiring.
+- **Load sanity** — `TestLoadSanity`: 10k events, `log`/`diff` medians under the 100ms budget (observed ~0.2ms / ~15ms).
+- **LICENSE** — Apache-2.0 text added (repo declared it, file was missing).
+
+Config gained standalone `d`/`w` duration suffixes so `keep: 180d` reads as the SPEC intends.
 
 ---
 

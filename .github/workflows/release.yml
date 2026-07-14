@@ -1,0 +1,30 @@
+name: release
+
+# Fires when the CI commitizen bump pushes a wtc version tag (v1.2.3). Demo
+# services tag as demo-<svc>-v* and are excluded. goreleaser builds the
+# cross-platform binary archives and attaches them to the GitHub Release;
+# the container image is published separately by ci.yml.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write # create the GitHub Release and upload archives
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # goreleaser needs full history + tags
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
