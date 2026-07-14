@@ -4,6 +4,31 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 6 (release hygiene)
+
+- **Retention prune job** (SPEC §8): `retention:` config (`keep`,
+  `ephemeral_env_pattern`, `ephemeral_keep`, `interval`). Opt-in — off until
+  `keep` is set, so a fresh box never silently deletes. Ephemeral `pr-*` envs
+  get a shorter window; unmapped `env=""` rows follow the normal `keep`. Runs
+  on the single writer connection (serializes with ingest), reclaims pages via
+  `PRAGMA incremental_vacuum`, and the FTS index stays consistent via the
+  existing delete trigger. Prunes once on start then every `interval`.
+- **`wtc demo`**: seeds a self-contained synthetic week (builds → dev/staging/
+  prod deploys with realistic lag, build failures, ephemeral `pr-*` envs, a
+  manual change, an alert) through `/ingest/generic`, so `log`/`where`/`diff`/
+  `around` and the UI work with zero real wiring. `--days N` (default 7); each
+  run is now-anchored and accumulates.
+- **Duration config** now accepts standalone `d`/`w` suffixes (`180d`, `2w`),
+  not just `time.ParseDuration`'s `ns…h`.
+- **`wtc doctor`** reports the oldest retained event (`oldest_event`) as a
+  quick retention gauge.
+- **goreleaser** (`.goreleaser.yaml` + `release.yml`): cross-platform binary
+  archives (linux/darwin × amd64/arm64, static, no CGO) attached to the GitHub
+  Release on each `v*` tag; container image still built separately by CI.
+- **LICENSE**: added the Apache-2.0 text the repo had declared but was missing.
+- **Load sanity test**: 10k events, `log`/`diff` query medians asserted under
+  the 100ms SPEC budget (observed ~0.2ms/15ms).
+
 ### Added — Phase 5 (surfaces)
 
 - **Embedded web timeline** at `/` (toolchain-free: hand-written

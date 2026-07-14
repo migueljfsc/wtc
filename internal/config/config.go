@@ -9,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,12 +27,31 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 	if err := value.Decode(&s); err != nil {
 		return fmt.Errorf("duration must be a string like \"60s\": %w", err)
 	}
-	parsed, err := time.ParseDuration(s)
+	parsed, err := parseDuration(s)
 	if err != nil {
 		return fmt.Errorf("parse duration %q: %w", s, err)
 	}
 	*d = Duration(parsed)
 	return nil
+}
+
+// parseDuration extends time.ParseDuration (ns…h) with standalone day ("d")
+// and week ("w") suffixes, so retention windows read as "180d"/"2w" instead of
+// "4320h". Composite forms like "1d12h" are not supported — d/w must stand
+// alone; everything else delegates unchanged.
+func parseDuration(s string) (time.Duration, error) {
+	s = strings.TrimSpace(s)
+	if n, ok := strings.CutSuffix(s, "d"); ok {
+		if f, err := strconv.ParseFloat(n, 64); err == nil {
+			return time.Duration(f * 24 * float64(time.Hour)), nil
+		}
+	}
+	if n, ok := strings.CutSuffix(s, "w"); ok {
+		if f, err := strconv.ParseFloat(n, 64); err == nil {
+			return time.Duration(f * 7 * 24 * float64(time.Hour)), nil
+		}
+	}
+	return time.ParseDuration(s)
 }
 
 // Std returns the underlying time.Duration.
@@ -81,6 +101,18 @@ type Digest struct {
 	SlackWebhook string   `yaml:"slack_webhook"` // incoming-webhook URL (secret; use ${VAR})
 }
 
+// Retention configures the prune job (SPEC §8). Opt-in: the whole job is
+// disabled unless Keep is set, so a fresh operator never gets silent
+// auto-deletion. Rows whose env matches EphemeralEnvPattern (a SQLite GLOB,
+// e.g. "pr-*") use the shorter EphemeralKeep so ephemeral-env churn doesn't
+// accumulate. Interval defaults to 24h and the pattern to "pr-*" when unset.
+type Retention struct {
+	Keep                Duration `yaml:"keep"`                  // 0 disables the whole job
+	EphemeralEnvPattern string   `yaml:"ephemeral_env_pattern"` // SQLite GLOB; default "pr-*"
+	EphemeralKeep       Duration `yaml:"ephemeral_keep"`        // 0 => same as Keep
+	Interval            Duration `yaml:"interval"`              // run cadence; default 24h when Keep set
+}
+
 // Config is the full wtc.yaml.
 type Config struct {
 	Server      Server           `yaml:"server"`
@@ -89,6 +121,7 @@ type Config struct {
 	Rules       []normalize.Rule `yaml:"rules"`        // ordered env/service inference rules (SPEC §3)
 	TagPatterns []string         `yaml:"tag_patterns"` // tag→sha extraction; empty = defaults (SPEC §2)
 	Digest      Digest           `yaml:"digest"`       // optional scheduled Slack digest
+	Retention   Retention        `yaml:"retention"`    // optional prune job (SPEC §8)
 }
 
 // Default returns the config used when no file or overrides are present.

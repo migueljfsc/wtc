@@ -36,6 +36,63 @@ func TestLoadMissingRequired(t *testing.T) {
 	}
 }
 
+func TestParseDuration(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    time.Duration
+		wantErr bool
+	}{
+		{"60s", 60 * time.Second, false},
+		{"10m", 10 * time.Minute, false},
+		{"24h", 24 * time.Hour, false},
+		{"180d", 180 * 24 * time.Hour, false},
+		{"30d", 30 * 24 * time.Hour, false},
+		{"2w", 14 * 24 * time.Hour, false},
+		{"0.5d", 12 * time.Hour, false},
+		{"1d12h", 0, true}, // composite d-forms unsupported by design
+		{"nope", 0, true},
+	}
+	for _, tt := range tests {
+		got, err := parseDuration(tt.in)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("parseDuration(%q) err = %v, wantErr %v", tt.in, err, tt.wantErr)
+			continue
+		}
+		if !tt.wantErr && got != tt.want {
+			t.Errorf("parseDuration(%q) = %s, want %s", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestRetentionConfig(t *testing.T) {
+	path := writeFile(t, `
+server:
+  listen: ":8484"
+  db: ./wtc.db
+retention:
+  keep: 180d
+  ephemeral_env_pattern: "pr-*"
+  ephemeral_keep: 30d
+  interval: 24h
+`)
+	cfg, err := Load(path, false)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Retention.Keep.Std() != 180*24*time.Hour {
+		t.Errorf("Keep = %s, want 180d", cfg.Retention.Keep.Std())
+	}
+	if cfg.Retention.EphemeralKeep.Std() != 30*24*time.Hour {
+		t.Errorf("EphemeralKeep = %s, want 30d", cfg.Retention.EphemeralKeep.Std())
+	}
+	if cfg.Retention.EphemeralEnvPattern != "pr-*" {
+		t.Errorf("EphemeralEnvPattern = %q, want pr-*", cfg.Retention.EphemeralEnvPattern)
+	}
+	if cfg.Retention.Interval.Std() != 24*time.Hour {
+		t.Errorf("Interval = %s, want 24h", cfg.Retention.Interval.Std())
+	}
+}
+
 func TestLoadFileAndVarExpansion(t *testing.T) {
 	t.Setenv("TEST_WTC_TOKEN", "sekrit")
 	t.Setenv("TEST_WTC_EMPTY_TOKEN", "") // set-but-empty is allowed and filtered

@@ -90,7 +90,11 @@ func newDoctorCmd(flags *clientFlags) *cobra.Command {
 			}
 
 			out := cmd.OutOrStdout()
-			_, _ = fmt.Fprintf(out, "events: %d total · db %s\n\n", r.TotalEvents, humanBytes(r.DBSizeBytes))
+			_, _ = fmt.Fprintf(out, "events: %d total · db %s", r.TotalEvents, humanBytes(r.DBSizeBytes))
+			if r.OldestEvent != nil {
+				_, _ = fmt.Fprintf(out, " · oldest %s ago", time.Since(*r.OldestEvent).Round(time.Hour))
+			}
+			_, _ = fmt.Fprint(out, "\n\n")
 
 			w := tabwriter.NewWriter(out, 2, 4, 2, ' ', 0)
 			_, _ = fmt.Fprintln(w, "SOURCE\tLAST EVENT\t24H COUNT")

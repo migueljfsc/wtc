@@ -16,3 +16,15 @@ auth:
 #    poll_interval: 60s
 #    repos:
 #      - owner/repo
+
+# Retention prune — opt-in: the whole job stays off until `keep` is set, so a
+# fresh box never silently deletes. Ephemeral pr-* envs get a shorter window.
+#retention:
+#  keep: 180d                     # normal envs (and unmapped env="")
+#  ephemeral_env_pattern: "pr-*"  # SQLite GLOB; default "pr-*"
+#  ephemeral_keep: 30d            # pr-* churn; defaults to keep
+#  interval: 24h                  # run cadence; default 24h once keep is set
+
+# Try it without wiring anything real:
+#   wtc demo            # seeds a synthetic week via /ingest/generic
+#   wtc log --since 7d ; wtc diff staging prod
