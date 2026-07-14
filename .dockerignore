@@ -4,7 +4,8 @@ dev/
 demo/
 testdata/
 docs/
-web/
+# NOTE: web/ must stay in the build context — its static/ tree is go:embed-ed
+# into the binary; excluding it breaks the build.
 *.db
 *.db-wal
 *.db-shm
