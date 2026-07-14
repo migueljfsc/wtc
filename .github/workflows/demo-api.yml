@@ -44,15 +44,6 @@ jobs:
           ref: main       # a branch, not the detached trigger sha — cz needs
           fetch-depth: 0  # to be ON main to commit/push the bump
 
-      - name: debug CZ_TOKEN identity (temporary)
-        if: steps.gate.outputs.skip == 'false'
-        env:
-          CZ: ${{ secrets.CZ_TOKEN }}
-        run: |
-          echo "token prefix: ${CZ:0:11} (ghp_=classic, github_pat_=fine-grained)"
-          echo "login: $(curl -s -H "Authorization: token $CZ" https://api.github.com/user | jq -r .login)"
-          echo "scopes: $(curl -s -D- -o /dev/null -H "Authorization: token $CZ" https://api.github.com/user | grep -i x-oauth-scopes)"
-
       - name: bump version
         id: cz
         if: steps.gate.outputs.skip == 'false' && github.event_name == 'push'
