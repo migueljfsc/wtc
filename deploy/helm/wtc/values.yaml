@@ -1,0 +1,45 @@
+image:
+  repository: ghcr.io/migueljfsc/wtc
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8484
+
+# SQLite lives here. Single writer => single replica + Recreate strategy;
+# do not scale this chart horizontally.
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""
+
+# Name of an existing Secret whose keys become env vars, e.g.
+# WTC_API_TOKEN, WTC_GH_API_TOKEN, WTC_FLUX_HMAC_KEY, WTC_GH_WEBHOOK_SECRET.
+# The config below references them with ${VAR}.
+existingSecret: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+# Rendered verbatim to /etc/wtc/wtc.yaml — see docs/SPEC.md §2.
+# NOTE: ${VAR} references resolve from the pod environment at startup and an
+# UNSET variable is a fatal config error (by design — a silently empty db
+# path once meant data loss). Only reference variables that existingSecret
+# actually provides. The default below boots without any secret: the API
+# rejects everything until auth.api_tokens is configured.
+config:
+  server:
+    listen: ":8484"
+    db: /data/wtc.db
+  # auth:
+  #   api_tokens:
+  #     - ${WTC_API_TOKEN}          # requires existingSecret with this key
+  # sources:
+  #   flux:
+  #     hmac_key: ${WTC_FLUX_HMAC_KEY}
+  #     suppression_window: 10m

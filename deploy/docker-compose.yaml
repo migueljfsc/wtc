@@ -1,0 +1,19 @@
+# wtc on a VM / locally. `docker compose up -d` next to a wtc.yaml.
+services:
+  wtc:
+    build:
+      context: ..
+    image: ghcr.io/migueljfsc/wtc:latest
+    ports:
+      - "8484:8484"
+    volumes:
+      - wtc-data:/data
+      - ./wtc.yaml:/etc/wtc/wtc.yaml:ro
+    environment:
+      WTC_API_TOKEN: ${WTC_API_TOKEN:?set WTC_API_TOKEN}
+      WTC_GH_API_TOKEN: ${WTC_GH_API_TOKEN:-}
+      WTC_FLUX_HMAC_KEY: ${WTC_FLUX_HMAC_KEY:-}
+    restart: unless-stopped
+
+volumes:
+  wtc-data:

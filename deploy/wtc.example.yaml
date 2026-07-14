@@ -1,0 +1,7 @@
+# Copy to wtc.yaml next to docker-compose.yaml and edit. See docs/SPEC.md §2.
+server:
+  listen: ":8484"
+  db: /data/wtc.db
+auth:
+  api_tokens:
+    - ${WTC_API_TOKEN}

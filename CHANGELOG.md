@@ -4,6 +4,23 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 4 (gap closers + packaging)
+
+- **`wtc wrap -- <command>`**: records started → succeeded/failed on one row
+  with duration and exit code; inherited stdio; exit code passthrough; a dead
+  server warns and never blocks. Sniffers: helm upgrade/install (release →
+  service, namespace, chart, `--set image.tag`), terraform/tofu apply/destroy
+  (`-json` change_summary counted into the title — plan bodies never stored).
+- Merged revert PRs (`Revert "..."`) land as kind=rollback.
+- Flux `Progressing` pre-events dropped (phantom started-forever rows).
+- Generic ingest accepts structured `details` (exit codes, change counts)
+  into the payload.
+- **Packaging**: scratch Dockerfile (CI publishes `ghcr.io/migueljfsc/wtc`),
+  Helm chart under `deploy/helm/wtc` (single replica + Recreate + PVC — the
+  SQLite contract), `deploy/docker-compose.yaml` for VMs/local.
+  Chart verified by installing into a kind cluster; compose boot verified.
+- Docs: `docs/setup/{wrap,deploy,gha-report-step}.md`.
+
 ### Added — Phase 3 (the three killer queries)
 
 - **`wtc where <sha|tag>`** — BUILD → INTENT → APPLIED per environment with
