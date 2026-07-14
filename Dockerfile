@@ -1,10 +1,13 @@
-FROM golang:1.26-alpine AS build
+# syntax=docker/dockerfile:1
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
+ARG TARGETOS TARGETARCH VERSION=dev
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-ARG VERSION=dev
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /wtc ./cmd/wtc
+# Cross-compile natively for the target platform (no QEMU emulation).
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /wtc ./cmd/wtc
 
 FROM scratch
 # CA bundle: the poller talks HTTPS to api.github.com.
