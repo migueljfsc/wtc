@@ -22,3 +22,5 @@ func main() {
 	log.Printf("wtc-demo-web %s listening on :8080", version)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
+
+// touch: trigger demo pipelines after workflow registration
