@@ -50,7 +50,7 @@ jobs:
         uses: commitizen-tools/commitizen-action@0.27.1
         continue-on-error: true   # cz exits nonzero when nothing to bump
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.CZ_TOKEN }}   # PAT: bump pushes bypass ruleset as repo admin
           working_directory: demo/api
 
       - uses: docker/setup-buildx-action@v4.2.0
