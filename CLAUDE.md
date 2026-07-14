@@ -38,12 +38,16 @@ Consequence: the two highest-value ingest paths are the **GitHub API poller** an
 - **Ingestion is at-least-once.** Idempotency via a `dedup_key` UNIQUE index + upsert. Every normalizer MUST derive a stable `dedup_key` from source-side identifiers (run id, delivery id, object+revision+reason) — never from received-at time. This is what makes webhook loss recoverable by a later sweeper/poller.
 - **Auth:** per-source HMAC on webhook paths (GitHub `X-Hub-Signature-256`; Flux `generic-hmac` provider). Static bearer tokens for `/ingest/generic` and all `/api/*`. No users, no RBAC in v1.
 - **Redaction before storage:** raw payloads pass a regex deny-list (AWS keys, `ghp_`/`github_pat_` tokens, bearer tokens, `password|secret|token[:=]` values). Terraform plan bodies are never stored — summary counts only.
-- **Web UI (phase 5 only):** toolchain-free. Hand-written HTML/CSS/vanilla JS (htmx allowed), embedded with `go:embed`. **No node, no npm, no bundler.** If a task seems to need React, the task is out of scope.
+- **Two UIs (operator decision 2026-07-14).**
+  - *Embedded timeline (`web/`, phase 5):* toolchain-free — hand-written HTML/CSS/vanilla JS (htmx allowed), embedded with `go:embed`, **no node/npm/bundler**. Kept as the dependency-free lite view served from the binary. Do NOT add a bundler here.
+  - *Portal (`ui/`, phases 7–10):* a separate rich SPA (React + TS + Vite + Tailwind + shadcn/ui). A real toolchain is allowed **in `ui/` only** — it never touches the Go build. Built + deployed independently (its own image); mobile-web and single-binary embedding are not requirements. The Go binary stays the single backend/API; the portal is a client of `/api/*`. See docs/PLAN.md "UI Platform track".
 - **License:** Apache-2.0.
 
 ## Non-goals for v1 — do not build
 
-Postgres backend, multi-tenancy/RBAC, DORA dashboards, feature-flag providers, in-cluster Kubernetes agent, Slack slash-commands, AI summaries, any SPA framework.
+Postgres backend, multi-tenancy/RBAC, feature-flag providers, in-cluster Kubernetes agent, Slack slash-commands, AI summaries.
+
+Moved into scope for the post-v1 UI Platform track (docs/PLAN.md P7–P10, operator decision 2026-07-14): an SPA portal (React) and DORA-style dashboards/metrics. Still out of scope until then; the data plane (Go binary, SQLite) stays a single self-hosted binary regardless.
 
 ## Repository layout
 
@@ -62,7 +66,8 @@ internal/query/       where, diff, handoff logic
 internal/client/      thin HTTP client for all non-serve subcommands
 internal/wrap/        `wtc wrap` command runner + helm/terraform arg sniffers
 deploy/               Dockerfile context, helm chart, docker-compose
-web/                  phase 5 embedded UI
+web/                  phase 5 embedded UI (toolchain-free, go:embed)
+ui/                    phases 7-10 portal SPA (React/TS/Vite; own toolchain, separate build) — not yet created
 testdata/             captured real payloads as golden fixtures, per source
 demo/                 dummy services (api/web/worker) that feed wtc real events:
                       own go modules (invisible to root build), commitizen

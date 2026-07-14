@@ -11,12 +11,25 @@ Lives at `docs/PLAN.md`. Each phase ≈ 1–3 Claude Code sessions. A phase is d
 | P2 Flux ingest | ✅ 2026-07-13 | captured from a local kind cluster (Flux v2.9); ImageUpdateAutomation fixtures deferred |
 | P3 killer queries | ✅ 2026-07-14 | live-validated on the demo stack: real PR promotion traced end-to-end, 37s lag |
 | P4 gap closers | ✅ 2026-07-14 | wrap verified against a live helm install; chart+compose verified; image on GHCR |
-| P5 surfaces | ⬜ | web UI, Alertmanager + `wtc around`, Slack digest |
-| P6 release hygiene | ⬜ | goreleaser, quickstart, `wtc demo` seed, load sanity |
+| P5 surfaces | ✅ 2026-07-14 | embedded timeline UI, Alertmanager + `wtc around`, Slack digest — all live-verified |
+| P6 release hygiene | 🟡 partial | auto cz-versioning + multi-arch images done; goreleaser, `wtc demo` seed, load sanity remain |
+| **P7 portal foundation** | ⬜ | separate SPA + API hardening (CORS, versioning, aggregation endpoints) |
+| **P8 portal core views** | ⬜ | dashboard, rich timeline, service pages |
+| **P9 change-intelligence views** | ⬜ | `where`/`diff`/`around` visualized; env matrix |
+| **P10 live + config surfaces** | ⬜ | SSE live updates, rules/sources settings UI, deploy path |
 
 Unplanned addition: `demo/` — three dummy services + fake three-cluster Flux
 wiring generating real events continuously (operator-requested test bed;
 doubles as the P3 live-acceptance rig and portfolio demo).
+
+**Direction change (2026-07-14):** the operator wants a richer, portal/
+platform-style UI with dashboards and metrics, in addition to — not instead of
+— the embedded timeline. Two UIs are kept: the toolchain-free built-in (P5,
+zero-dependency, served from the binary) stays as a lite fallback; a separate
+SPA portal (P7–P10) is the primary rich experience. This reverses several
+CLAUDE.md hard decisions (toolchain-free-only, no-SPA, no dashboards,
+single-binary UI) — those are updated with operator approval. Mobile-web and
+single-binary embedding are explicitly NOT requirements for the portal.
 
 ## Decisions (operator answers, 2026-07-12 — previously "open questions")
 
@@ -72,8 +85,98 @@ Embedded web timeline (toolchain-free per CLAUDE.md): filter bar (env/service/ki
 
 goreleaser (linux/darwin, amd64/arm64), versioned migrations check, README with 5-minute quickstart, demo seed command (`wtc demo` loads a synthetic week), retention job verified, basic load sanity (10k events: log/diff < 100ms).
 
+Done so far: auto commitizen versioning in CI (tags `vX.Y.Z`, bumps Helm appVersion) and multi-arch images (linux/amd64+arm64). Remaining: goreleaser binaries, `wtc demo` seed, retention verification, load sanity.
+
+---
+
+# UI Platform track (P7–P10)
+
+A separate rich UI, built and deployed independently of the binary. The
+existing embedded timeline (P5) is kept unchanged as a dependency-free lite
+view; this track is additive.
+
+## Architecture decision (do not relitigate without operator approval)
+
+- **No new backend.** The Go binary stays the single backend/API and sole
+  owner of SQLite/ingest/queries. The portal is a **client** of `/api/*`.
+  Adding a second backend language would fragment ownership of the data
+  plane and break the "one self-hosted binary for the data" property.
+- **Frontend stack:** React 18 + TypeScript + Vite; Tailwind CSS + shadcn/ui
+  (Radix-based, copy-in components — no heavyweight framework lock, fits the
+  vendor-neutral ethos); TanStack Query (server state) + a router; Recharts
+  for charts. A real toolchain (node/npm/bundler) is allowed **for the `ui/`
+  tree only** — it never touches the Go build.
+- **Typed client:** the Go server emits an OpenAPI spec (`/api/openapi.json`);
+  the portal generates its API client from it, so the contract can't drift.
+- **Deploy:** the portal builds to static assets served by its own container
+  (nginx) or any static host/CDN; separate from the wtc pod. Optionally the
+  built `dist/` may be `go:embed`-ed for a single-image convenience deploy,
+  but that is not a requirement. No mobile-web requirement.
+- **Auth for the portal:** start with a token-login screen (enter an
+  `api_tokens` value → stored client-side → sent as bearer). Real multi-user
+  login/RBAC is a possible later phase, still gated on the v1 RBAC non-goal
+  being lifted.
+- **Repo layout:** new top-level `ui/` (its own `package.json`, gitignored
+  `node_modules/`, `dist/`). CI gains a `ui` job (lint + typecheck + build)
+  and, on main, publishes `ghcr.io/migueljfsc/wtc-ui`.
+
+## Phase 7 — Portal foundation
+
+Scaffold `ui/` (Vite + TS + Tailwind + shadcn + TanStack Query, app shell with
+nav + theming). API hardening: versioned `/api/v1` namespace (alias current
+routes), configurable CORS middleware (allowed origins in config; off by
+default), an OpenAPI spec endpoint, and token-login flow. `ui/` CI job +
+`ghcr.io/migueljfsc/wtc-ui` image; docker-compose + Helm gain a `ui` service.
+
+**Accept:** portal shell runs against a live wtc, authenticates with an API
+token, navigates between empty view stubs; CORS lets the separately-served
+SPA call the API; `docs/setup/portal.md` shows wiring both containers.
+
+## Phase 8 — Portal core views
+
+- **Dashboard/overview:** activity summary (events over time), deploy
+  frequency + failure-rate tiles per env, env-health cards, recent changes
+  feed. Needs new aggregation endpoints (`/api/v1/stats/...` — time buckets,
+  per-env/per-service counts) — these are the DORA-ish metrics now in scope.
+- **Timeline view:** the rich log — faceted filters (env/service/kind/status/
+  actor/text), saved filters, infinite scroll, an event-detail drawer showing
+  the full (redacted) payload and the event's `where`-journey inline.
+- **Global search** over events (FTS).
+
+**Accept:** dashboard renders real metrics from the demo stack; timeline
+filters/searches without a page reload; event drawer shows a change's journey.
+
+## Phase 9 — Change-intelligence views
+
+- **`where` visualized:** the BUILD → INTENT → APPLIED journey as a per-env
+  horizontal pipeline with intent→applied lag, unknown/gap markers.
+- **`diff` visualized:** a services × environments matrix, drift highlighted,
+  not-yet-promoted services flagged, revision-only caveats surfaced.
+- **Service detail pages:** current version across every env, deploy history,
+  MTBF/lead-time, recent failures.
+- **Alert correlation (`around`) visualized:** a timeline centred on an alert
+  with the preceding window of changes highlighted.
+
+**Accept:** the three killer queries + alert correlation are each answerable
+entirely in the UI, driven by the live demo data; a promotion visibly moves a
+service across the env matrix.
+
+## Phase 10 — Live + config surfaces
+
+- **Live updates:** an SSE stream endpoint (`/api/v1/stream`) so the timeline
+  and dashboard update without polling.
+- **Config UI:** view/edit the env/service inference rules and `tag_patterns`,
+  view source health (`doctor`) as a page, manage tokens. (Editing rules
+  implies a writable config path — decide file-backed vs DB-backed then.)
+- **Optional:** real multi-user auth — only if the RBAC non-goal is lifted.
+
+**Accept:** events appear in the portal live (no refresh); an operator edits a
+rule in the UI and sees a subsequently-ingested event re-routed.
+
 ## Sequencing notes
 
-- P0→P1→P2 strictly ordered. P3 needs P1+P2 data shapes. P4 parallelizable after P1. P5 last.
+- P0→P1→P2 strictly ordered. P3 needs P1+P2 data shapes. P4 parallelizable after P1.
 - Capture fixtures the moment real sources are wired (P1/P2) — they are the contract for everything downstream.
 - Q3 re-order applied: the GitHub poller (formerly P4 sweeper) is now in P1 as the primary ingest path; HMAC middleware still built in P1 (webhook mode stays supported; Flux traffic is in-cluster/private anyway).
+- **UI track (P7–P10)** is independent of the remaining P6 work and can proceed in parallel. P7 is the gate — the OpenAPI spec + `/api/v1` + CORS + login unblock everything after it. P8/P9 need only P3-era query data (already present); P9 leans on the aggregation endpoints added in P8. P10 (live/config) last.
+- Portal work must not regress the embedded timeline or the CLI; the Go API is extended additively (new `/api/v1` routes; existing `/api/*` and `/` stay).
