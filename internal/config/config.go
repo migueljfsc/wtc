@@ -74,10 +74,11 @@ type Sources struct {
 
 // Config is the full wtc.yaml.
 type Config struct {
-	Server  Server           `yaml:"server"`
-	Auth    Auth             `yaml:"auth"`
-	Sources Sources          `yaml:"sources"`
-	Rules   []normalize.Rule `yaml:"rules"` // ordered env/service inference rules (SPEC §3)
+	Server      Server           `yaml:"server"`
+	Auth        Auth             `yaml:"auth"`
+	Sources     Sources          `yaml:"sources"`
+	Rules       []normalize.Rule `yaml:"rules"`        // ordered env/service inference rules (SPEC §3)
+	TagPatterns []string         `yaml:"tag_patterns"` // tag→sha extraction; empty = defaults (SPEC §2)
 }
 
 // Default returns the config used when no file or overrides are present.

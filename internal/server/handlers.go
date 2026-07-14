@@ -79,18 +79,12 @@ type EventsResponse struct {
 
 func (s *Server) handleListEvents(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	if q.Get("q") != "" {
-		// SPEC §4 lists q (FTS) but it lands in Phase 3; silently returning
-		// unfiltered results would be wrong data, so reject loudly.
-		s.writeError(w, http.StatusBadRequest, "q (full-text search) is not implemented yet — lands in phase 3")
-		return
-	}
-
 	f := store.Filter{
 		Env:     q.Get("env"),
 		Service: q.Get("service"),
 		Kind:    q.Get("kind"),
 		Status:  q.Get("status"),
+		Query:   q.Get("q"),
 		Cursor:  q.Get("cursor"),
 	}
 

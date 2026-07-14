@@ -27,6 +27,7 @@ type Filter struct {
 	Service string
 	Kind    string
 	Status  string
+	Query   string // FTS5 MATCH over title/service/actor/artifact
 	Since   time.Time
 	Until   time.Time
 	Limit   int
@@ -68,6 +69,9 @@ func (s *Store) ListEvents(ctx context.Context, f Filter) (events []model.Event,
 	}
 	if !f.Until.IsZero() {
 		add("ts <= ?", model.FormatTS(f.Until))
+	}
+	if f.Query != "" {
+		add("rowid IN (SELECT rowid FROM events_fts WHERE events_fts MATCH ?)", ftsQuery(f.Query))
 	}
 	if f.Cursor != "" {
 		ts, id, err := decodeCursor(f.Cursor)
@@ -141,6 +145,18 @@ func scanEvent(rows *sql.Rows) (model.Event, error) {
 	}
 	ev.Payload = payload.String
 	return ev, nil
+}
+
+// ftsQuery turns free text into a safe FTS5 prefix query: each term is
+// double-quoted (so FTS5 operators/punctuation in user input can't inject
+// syntax errors) with a trailing * for prefix matching.
+func ftsQuery(q string) string {
+	terms := strings.Fields(q)
+	quoted := make([]string, 0, len(terms))
+	for _, t := range terms {
+		quoted = append(quoted, `"`+strings.ReplaceAll(t, `"`, `""`)+`"*`)
+	}
+	return strings.Join(quoted, " ")
 }
 
 // Cursor format: base64url("<stored ts>\x00<id>"). Opaque to clients.

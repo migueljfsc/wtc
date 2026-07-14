@@ -170,7 +170,6 @@ func TestListEventsBadParams(t *testing.T) {
 		"/api/events?limit=-1",
 		"/api/events?limit=abc",
 		"/api/events?cursor=%21%21not-base64", // client input error, not 500
-		"/api/events?q=payments",              // FTS is phase 3: reject, don't ignore
 	} {
 		resp, _ := doRequest(t, http.MethodGet, ts.URL+path, testToken, nil)
 		if resp.StatusCode != http.StatusBadRequest {
