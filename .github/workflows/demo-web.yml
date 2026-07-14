@@ -43,6 +43,11 @@ jobs:
         with:
           ref: main       # a branch, not the detached trigger sha — cz needs
           fetch-depth: 0  # to be ON main to commit/push the bump
+          # checkout persists this credential as http.extraheader, which
+          # overrides any token cz puts in its push URL — so the PAT must
+          # be THE checkout credential, or pushes authenticate as the bot
+          # (GH013 under the ruleset).
+          token: ${{ secrets.CZ_TOKEN }}
 
       - name: bump version
         id: cz
