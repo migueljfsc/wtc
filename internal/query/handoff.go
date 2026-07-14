@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -91,6 +92,58 @@ func sortActors(a []ActorCount) {
 	}
 }
 
+// SlackText renders the digest as Slack mrkdwn (which is not CommonMark:
+// *bold*, no headers, `-` bullets render fine). Kept structurally parallel
+// to Markdown so the two don't drift.
+func (r *HandoffReport) SlackText(now time.Time) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "*Change handoff — since %s*\n", r.Since.Local().Format("2006-01-02 15:04"))
+
+	fmt.Fprintf(&b, "\n*Deploys*\n")
+	if len(r.DeploysByEnv) == 0 {
+		b.WriteString("_no deploys in window_\n")
+	}
+	for _, env := range sortedEnvs(r.DeploysByEnv) {
+		s := r.DeploysByEnv[env]
+		name := env
+		if name == "" {
+			name = "(unmapped)"
+		}
+		warn := ""
+		if s.Failed > 0 {
+			warn = " :warning:"
+		}
+		fmt.Fprintf(&b, "• *%s*: %d deploys, %d failed%s\n", name, s.Total, s.Failed, warn)
+	}
+	if len(r.Failures) > 0 {
+		b.WriteString("\n*Failures*\n")
+		for _, ev := range r.Failures {
+			fmt.Fprintf(&b, "• [%s] %s\n", ev.Env, ev.Title)
+		}
+	}
+	fmt.Fprintf(&b, "\n_infra %d · rollbacks %d · unmapped %d_\n", r.InfraChanges, r.Rollbacks, r.Unmapped)
+	if len(r.TopActors) > 0 {
+		var parts []string
+		for _, a := range r.TopActors {
+			parts = append(parts, fmt.Sprintf("%s (%d)", a.Actor, a.Count))
+		}
+		fmt.Fprintf(&b, "*Top actors:* %s\n", strings.Join(parts, ", "))
+	}
+	if len(r.NewServices) > 0 {
+		fmt.Fprintf(&b, "*First-seen:* %s\n", strings.Join(r.NewServices, ", "))
+	}
+	return b.String()
+}
+
+func sortedEnvs(m map[string]EnvStats) []string {
+	envs := make([]string, 0, len(m))
+	for e := range m {
+		envs = append(envs, e)
+	}
+	sort.Strings(envs)
+	return envs
+}
+
 // Markdown renders the digest for terminals and future Slack posting.
 func (r *HandoffReport) Markdown(now time.Time) string {
 	var b strings.Builder
@@ -100,7 +153,8 @@ func (r *HandoffReport) Markdown(now time.Time) string {
 	if len(r.DeploysByEnv) == 0 {
 		b.WriteString("no deploys in window\n")
 	}
-	for env, s := range r.DeploysByEnv {
+	for _, env := range sortedEnvs(r.DeploysByEnv) {
+		s := r.DeploysByEnv[env]
 		name := env
 		if name == "" {
 			name = "(unmapped)"

@@ -114,6 +114,11 @@ retention:
   keep: 180d
   ephemeral_env_pattern: "pr-*"
   ephemeral_keep: 30d
+
+digest:                                  # optional serve-side Slack digest (phase 5)
+  interval: 24h                          # 0/unset disables
+  window: 24h                            # lookback per digest (default = interval)
+  slack_webhook: ${WTC_SLACK_WEBHOOK}
 ```
 
 Env expansion `${VAR}` at load. `WTC_SERVER_LISTEN`-style overrides win over file values.
@@ -138,7 +143,7 @@ POST /ingest/flux       HMAC X-Signature (flux generic-hmac)
 POST /ingest/generic    Bearer token; body = Event JSON subset (kind, title, env?, service?, cluster?, namespace?, actor?, ts?, ref?, artifact?, artifacts?, status?, duration_ms?, url?, source?, dedup_key?)
                         source restricted to generic|manual|helm|terraform; dedup_key prefixes gh:/flux:/am: rejected (reserved for dedicated ingest paths).
                         Omitting dedup_key ⇒ server generates a random key: the delivery is NOT idempotent — clients needing retry-safety must send a stable key.
-POST /ingest/alertmanager   Bearer token (phase 5)
+POST /ingest/alertmanager   Bearer token
 GET  /healthz
 ```
 
@@ -149,6 +154,7 @@ GET /api/events?env=&service=&kind=&status=&since=&until=&q=&limit=&cursor=
 GET /api/where/{ref}          # ref = full/short sha or image tag
 GET /api/diff?a=staging&b=prod
 GET /api/handoff?since=168h
+GET /api/around?ts=&id=&window=30m       # changes in the window before an instant or event
 GET /api/doctor
 ```
 

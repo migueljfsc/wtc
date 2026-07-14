@@ -4,6 +4,24 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 5 (surfaces)
+
+- **Embedded web timeline** at `/` (toolchain-free: hand-written
+  HTML/CSS/vanilla JS, `go:embed`, no node/bundler). Filter bar
+  (search/env/service/kind/since), day-grouped status-colored stream, source
+  deep links, cursor load-more, localStorage token, auto-refresh, mobile
+  layout. Served behind the mux catch-all so API routes are never shadowed;
+  no external asset fetches.
+- **Alertmanager ingest** (`POST /ingest/alertmanager`): normalizer built
+  against a real Alertmanager 0.33 v4 webhook. One event per alert episode —
+  firing→started, resolved→succeeded on `am:<fingerprint>:<startsAt>` with
+  duration = endsAt−startsAt. kind=alert (correlation only).
+- **`wtc around <ts|alert-id>`** + `GET /api/around`: what changed in the
+  window before an instant or an alert event.
+- **Slack digest**: `wtc handoff --slack-webhook <url>` posts the digest as
+  Slack mrkdwn; optional serve-side scheduler via a `digest:` config section
+  (interval + window + webhook), first post one interval after startup.
+
 ### Added — Phase 4 (gap closers + packaging)
 
 - **`wtc wrap -- <command>`**: records started → succeeded/failed on one row

@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/migueljfsc/wtc/internal/model"
+	"github.com/migueljfsc/wtc/internal/notify"
 )
 
 func jsonOut(cmd *cobra.Command, v any) error {
@@ -178,7 +179,7 @@ func newAroundCmd(flags *clientFlags) *cobra.Command {
 }
 
 func newHandoffCmd(flags *clientFlags) *cobra.Command {
-	var since string
+	var since, slackWebhook string
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "handoff",
@@ -192,14 +193,22 @@ func newHandoffCmd(flags *clientFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if asJSON {
+			switch {
+			case slackWebhook != "":
+				if err := notify.Slack(cmd.Context(), slackWebhook, r.SlackText(time.Now())); err != nil {
+					return err
+				}
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "digest posted to slack")
+			case asJSON:
 				return jsonOut(cmd, r)
+			default:
+				_, _ = fmt.Fprint(cmd.OutOrStdout(), (&r).Markdown(time.Now()))
 			}
-			_, _ = fmt.Fprint(cmd.OutOrStdout(), (&r).Markdown(time.Now()))
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&since, "since", "7d", "window: 2h, 7d, 1w, or RFC3339")
+	cmd.Flags().StringVar(&slackWebhook, "slack-webhook", "", "post the digest to this Slack incoming-webhook URL instead of printing")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
 	return cmd
 }
