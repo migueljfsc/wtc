@@ -74,6 +74,11 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 	if len(cfg.Rules) == 0 {
 		log.Warn("no rules configured — events will land with env=\"\" (see wtc doctor)")
 	}
+	tags, err := normalize.NewTagResolver(cfg.TagPatterns)
+	if err != nil {
+		_ = st.Close()
+		return fmt.Errorf("tag_patterns: %w", err)
+	}
 
 	httpSrv := &http.Server{
 		Addr: cfg.Server.Listen,
@@ -83,6 +88,7 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 			FluxHMACKey:         cfg.Sources.Flux.HMACKey,
 			FluxSuppression:     cfg.Sources.Flux.SuppressionWindow.Std(),
 			Engine:              engine,
+			Tags:                tags,
 			CaptureDir:          cfg.Server.CaptureDir,
 		}, log).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
