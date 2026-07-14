@@ -5,4 +5,4 @@ resources:
   - ../../base
 images:
   - name: ghcr.io/migueljfsc/wtc-demo-api
-    newTag: bootstrap   # replaced by CI-built tags; PR bumps edit this line
+    newTag: sha-8ff9aea
