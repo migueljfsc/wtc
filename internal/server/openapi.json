@@ -172,6 +172,19 @@
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       }
+    },
+    "/api/v1/matrix": {
+      "get": {
+        "operationId": "matrix",
+        "summary": "Services × environments current-deploy grid (diff visualized).",
+        "parameters": [
+          { "name": "envs", "in": "query", "description": "Ordered comma-separated column list. Omitted => distinct non-ephemeral envs.", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "The current-deploy grid.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Matrix" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
     }
   },
   "components": {
@@ -381,6 +394,36 @@
           "envs": { "type": "array", "items": { "type": "string" } },
           "services": { "type": "array", "items": { "type": "string" } },
           "actors": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "MatrixCell": {
+        "type": "object",
+        "required": ["id", "ts"],
+        "properties": {
+          "id": { "type": "string", "description": "Deploy event id, for deep-linking." },
+          "ref": { "type": "string" },
+          "artifact": { "type": "string" },
+          "ts": { "type": "string", "format": "date-time" }
+        }
+      },
+      "MatrixRow": {
+        "type": "object",
+        "required": ["service", "cells"],
+        "properties": {
+          "service": { "type": "string" },
+          "cells": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/components/schemas/MatrixCell" },
+            "description": "Keyed by env; a missing env means not deployed there."
+          }
+        }
+      },
+      "Matrix": {
+        "type": "object",
+        "required": ["envs", "services"],
+        "properties": {
+          "envs": { "type": "array", "items": { "type": "string" }, "description": "Column order as requested." },
+          "services": { "type": "array", "items": { "$ref": "#/components/schemas/MatrixRow" } }
         }
       }
     }
