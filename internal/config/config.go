@@ -64,6 +64,14 @@ type Server struct {
 	Listen     string `yaml:"listen"`
 	DB         string `yaml:"db"`
 	CaptureDir string `yaml:"capture_dir"` // non-empty => dump raw ingest bodies (dev only)
+	CORS       CORS   `yaml:"cors"`
+}
+
+// CORS configures cross-origin access for the separately-served portal SPA.
+// Off by default (no origins => no CORS headers). A single "*" allows any
+// origin. Only the portal needs this; same-origin CLI/embedded-web don't.
+type CORS struct {
+	AllowedOrigins []string `yaml:"allowed_origins"`
 }
 
 // Auth holds static bearer tokens accepted on /api/* and /ingest/generic.
@@ -254,6 +262,10 @@ func applyEnvOverrides(cfg *Config) {
 	set(&cfg.Server.Listen, "WTC_SERVER_LISTEN")
 	set(&cfg.Server.DB, "WTC_SERVER_DB")
 	set(&cfg.Server.CaptureDir, "WTC_SERVER_CAPTURE_DIR")
+	// Comma-separated origins, e.g. "https://portal.example.com,http://localhost:5173".
+	if v, ok := os.LookupEnv("WTC_SERVER_CORS_ALLOWED_ORIGINS"); ok {
+		cfg.Server.CORS.AllowedOrigins = splitAndTrim(v)
+	}
 	set(&cfg.Sources.GitHub.APIToken, "WTC_GH_API_TOKEN")
 	set(&cfg.Sources.GitHub.WebhookSecret, "WTC_GH_WEBHOOK_SECRET")
 	set(&cfg.Sources.Flux.HMACKey, "WTC_FLUX_HMAC_KEY")
@@ -264,4 +276,16 @@ func applyEnvOverrides(cfg *Config) {
 			cfg.Auth.APITokens = append(cfg.Auth.APITokens, v)
 		}
 	}
+}
+
+// splitAndTrim splits a comma-separated list, trimming whitespace and dropping
+// empty entries — used for env-supplied string lists.
+func splitAndTrim(s string) []string {
+	var out []string
+	for _, part := range strings.Split(s, ",") {
+		if p := strings.TrimSpace(part); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

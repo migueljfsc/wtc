@@ -3,6 +3,10 @@ server:
   listen: ":8484"
   db: ./dev/wtc.db
   # capture_dir: ./testdata/raw   # uncomment (or use --capture-dir) for fixture capture
+  # Let the portal dev server (ui/, `npm run dev`) call the API cross-origin.
+  cors:
+    allowed_origins:
+      - http://localhost:5173
 
 auth:
   api_tokens:

@@ -36,6 +36,9 @@ config:
   server:
     listen: ":8484"
     db: /data/wtc.db
+    # cors:                          # required when ui.enabled and the SPA is
+    #   allowed_origins:             # served from a different origin than the API
+    #     - https://wtc-portal.example.com
   # auth:
   #   api_tokens:
   #     - ${WTC_API_TOKEN}          # requires existingSecret with this key
@@ -43,3 +46,27 @@ config:
   #   flux:
   #     hmac_key: ${WTC_FLUX_HMAC_KEY}
   #     suppression_window: 10m
+
+# Portal SPA (P7+). Optional and additive — the Go binary is the backend
+# either way. When enabled, add the origin the SPA is served from to
+# config.server.cors.allowed_origins above, since the browser calls the API
+# cross-origin (or front both with one ingress host and leave apiBaseUrl empty).
+ui:
+  enabled: false
+  image:
+    repository: ghcr.io/migueljfsc/wtc-ui
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  # Browser-facing wtc API URL (what the user's browser calls — e.g. the API
+  # ingress host). Empty => same origin, for reverse-proxy/single-host setups.
+  apiBaseUrl: ""
+  replicas: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi

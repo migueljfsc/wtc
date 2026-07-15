@@ -4,6 +4,35 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 7 (portal foundation)
+
+- **Portal SPA scaffold** (`ui/`): a separate rich client — Vite + React 18 +
+  TypeScript + Tailwind + shadcn-style components + TanStack Query + React
+  Router. App shell (nav + light/dark theming), token-login screen, and empty
+  view stubs for P8–P10 (Dashboard, Timeline, Where, Diff, Services, Settings).
+  Its own toolchain; never touches the Go build. Built and deployed as its own
+  image.
+- **API hardening on the Go server (additive — `/api/*`, `/`, and the CLI are
+  unchanged):**
+  - **`/api/v1/*`** — every query route now also answers under a versioned
+    prefix (same handler, so the two can't drift). `apiRoutes()` is the single
+    registration source.
+  - **CORS** — `server.cors.allowed_origins` (off by default; `*` allows any).
+    Answers preflight `OPTIONS`, echoes the allowed origin with `Vary: Origin`,
+    and carries the header on errors so the browser can read them.
+  - **OpenAPI** — hand-authored 3.0 spec served at `/api/openapi.json`; the
+    portal generates its typed client from it. `TestOpenAPINoDrift` fails if a
+    route is added without a spec entry; CI fails if the committed client is
+    stale.
+  - **Token-login** — `GET /api/v1/auth/verify` lets the SPA validate a bearer
+    token with no side effect (200/401).
+- **Packaging:** `ui/Dockerfile` (build → nginx) with runtime API-base-URL
+  injection (`WTC_API_BASE_URL`, one image any server); CI `ui` job (lint +
+  typecheck + build + client-drift check) and gated `ghcr.io/…/wtc-ui` image;
+  docker-compose and the Helm chart gain an opt-in `ui` service;
+  `docs/setup/portal.md` wires both containers (direct-CORS and same-origin
+  proxy paths).
+
 ### Added — Phase 6 (release hygiene)
 
 - **Retention prune job** (SPEC §8): `retention:` config (`keep`,

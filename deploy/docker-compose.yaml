@@ -13,6 +13,25 @@ services:
       WTC_API_TOKEN: ${WTC_API_TOKEN:?set WTC_API_TOKEN}
       WTC_GH_API_TOKEN: ${WTC_GH_API_TOKEN:-}
       WTC_FLUX_HMAC_KEY: ${WTC_FLUX_HMAC_KEY:-}
+      # Allow the portal's browser origin to call the API cross-origin. Must
+      # match where the ui service is reachable from the browser (below).
+      WTC_SERVER_CORS_ALLOWED_ORIGINS: ${WTC_UI_ORIGIN:-http://localhost:8080}
+    restart: unless-stopped
+
+  # Portal SPA (P7+). Serves static assets; the browser calls the wtc API
+  # directly (cross-origin, hence the CORS setting above).
+  ui:
+    build:
+      context: ../ui
+    image: ghcr.io/migueljfsc/wtc-ui:latest
+    ports:
+      - "8080:80"
+    environment:
+      # Browser-facing wtc API URL. Injected into the SPA at container start.
+      # This is the URL the *browser* uses, not an in-network service name.
+      WTC_API_BASE_URL: ${WTC_API_BASE_URL:-http://localhost:8484}
+    depends_on:
+      - wtc
     restart: unless-stopped
 
 volumes:

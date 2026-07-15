@@ -39,4 +39,5 @@ coverage.html
 /ui/node_modules/
 /ui/dist/
 /ui/.vite/
+/ui/*.tsbuildinfo
 npm-debug.log*
