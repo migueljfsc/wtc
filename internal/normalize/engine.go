@@ -34,31 +34,31 @@ type Facts struct {
 // RuleMatch selects events. Empty fields are unconstrained; strings support
 // * and ** globs; Paths matches when ANY changed path matches ANY pattern.
 type RuleMatch struct {
-	Source     string   `yaml:"source"`
-	Repo       string   `yaml:"repo"`
-	Branch     string   `yaml:"branch"`
-	Event      string   `yaml:"event"`
-	Workflow   string   `yaml:"workflow"`
-	Cluster    string   `yaml:"cluster"`
-	ObjectKind string   `yaml:"object_kind"`
-	Paths      []string `yaml:"paths"`
+	Source     string   `yaml:"source" json:"source,omitempty"`
+	Repo       string   `yaml:"repo" json:"repo,omitempty"`
+	Branch     string   `yaml:"branch" json:"branch,omitempty"`
+	Event      string   `yaml:"event" json:"event,omitempty"`
+	Workflow   string   `yaml:"workflow" json:"workflow,omitempty"`
+	Cluster    string   `yaml:"cluster" json:"cluster,omitempty"`
+	ObjectKind string   `yaml:"object_kind" json:"object_kind,omitempty"`
+	Paths      []string `yaml:"paths" json:"paths,omitempty"`
 }
 
 // RuleSet holds the fields a rule may set. Values are Go templates over the
 // fact map with funcs trimPrefix, trimSuffix, lower, regexReplace.
 type RuleSet struct {
-	Env       string `yaml:"env"`
-	Cluster   string `yaml:"cluster"`
-	Namespace string `yaml:"namespace"`
-	Service   string `yaml:"service"`
-	Kind      string `yaml:"kind"`
-	Actor     string `yaml:"actor"`
+	Env       string `yaml:"env" json:"env,omitempty"`
+	Cluster   string `yaml:"cluster" json:"cluster,omitempty"`
+	Namespace string `yaml:"namespace" json:"namespace,omitempty"`
+	Service   string `yaml:"service" json:"service,omitempty"`
+	Kind      string `yaml:"kind" json:"kind,omitempty"`
+	Actor     string `yaml:"actor" json:"actor,omitempty"`
 }
 
 // Rule is one ordered entry of the config `rules:` list.
 type Rule struct {
-	Match RuleMatch `yaml:"match"`
-	Set   RuleSet   `yaml:"set"`
+	Match RuleMatch `yaml:"match" json:"match"`
+	Set   RuleSet   `yaml:"set" json:"set"`
 }
 
 type compiledRule struct {

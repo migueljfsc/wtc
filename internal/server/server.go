@@ -37,6 +37,10 @@ type Options struct {
 	// CORSAllowedOrigins enables cross-origin access from the portal SPA. Empty
 	// means CORS is off (no headers emitted); a single "*" allows any origin.
 	CORSAllowedOrigins []string
+	// Rules and TagPatterns are exposed read-only at /api/v1/config (portal
+	// config viewer). Display copies of what the engine/resolver were built from.
+	Rules       []normalize.Rule
+	TagPatterns []string
 }
 
 // Server routes ingest and query requests onto a Store.
@@ -50,6 +54,8 @@ type Server struct {
 	tags           *normalize.TagResolver
 	captureDir     string
 	corsOrigins    []string
+	rules          []normalize.Rule
+	tagPatterns    []string
 	log            *slog.Logger
 	mux            *http.ServeMux
 }
@@ -77,6 +83,8 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 		tags:           tags,
 		captureDir:     opts.CaptureDir,
 		corsOrigins:    opts.CORSAllowedOrigins,
+		rules:          opts.Rules,
+		tagPatterns:    opts.TagPatterns,
 		log:            log,
 		mux:            http.NewServeMux(),
 	}
@@ -132,6 +140,8 @@ func (s *Server) apiRoutes() []apiRoute {
 		{"GET", "/stats/deploys", http.HandlerFunc(s.handleStatsDeploys)},
 		{"GET", "/facets", http.HandlerFunc(s.handleFacets)},
 		{"GET", "/matrix", http.HandlerFunc(s.handleMatrix)},
+		{"GET", "/config", http.HandlerFunc(s.handleConfig)},
+		{"GET", "/stream", http.HandlerFunc(s.handleStream)},
 		{"GET", "/auth/verify", http.HandlerFunc(s.handleAuthVerify)},
 	}
 }

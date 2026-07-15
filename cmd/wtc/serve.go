@@ -79,6 +79,12 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 		_ = st.Close()
 		return fmt.Errorf("tag_patterns: %w", err)
 	}
+	// /api/v1/config shows the EFFECTIVE tag patterns, so surface the defaults
+	// when none are configured (the resolver falls back to them internally).
+	effectiveTagPatterns := cfg.TagPatterns
+	if len(effectiveTagPatterns) == 0 {
+		effectiveTagPatterns = normalize.DefaultTagPatterns
+	}
 
 	httpSrv := &http.Server{
 		Addr: cfg.Server.Listen,
@@ -91,6 +97,8 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 			Tags:                tags,
 			CaptureDir:          cfg.Server.CaptureDir,
 			CORSAllowedOrigins:  cfg.Server.CORS.AllowedOrigins,
+			Rules:               cfg.Rules,
+			TagPatterns:         effectiveTagPatterns,
 		}, log).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

@@ -36,6 +36,8 @@ type Store struct {
 
 	upsertStmt    *sql.Stmt
 	idByDedupStmt *sql.Stmt
+
+	broadcast *broadcaster // fans newly-stored events to SSE subscribers
 }
 
 type writeReq struct {
@@ -139,6 +141,7 @@ func Open(path string) (*Store, error) {
 		writeCh:       make(chan writeReq, 256),
 		upsertStmt:    upsertStmt,
 		idByDedupStmt: idByDedupStmt,
+		broadcast:     newBroadcaster(),
 	}
 	s.wg.Add(1)
 	go s.writer()
@@ -209,6 +212,11 @@ func (s *Store) Ingest(ctx context.Context, ev *model.Event) (id string, deduped
 	// closed (resp is buffered), so this cannot leak.
 	select {
 	case r := <-req.resp:
+		// Publish only newly-inserted rows to the live stream: re-ingested
+		// duplicates (poller sweeps, redeliveries) must not flood subscribers.
+		if r.err == nil && !r.deduped {
+			s.broadcast.publish(*ev)
+		}
 		return r.id, r.deduped, r.err
 	case <-ctx.Done():
 		return "", false, fmt.Errorf("ingest wait: %w", ctx.Err())

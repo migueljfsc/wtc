@@ -41,6 +41,18 @@ export function daysAgoISO(days: number): string {
   return new Date(Date.now() - days * DAY).toISOString();
 }
 
+/** Human byte size: 1536 => "1.5 KB". */
+export function bytes(n: number): string {
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let v = n;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${i === 0 ? v : v.toFixed(1)} ${units[i]}`;
+}
+
 /** Compact duration from milliseconds: 1500 => "2s", 900000 => "15m". */
 export function duration(ms: number): string {
   const s = Math.round(ms / 1000);

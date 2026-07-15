@@ -185,6 +185,30 @@
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       }
+    },
+    "/api/v1/config": {
+      "get": {
+        "operationId": "config",
+        "summary": "Read-only view of the normalization rules and tag patterns in use.",
+        "responses": {
+          "200": { "description": "Current rules + tag patterns.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfigResponse" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/stream": {
+      "get": {
+        "operationId": "stream",
+        "summary": "Server-sent events: newly-stored events pushed live.",
+        "description": "text/event-stream. Each `data:` frame is one Event (as in /events). Consume with fetch — EventSource cannot set the Authorization header.",
+        "responses": {
+          "200": {
+            "description": "An SSE stream of Event frames.",
+            "content": { "text/event-stream": { "schema": { "type": "string" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
     }
   },
   "components": {
@@ -424,6 +448,48 @@
         "properties": {
           "envs": { "type": "array", "items": { "type": "string" }, "description": "Column order as requested." },
           "services": { "type": "array", "items": { "$ref": "#/components/schemas/MatrixRow" } }
+        }
+      },
+      "RuleMatch": {
+        "type": "object",
+        "description": "Selector; empty fields are unconstrained. Strings support * and ** globs.",
+        "properties": {
+          "source": { "type": "string" },
+          "repo": { "type": "string" },
+          "branch": { "type": "string" },
+          "event": { "type": "string" },
+          "workflow": { "type": "string" },
+          "cluster": { "type": "string" },
+          "object_kind": { "type": "string" },
+          "paths": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "RuleSet": {
+        "type": "object",
+        "description": "Fields a rule sets. Values are Go templates over the fact map.",
+        "properties": {
+          "env": { "type": "string" },
+          "cluster": { "type": "string" },
+          "namespace": { "type": "string" },
+          "service": { "type": "string" },
+          "kind": { "type": "string" },
+          "actor": { "type": "string" }
+        }
+      },
+      "Rule": {
+        "type": "object",
+        "required": ["match", "set"],
+        "properties": {
+          "match": { "$ref": "#/components/schemas/RuleMatch" },
+          "set": { "$ref": "#/components/schemas/RuleSet" }
+        }
+      },
+      "ConfigResponse": {
+        "type": "object",
+        "required": ["rules", "tag_patterns"],
+        "properties": {
+          "rules": { "type": "array", "items": { "$ref": "#/components/schemas/Rule" } },
+          "tag_patterns": { "type": "array", "items": { "type": "string" } }
         }
       }
     }
