@@ -32,6 +32,7 @@ type Filter struct {
 	Service string
 	Kind    string
 	Status  string
+	Actor   string // exact match (facet); FTS `Query` covers actor text search
 	Query   string // FTS5 MATCH over title/service/actor/artifact
 	Since   time.Time
 	Until   time.Time
@@ -68,6 +69,9 @@ func (s *Store) ListEvents(ctx context.Context, f Filter) (events []model.Event,
 	}
 	if f.Status != "" {
 		add("status = ?", f.Status)
+	}
+	if f.Actor != "" {
+		add("actor = ?", f.Actor)
 	}
 	if !f.Since.IsZero() {
 		add("ts >= ?", model.FormatTS(f.Since))

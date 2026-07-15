@@ -69,6 +69,9 @@ server:
   db: /var/lib/wtc/wtc.db
   base_url: https://wtc.example.com     # used in links/digests
   capture_dir: ""                        # non-empty => dump raw ingest bodies (dev only)
+  cors:                                  # cross-origin access for the separately-served portal SPA
+    allowed_origins:                     # empty (default) => CORS off; a single "*" allows any origin
+      - https://wtc-portal.example.com
 
 auth:
   api_tokens:                            # bearer tokens for /api/* and /ingest/generic
@@ -145,20 +148,30 @@ POST /ingest/generic    Bearer token; body = Event JSON subset (kind, title, env
                         Omitting dedup_key ⇒ server generates a random key: the delivery is NOT idempotent — clients needing retry-safety must send a stable key.
 POST /ingest/alertmanager   Bearer token
 GET  /healthz
+GET  /api/openapi.json      # OpenAPI 3.0 spec of the query API (public; the portal generates its typed client from it)
 ```
 
-Query API (Bearer):
+Query API (Bearer). Every route is served under both the legacy `/api/*` prefix
+(CLI + embedded web) and the versioned `/api/v1/*` prefix (portal SPA) — same
+handlers, registered from one table so the two can't drift:
 
 ```
-GET /api/events?env=&service=&kind=&status=&since=&until=&q=&limit=&cursor=
-GET /api/where/{ref}          # ref = full/short sha or image tag
-GET /api/diff?a=staging&b=prod
-GET /api/handoff?since=168h
-GET /api/around?ts=&id=&window=30m       # changes in the window before an instant or event
-GET /api/doctor
+GET /api/v1/events?env=&service=&kind=&status=&actor=&since=&until=&q=&limit=&cursor=
+GET /api/v1/where/{ref}          # ref = full/short sha or image tag
+GET /api/v1/diff?a=staging&b=prod
+GET /api/v1/handoff?since=168h
+GET /api/v1/around?ts=&id=&window=30m       # changes in the window before an instant or event
+GET /api/v1/doctor
+GET /api/v1/auth/verify          # 200 if the bearer token is valid, else 401 (portal login)
+GET /api/v1/stats/activity?since=&until=&bucket=day|hour   # gap-filled event-count buckets (portal dashboard)
+GET /api/v1/stats/deploys?since=&until=                    # per-env deploy count/failures/health
+GET /api/v1/facets                                          # distinct env/service/actor values (filter dropdowns)
 ```
 
-All timestamps RFC3339. Cursor pagination on `(ts, id)`.
+All timestamps RFC3339 (UTC). Cursor pagination on `(ts, id)`. `q` is FTS5 over
+title/service/actor/artifact; `actor=` is an exact-match facet. Stats windows
+are inclusive of `until`. Cross-origin access for a separately-served portal is
+off by default (`server.cors.allowed_origins`, §2).
 
 ## 5. CLI surface
 

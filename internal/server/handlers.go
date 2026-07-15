@@ -185,6 +185,7 @@ func (s *Server) handleListEvents(w http.ResponseWriter, r *http.Request) {
 		Service: q.Get("service"),
 		Kind:    q.Get("kind"),
 		Status:  q.Get("status"),
+		Actor:   q.Get("actor"),
 		Query:   q.Get("q"),
 		Cursor:  q.Get("cursor"),
 	}

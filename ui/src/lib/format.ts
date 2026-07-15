@@ -40,3 +40,14 @@ export function pct(part: number, whole: number): string {
 export function daysAgoISO(days: number): string {
   return new Date(Date.now() - days * DAY).toISOString();
 }
+
+/** Compact duration from milliseconds: 1500 => "2s", 900000 => "15m". */
+export function duration(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h`;
+  return `${Math.round(h / 24)}d`;
+}

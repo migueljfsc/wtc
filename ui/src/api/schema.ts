@@ -174,6 +174,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Distinct env/service/actor values for filter dropdowns. */
+        get: operations["facets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -367,6 +384,11 @@ export interface components {
             /** @description Non-empty envs only, sorted by name. */
             envs: components["schemas"]["EnvDeployStats"][];
         };
+        Facets: {
+            envs: string[];
+            services: string[];
+            actors: string[];
+        };
     };
     responses: {
         /** @description Malformed request. */
@@ -457,6 +479,8 @@ export interface operations {
                 service?: string;
                 kind?: string;
                 status?: string;
+                /** @description Exact actor match (facet). */
+                actor?: string;
                 /** @description Full-text search over event text. */
                 q?: string;
                 since?: string;
@@ -663,6 +687,27 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    facets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sorted distinct dimension values. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Facets"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
         };
     };

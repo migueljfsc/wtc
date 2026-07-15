@@ -8,7 +8,17 @@ deployed independently of the Go binary — its own toolchain, never touches
 ## Stack
 
 React 18 · TypeScript · Vite · Tailwind + shadcn-style components · TanStack
-Query · React Router · a typed client generated from the server's OpenAPI spec.
+Query · React Router · Recharts (dashboard charts) · a typed client generated
+from the server's OpenAPI spec.
+
+## Views
+
+- **Dashboard** — activity chart + per-env deploy health, from `/api/v1/stats/*`.
+- **Timeline** — faceted filters + full-text search, infinite scroll, saved
+  filters, and an event-detail drawer with the inline `where`-journey.
+- **Where / Diff / Services / Settings** — stubs until P9–P10.
+
+Routes are code-split, so Recharts loads only with the dashboard.
 
 ## Develop
 

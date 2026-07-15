@@ -193,6 +193,44 @@ func TestStatsEndpoints(t *testing.T) {
 	}
 }
 
+func TestFacetsAndActorFilter(t *testing.T) {
+	ts := newTestServer(t)
+
+	if resp, _ := doRequest(t, http.MethodGet, ts.URL+"/api/v1/facets", "", nil); resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("facets without token = %d, want 401", resp.StatusCode)
+	}
+
+	for _, ev := range []string{
+		`{"kind":"deploy","env":"prod","service":"api","actor":"alice","title":"a","dedup_key":"fa:1"}`,
+		`{"kind":"deploy","env":"dev","service":"web","actor":"bob","title":"b","dedup_key":"fa:2"}`,
+	} {
+		if resp, body := doRequest(t, http.MethodPost, ts.URL+"/ingest/generic", testToken, []byte(ev)); resp.StatusCode != http.StatusCreated {
+			t.Fatalf("seed = %d %s", resp.StatusCode, body)
+		}
+	}
+
+	_, body := doRequest(t, http.MethodGet, ts.URL+"/api/v1/facets", testToken, nil)
+	var facets struct {
+		Envs, Services, Actors []string
+	}
+	if err := json.Unmarshal(body, &facets); err != nil {
+		t.Fatal(err)
+	}
+	if len(facets.Envs) != 2 || len(facets.Services) != 2 || len(facets.Actors) != 2 {
+		t.Fatalf("facets = %+v, want 2 of each", facets)
+	}
+
+	// actor= filters to exact match.
+	_, body = doRequest(t, http.MethodGet, ts.URL+"/api/v1/events?actor=alice", testToken, nil)
+	var list EventsResponse
+	if err := json.Unmarshal(body, &list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Events) != 1 || list.Events[0].Actor != "alice" {
+		t.Fatalf("actor filter returned %d events, want 1 alice", len(list.Events))
+	}
+}
+
 func TestCORS(t *testing.T) {
 	const allowed = "https://portal.example.com"
 

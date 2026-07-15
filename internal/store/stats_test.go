@@ -83,6 +83,60 @@ func TestActivityStatsHourBucketAndGuards(t *testing.T) {
 	}
 }
 
+func actor(v string) func(*model.Event) { return func(e *model.Event) { e.Actor = v } }
+
+func TestFacets(t *testing.T) {
+	s := openTestStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	seed := []*model.Event{
+		testEvent("f:1", now, env("prod"), service("api"), actor("alice")),
+		testEvent("f:2", now, env("dev"), service("web"), actor("bob")),
+		testEvent("f:3", now, env("prod"), service("api"), actor("alice")), // dupes collapse
+		testEvent("f:4", now, env(""), service(""), actor("")),             // empties excluded
+	}
+	for _, e := range seed {
+		if _, _, err := s.Ingest(ctx, e); err != nil {
+			t.Fatalf("ingest %s: %v", e.DedupKey, err)
+		}
+	}
+
+	f, err := s.Facets(ctx)
+	if err != nil {
+		t.Fatalf("Facets: %v", err)
+	}
+	if got := f.Envs; len(got) != 2 || got[0] != "dev" || got[1] != "prod" {
+		t.Errorf("envs = %v, want [dev prod]", got)
+	}
+	if got := f.Services; len(got) != 2 || got[0] != "api" || got[1] != "web" {
+		t.Errorf("services = %v, want [api web]", got)
+	}
+	if got := f.Actors; len(got) != 2 || got[0] != "alice" || got[1] != "bob" {
+		t.Errorf("actors = %v, want [alice bob]", got)
+	}
+}
+
+func TestListEventsActorFilter(t *testing.T) {
+	s := openTestStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	if _, _, err := s.Ingest(ctx, testEvent("act:1", now, actor("alice"))); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.Ingest(ctx, testEvent("act:2", now, actor("bob"))); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _, err := s.ListEvents(ctx, Filter{Actor: "alice"})
+	if err != nil {
+		t.Fatalf("ListEvents: %v", err)
+	}
+	if len(got) != 1 || got[0].Actor != "alice" {
+		t.Fatalf("actor filter returned %d events: %+v", len(got), got)
+	}
+}
+
 func TestDeployStats(t *testing.T) {
 	s := openTestStore(t)
 	ctx := context.Background()
