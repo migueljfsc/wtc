@@ -15,8 +15,13 @@ from the server's OpenAPI spec.
 
 - **Dashboard** — activity chart + per-env deploy health, from `/api/v1/stats/*`.
 - **Timeline** — faceted filters + full-text search, infinite scroll, saved
-  filters, and an event-detail drawer with the inline `where`-journey.
-- **Where / Diff / Services / Settings** — stubs until P9–P10.
+  filters, and an event-detail drawer with the inline `where`-journey; alert
+  events also show correlated preceding changes.
+- **Where** — trace a ref through its per-env BUILD→INTENT→APPLIED pipeline.
+- **Diff** — services × environments matrix, drift and not-yet-promoted flagged.
+- **Services** — per-service current versions, deploy freq / failure rate /
+  MTBF, recent failures, deploy history.
+- **Settings** — stub until P10.
 
 Routes are code-split, so Recharts loads only with the dashboard.
 

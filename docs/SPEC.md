@@ -166,6 +166,7 @@ GET /api/v1/auth/verify          # 200 if the bearer token is valid, else 401 (p
 GET /api/v1/stats/activity?since=&until=&bucket=day|hour   # gap-filled event-count buckets (portal dashboard)
 GET /api/v1/stats/deploys?since=&until=                    # per-env deploy count/failures/health
 GET /api/v1/facets                                          # distinct env/service/actor values (filter dropdowns)
+GET /api/v1/matrix?envs=dev,staging,prod                    # services × envs current-deploy grid (portal diff view)
 ```
 
 All timestamps RFC3339 (UTC). Cursor pagination on `(ts, id)`. `q` is FTS5 over
