@@ -2,6 +2,7 @@ import type { components } from "@/api/schema";
 import { Drawer } from "@/components/Drawer";
 import { StatusBadge } from "@/components/StatusBadge";
 import { WhereJourney } from "@/components/timeline/WhereJourney";
+import { AroundPanel } from "@/components/timeline/AroundPanel";
 import { useWhere } from "@/lib/queries";
 import { dateTime } from "@/lib/format";
 
@@ -59,7 +60,9 @@ export function EventDrawer({ event, onClose }: { event: Event | null; onClose: 
             </dl>
           </section>
 
-          {ref && (
+          {event.kind === "alert" && <AroundPanel alert={event} />}
+
+          {ref && event.kind !== "alert" && (
             <section>
               <h3 className="mb-2 text-sm font-semibold">Journey</h3>
               {where.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}

@@ -4,6 +4,27 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 9 (change-intelligence views)
+
+- **Where visualized** (`ui/`): search a ref (or arrive via `?ref=`) → per-env
+  BUILD→INTENT→APPLIED pipeline with intent→applied lag and dashed gap/unknown
+  markers.
+- **Diff visualized** (`ui/`): a services × environments matrix with
+  promotion-ordered columns (dev→…→prod heuristic), drift highlighted,
+  not-yet-promoted flagged, revision-only caveat marked; cells deep-link to
+  Where. Backed by a new **`GET /api/v1/matrix?envs=`** endpoint (latest
+  succeeded deploy per cell, reusing `LatestSucceededDeploys`; default columns
+  exclude ephemeral `pr-*`).
+- **Service detail** (`ui/`): current version across every env, deploy
+  frequency / change-failure rate / MTBF (computed client-side), recent
+  failures, and deploy history. (Lead-time is deferred — it needs a
+  build↔deploy join.)
+- **Alert correlation** (`ui/`): opening an alert event shows a timeline of the
+  changes in the preceding window (selectable 30m–24h, mirroring
+  `wtc around --window`), closest-to-alert highlighted.
+- OpenAPI + drift test + store test cover the matrix endpoint; routes stay
+  code-split.
+
 ### Added — Phase 8 (portal core views)
 
 - **Dashboard** (`ui/`): window control (14/30/90d), headline tiles, an activity

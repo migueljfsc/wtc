@@ -105,6 +105,36 @@ export function useMatrix(envs: string[]) {
   });
 }
 
+/** Recent deploys for one service, for the service-detail page + its metrics. */
+export function useServiceDeploys(service: string | null) {
+  return useQuery({
+    queryKey: ["events", "service-deploys", service],
+    enabled: !!service,
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/events", {
+        params: { query: { service: service!, kind: "deploy", limit: 100 } },
+      });
+      if (error) throw new Error("service deploys request failed");
+      return data.events ?? [];
+    },
+  });
+}
+
+/** Changes in the window before an event (alert correlation). */
+export function useAround(id: string | null, window: string) {
+  return useQuery({
+    queryKey: ["around", id, window],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/around", {
+        params: { query: { id: id!, window } },
+      });
+      if (error) throw new Error("around request failed");
+      return data.events ?? [];
+    },
+  });
+}
+
 /** The where-journey for a ref (git sha / tag / artifact), for the drawer. */
 export function useWhere(ref: string | null) {
   return useQuery({
