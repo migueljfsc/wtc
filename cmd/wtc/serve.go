@@ -113,7 +113,9 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 	defer stop()
 
 	// GitHub API poller — primary GitHub ingest for private deployments.
-	if gh := cfg.Sources.GitHub; gh.APIToken != "" && len(gh.Repos) > 0 && gh.PollInterval.Std() > 0 {
+	// repos may be empty — the poller then auto-discovers every repo the token
+	// can access.
+	if gh := cfg.Sources.GitHub; gh.APIToken != "" && gh.PollInterval.Std() > 0 {
 		poller := github.NewPoller(
 			github.NewClient(gh.APIToken, ""),
 			st, engineHolder, gh.Repos, gh.PollInterval.Std(), cfg.Server.CaptureDir, log,

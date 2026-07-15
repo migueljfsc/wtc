@@ -4,6 +4,22 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Operability (post-P10)
+
+- **GitHub poller auto-discovery**: leave `sources.github.repos` empty to watch
+  every repo the token can access (owner/collaborator/org member; archived
+  skipped; the set is re-checked each poll).
+- **Helm — deploy the portal by default** (`ui.enabled: true`) + an opt-in
+  single-host **ingress** that serves the SPA and proxies `/api` to wtc on the
+  same origin (no CORS).
+- **Helm — `env`/`secretKeyRef`**: inject secrets from any existing Secret + key,
+  as an alternative to `existingSecret` (which requires `WTC_*`-named keys).
+- **Diff matrix coloring**: a cell is amber when it is *behind* the newest deploy
+  in its row (the laggard to promote), not when it differs from the rightmost
+  column — so up-to-date envs are no longer flagged.
+- **Onboarding guide** (`docs/setup/onboarding.md`): Helm install + GitHub poller
+  + Flux, end to end.
+
 ### Added — Phase 10 (live + config surfaces)
 
 - **Live updates (SSE):** the store's single writer publishes each newly-stored

@@ -56,7 +56,11 @@ func NewPoller(client *Client, st *store.Store, engine *normalize.EngineHolder, 
 
 // Run polls until ctx is cancelled. The first sweep starts immediately.
 func (p *Poller) Run(ctx context.Context) {
-	p.log.Info("github poller starting", "repos", p.repos, "interval", p.interval)
+	scope := "auto-discover (all accessible)"
+	if len(p.repos) > 0 {
+		scope = fmt.Sprintf("%v", p.repos)
+	}
+	p.log.Info("github poller starting", "repos", scope, "interval", p.interval)
 	ticker := time.NewTicker(p.interval)
 	defer ticker.Stop()
 
@@ -72,9 +76,24 @@ func (p *Poller) Run(ctx context.Context) {
 }
 
 // Sweep polls every (repo, resource) pair once. Failures are logged and
-// skipped — the watermark only advances on success, so nothing is lost.
+// skipped — the watermark only advances on success, so nothing is lost. When
+// no repos are configured, the accessible set is (re)discovered each sweep, so
+// repos added to/removed from the token are picked up automatically.
 func (p *Poller) Sweep(ctx context.Context) {
-	for _, repo := range p.repos {
+	repos := p.repos
+	if len(repos) == 0 {
+		discovered, err := p.client.ListAccessibleRepos(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			p.log.Error("github repo discovery failed", "error", err)
+			return
+		}
+		p.log.Info("github poller discovered repos", "count", len(discovered))
+		repos = discovered
+	}
+	for _, repo := range repos {
 		for _, res := range []string{"runs", "prs", "commits"} {
 			if err := p.pollResource(ctx, repo, res); err != nil {
 				if ctx.Err() != nil {

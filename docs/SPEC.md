@@ -82,7 +82,7 @@ sources:
     webhook_secret: ${WTC_GH_WEBHOOK_SECRET}   # only needed if webhooks are wired (public endpoint)
     api_token: ${WTC_GH_API_TOKEN}       # enables the poller (primary ingest when private) + PR-diff enrichment
     poll_interval: 60s                   # 0 disables the poller (webhook-only mode)
-    repos:                               # poller scope; webhooks accept any repo passing HMAC
+    repos:                               # poller scope; OMIT to auto-discover every repo the token can access
       - org/app-api
       - org/app-web
     infra_path: infrastructure/          # per-repo manifests dir (microservices layout)

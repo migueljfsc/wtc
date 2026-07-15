@@ -34,6 +34,10 @@ spec:
             - secretRef:
                 name: {{ . }}
           {{- end }}
+          {{- with .Values.env }}
+          env:
+{{ toYaml . | indent 12 }}
+          {{- end }}
           livenessProbe:
             httpGet: {path: /healthz, port: http}
           readinessProbe:

@@ -86,9 +86,9 @@ config:
     github:
       api_token: ${WTC_GH_API_TOKEN}
       poll_interval: 60s
-      repos:                       # owner/name of each repo to watch
-        - your-org/app-api
-        - your-org/app-web
+      repos:                       # owner/name of each repo to watch —
+        - your-org/app-api         #   OMIT this whole list to auto-discover
+        - your-org/app-web         #   every repo the token can access
       infra_path: infrastructure/  # per-repo manifests dir (kustomize layout)
     flux:
       hmac_key: ${WTC_FLUX_HMAC_KEY}
@@ -116,9 +116,34 @@ config:
 
 Notes:
 - `auth.api_tokens` must be set or the API rejects everything.
+- **`repos` is optional** — omit it to watch every repo the token can access
+  (owner + collaborator + org member; archived repos skipped). The set is
+  re-checked each poll, so repos added to the token appear automatically. Mind
+  the rate budget: each repo costs ~3 requests per poll.
 - GitHub build/push events legitimately land `env=""` — REST payloads carry no
   changed-file list and wtc never guesses. **Env comes from Flux** (the
   cluster→env rules) and the tag↔sha join (`wtc where`).
+
+### Secrets: `existingSecret` vs `env`/`secretKeyRef`
+
+Step 1 used `existingSecret`, which requires the Secret's keys to be named
+`WTC_*`. If your secrets already exist under different names, use `env` instead
+to map any Secret + key to the env var — no renaming, no `${VAR}` in the config
+needed for source tokens (the `WTC_*` env override sets them directly):
+
+```yaml
+# values.yaml (instead of, or alongside, existingSecret)
+env:
+  - name: WTC_GH_API_TOKEN
+    valueFrom:
+      secretKeyRef: { name: github-credentials, key: token }
+  - name: WTC_API_TOKEN
+    valueFrom:
+      secretKeyRef: { name: wtc-api-token, key: token }
+  - name: WTC_FLUX_HMAC_KEY
+    valueFrom:
+      secretKeyRef: { name: wtc-flux-hmac, key: token }
+```
 
 ## Step 3 — Install
 
