@@ -19,6 +19,24 @@ function rowStatus(envs: string[], cells: Matrix["services"][number]["cells"]) {
   return { label: "in sync", tone: "sync" as const };
 }
 
+/**
+ * The version deployed most recently across the row (by ts) — the "current"
+ * version other envs are measured against. Envs not on it are behind; ts is
+ * sortable RFC3339, so string comparison finds the newest.
+ */
+function leadVersion(envs: string[], cells: Matrix["services"][number]["cells"]): string | null {
+  let leadTs = "";
+  let lead: string | null = null;
+  for (const e of envs) {
+    const c = cells[e];
+    if (c && c.ts > leadTs) {
+      leadTs = c.ts;
+      lead = version(c);
+    }
+  }
+  return lead;
+}
+
 const TONE = {
   drift: "text-amber-600 dark:text-amber-500",
   partial: "text-muted-foreground",
@@ -53,7 +71,7 @@ export function DiffMatrix({ matrix }: { matrix: Matrix }) {
         <tbody>
           {matrix.services.map((row) => {
             const st = rowStatus(envs, row.cells);
-            const targetVer = row.cells[target] ? version(row.cells[target]) : null;
+            const lead = leadVersion(envs, row.cells);
             return (
               <tr key={row.service} className="border-b last:border-0">
                 <td className="px-3 py-2 font-medium">{row.service}</td>
@@ -67,14 +85,22 @@ export function DiffMatrix({ matrix }: { matrix: Matrix }) {
                     );
                   }
                   const ver = version(cell);
-                  const drift = targetVer !== null && ver !== targetVer;
+                  // Amber marks an env that is BEHIND the newest deploy — the
+                  // laggard needing promotion, not the up-to-date envs.
+                  const behind = lead !== null && ver !== lead;
                   const revOnly = !cell.artifact && !!cell.ref;
                   return (
-                    <td key={e} className={cn("px-3 py-2", drift && "bg-amber-500/10")}>
+                    <td key={e} className={cn("px-3 py-2", behind && "bg-amber-500/10")}>
                       <Link
                         to={`/where?ref=${encodeURIComponent(cell.ref || cell.artifact || "")}`}
-                        className={cn("font-mono text-xs hover:underline", drift && TONE.drift)}
-                        title={revOnly ? "revision-only (no artifact reported)" : cell.artifact || cell.ref}
+                        className={cn("font-mono text-xs hover:underline", behind && TONE.drift)}
+                        title={
+                          behind
+                            ? `behind ${lead}`
+                            : revOnly
+                              ? "revision-only (no artifact reported)"
+                              : cell.artifact || cell.ref
+                        }
                       >
                         {ver}
                         {revOnly && <sup className="ml-0.5 text-[9px] text-muted-foreground">rev</sup>}
