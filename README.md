@@ -73,9 +73,12 @@ export WTC_GH_API_TOKEN=<github PAT>  # read-only: Actions/Contents/PRs
 ./bin/wtc doctor
 ```
 
-Wiring real sources: [docs/setup/github-poller.md](docs/setup/github-poller.md) ·
-[docs/setup/flux.md](docs/setup/flux.md) · [docs/setup/wrap.md](docs/setup/wrap.md) ·
-deploy via [docs/setup/deploy.md](docs/setup/deploy.md) ·
+**New cluster?** [docs/setup/onboarding.md](docs/setup/onboarding.md) is the
+end-to-end guide: Helm install + GitHub poller + Flux, start to finish.
+
+Per-source detail: [github-poller.md](docs/setup/github-poller.md) ·
+[flux.md](docs/setup/flux.md) · [wrap.md](docs/setup/wrap.md) ·
+[portal.md](docs/setup/portal.md) · deploy via [deploy.md](docs/setup/deploy.md) ·
 [retention](docs/setup/retention.md).
 
 ## How it works
