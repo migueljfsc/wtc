@@ -208,6 +208,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read-only view of the normalization rules and tag patterns in use. */
+        get: operations["config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Server-sent events: newly-stored events pushed live.
+         * @description text/event-stream. Each `data:` frame is one Event (as in /events). Consume with fetch — EventSource cannot set the Authorization header.
+         */
+        get: operations["stream"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -425,6 +462,34 @@ export interface components {
             /** @description Column order as requested. */
             envs: string[];
             services: components["schemas"]["MatrixRow"][];
+        };
+        /** @description Selector; empty fields are unconstrained. Strings support * and ** globs. */
+        RuleMatch: {
+            source?: string;
+            repo?: string;
+            branch?: string;
+            event?: string;
+            workflow?: string;
+            cluster?: string;
+            object_kind?: string;
+            paths?: string[];
+        };
+        /** @description Fields a rule sets. Values are Go templates over the fact map. */
+        RuleSet: {
+            env?: string;
+            cluster?: string;
+            namespace?: string;
+            service?: string;
+            kind?: string;
+            actor?: string;
+        };
+        Rule: {
+            match: components["schemas"]["RuleMatch"];
+            set: components["schemas"]["RuleSet"];
+        };
+        ConfigResponse: {
+            rules: components["schemas"]["Rule"][];
+            tag_patterns: string[];
         };
     };
     responses: {
@@ -767,6 +832,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Matrix"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current rules + tag patterns. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    stream: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description An SSE stream of Event frames. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
                 };
             };
             401: components["responses"]["Unauthorized"];

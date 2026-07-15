@@ -79,6 +79,29 @@ export function useEventsInfinite(filters: EventFilters) {
   });
 }
 
+export function useDoctor() {
+  return useQuery({
+    queryKey: ["doctor"],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/doctor", {});
+      if (error) throw new Error("doctor request failed");
+      return data;
+    },
+  });
+}
+
+export function useConfig() {
+  return useQuery({
+    queryKey: ["config"],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/config", {});
+      if (error) throw new Error("config request failed");
+      return data;
+    },
+    staleTime: 60_000,
+  });
+}
+
 export function useFacets() {
   return useQuery({
     queryKey: ["facets"],

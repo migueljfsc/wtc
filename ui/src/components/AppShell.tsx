@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/ThemeProvider";
 import { useAuth } from "@/auth/AuthProvider";
+import { useLiveUpdates } from "@/lib/useLiveUpdates";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -43,8 +44,26 @@ function ThemeToggle() {
   );
 }
 
+function LiveIndicator({ connected }: { connected: boolean }) {
+  return (
+    <span
+      className="flex items-center gap-1.5 text-xs text-muted-foreground"
+      title={connected ? "Live — updating in real time" : "Reconnecting…"}
+    >
+      <span
+        className={cn(
+          "size-2 rounded-full",
+          connected ? "bg-emerald-500 animate-pulse" : "bg-zinc-400",
+        )}
+      />
+      {connected ? "Live" : "Offline"}
+    </span>
+  );
+}
+
 export function AppShell() {
   const { logout } = useAuth();
+  const connected = useLiveUpdates();
   return (
     <div className="flex min-h-screen">
       <aside className="hidden w-56 shrink-0 flex-col border-r bg-card px-3 py-4 sm:flex">
@@ -79,7 +98,8 @@ export function AppShell() {
           <span className="text-sm text-muted-foreground">
             git log for production
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-3">
+            <LiveIndicator connected={connected} />
             <ThemeToggle />
             <Button variant="ghost" size="icon" aria-label="Log out" onClick={logout}>
               <LogOut />
