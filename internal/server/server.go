@@ -128,6 +128,8 @@ func (s *Server) apiRoutes() []apiRoute {
 		{"GET", "/around", http.HandlerFunc(s.handleAround)},
 		{"GET", "/diff", http.HandlerFunc(s.handleDiff)},
 		{"GET", "/handoff", http.HandlerFunc(s.handleHandoff)},
+		{"GET", "/stats/activity", http.HandlerFunc(s.handleStatsActivity)},
+		{"GET", "/stats/deploys", http.HandlerFunc(s.handleStatsDeploys)},
 		{"GET", "/auth/verify", http.HandlerFunc(s.handleAuthVerify)},
 	}
 }

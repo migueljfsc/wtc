@@ -140,6 +140,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stats/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Event counts over time (gap-filled), for the activity chart. */
+        get: operations["statsActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/deploys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Per-environment deploy frequency, failures and health. */
+        get: operations["statsDeploys"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -291,6 +325,47 @@ export interface components {
             unmapped_samples?: string[];
             clock_skew_24h: number;
             poll?: components["schemas"]["PollState"][];
+        };
+        ActivityBucket: {
+            /** @description Bucket start (UTC): YYYY-MM-DD for day, YYYY-MM-DDThh:00 for hour. */
+            ts: string;
+            total: number;
+            succeeded: number;
+            failed: number;
+        };
+        ActivityStats: {
+            /** Format: date-time */
+            since: string;
+            /** Format: date-time */
+            until: string;
+            /** @enum {string} */
+            bucket: "day" | "hour";
+            /** @description Contiguous (gap-filled) oldest-first. */
+            buckets: components["schemas"]["ActivityBucket"][];
+        };
+        EnvDeployStats: {
+            env: string;
+            /** @description Deploy events in the window. */
+            total: number;
+            succeeded: number;
+            failed: number;
+            /** @description Distinct services deployed. */
+            services: number;
+            /**
+             * Format: date-time
+             * @description Most recent deploy in the window.
+             */
+            last_ts?: string | null;
+            /** @description Status of the most recent deploy (env-health signal). */
+            last_status?: string;
+        };
+        DeployStats: {
+            /** Format: date-time */
+            since: string;
+            /** Format: date-time */
+            until: string;
+            /** @description Non-empty envs only, sorted by name. */
+            envs: components["schemas"]["EnvDeployStats"][];
         };
     };
     responses: {
@@ -532,6 +607,62 @@ export interface operations {
                     "application/json": components["schemas"]["DoctorReport"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    statsActivity: {
+        parameters: {
+            query?: {
+                /** @description Window start. Default 30 days ago. */
+                since?: string;
+                /** @description Window end. Default now. */
+                until?: string;
+                /** @description Time granularity. Default day. */
+                bucket?: "day" | "hour";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Contiguous count series. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityStats"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    statsDeploys: {
+        parameters: {
+            query?: {
+                /** @description Window start. Default 30 days ago. */
+                since?: string;
+                /** @description Window end. Default now. */
+                until?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Per-env deploy summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployStats"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
         };
     };

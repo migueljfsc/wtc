@@ -140,6 +140,59 @@ func TestOpenAPINoDrift(t *testing.T) {
 	}
 }
 
+func TestStatsEndpoints(t *testing.T) {
+	ts := newTestServer(t)
+
+	// Auth is enforced.
+	if resp, _ := doRequest(t, http.MethodGet, ts.URL+"/api/v1/stats/deploys", "", nil); resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("stats without token = %d, want 401", resp.StatusCode)
+	}
+	// Bad bucket is a 400, not a 500.
+	if resp, _ := doRequest(t, http.MethodGet, ts.URL+"/api/v1/stats/activity?bucket=week", testToken, nil); resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("bad bucket = %d, want 400", resp.StatusCode)
+	}
+
+	// Seed a successful prod deploy, then it should surface in both endpoints.
+	dep := []byte(`{"kind":"deploy","env":"prod","service":"api","status":"succeeded","title":"deploy api","dedup_key":"stats:1"}`)
+	if resp, body := doRequest(t, http.MethodPost, ts.URL+"/ingest/generic", testToken, dep); resp.StatusCode != http.StatusCreated {
+		t.Fatalf("seed = %d %s", resp.StatusCode, body)
+	}
+
+	resp, body := doRequest(t, http.MethodGet, ts.URL+"/api/v1/stats/deploys", testToken, nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("deploys = %d %s", resp.StatusCode, body)
+	}
+	var dstats struct {
+		Envs []struct {
+			Env        string `json:"env"`
+			Total      int    `json:"total"`
+			Succeeded  int    `json:"succeeded"`
+			LastStatus string `json:"last_status"`
+		} `json:"envs"`
+	}
+	if err := json.Unmarshal(body, &dstats); err != nil {
+		t.Fatal(err)
+	}
+	if len(dstats.Envs) != 1 || dstats.Envs[0].Env != "prod" || dstats.Envs[0].Total != 1 || dstats.Envs[0].LastStatus != "succeeded" {
+		t.Fatalf("deploy stats = %+v, want one prod deploy", dstats.Envs)
+	}
+
+	resp, body = doRequest(t, http.MethodGet, ts.URL+"/api/v1/stats/activity?bucket=day", testToken, nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("activity = %d %s", resp.StatusCode, body)
+	}
+	var astats struct {
+		Bucket  string           `json:"bucket"`
+		Buckets []map[string]any `json:"buckets"`
+	}
+	if err := json.Unmarshal(body, &astats); err != nil {
+		t.Fatal(err)
+	}
+	if astats.Bucket != "day" || len(astats.Buckets) == 0 {
+		t.Fatalf("activity stats = %+v, want non-empty day buckets", astats)
+	}
+}
+
 func TestCORS(t *testing.T) {
 	const allowed = "https://portal.example.com"
 
