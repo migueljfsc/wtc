@@ -39,6 +39,20 @@ timeline.
 
 ## Quickstart (local)
 
+Fastest way to see the whole thing — API + portal UI + a seeded week of fake
+data, one command:
+
+```bash
+docker compose up --build        # or: make demo
+# → open http://localhost:8080 and sign in with the token:  demo-token
+```
+
+Everything is self-contained (ephemeral DB, no secrets, no real GitHub/Flux).
+For a real deployment see [deploy/docker-compose.yaml](deploy/docker-compose.yaml)
++ [docs/setup/portal.md](docs/setup/portal.md).
+
+### From source (CLI only)
+
 ```bash
 make build
 ./bin/wtc init                        # scaffolds wtc.yaml + prints checklist

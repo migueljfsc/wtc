@@ -1,0 +1,55 @@
+# One-command local demo: the API + the portal UI + seeded fake data.
+#
+#   docker compose up --build
+#   → open http://localhost:8080 and sign in with the token:  demo-token
+#
+# Fully self-contained: no config files, no real GitHub/Flux wiring, no
+# secrets, and an ephemeral in-memory database that is freshly seeded on every
+# `up`. For a real deployment use deploy/docker-compose.yaml + docs/setup/.
+name: wtc-demo
+
+services:
+  # Change-ledger API (wtc serve). Configured entirely by env — no wtc.yaml.
+  api:
+    build:
+      context: .
+    image: ghcr.io/migueljfsc/wtc:latest
+    command: ["serve"]          # override the image's default --config path
+    environment:
+      WTC_API_TOKEN: demo-token
+      WTC_SERVER_DB: /data/wtc.db
+      # Let the portal's browser origin call the API cross-origin.
+      WTC_SERVER_CORS_ALLOWED_ORIGINS: http://localhost:8080
+    ports:
+      - "8484:8484"
+    tmpfs:
+      - /data                   # ephemeral DB — fresh on every `up`
+    healthcheck:
+      # The scratch image has no shell/curl; probe with the wtc binary itself.
+      test: ["CMD", "/wtc", "doctor", "--server", "http://127.0.0.1:8484", "--token", "demo-token"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 2s
+
+  # One-shot seeder: posts a synthetic week of events once the API is healthy,
+  # then exits. Reuses the api image (same tag), so nothing extra to build.
+  seed:
+    image: ghcr.io/migueljfsc/wtc:latest
+    command: ["demo", "--server", "http://api:8484", "--token", "demo-token"]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: "no"
+
+  # Portal SPA (nginx). The browser calls the API directly (cross-origin).
+  ui:
+    build:
+      context: ./ui
+    image: ghcr.io/migueljfsc/wtc-ui:latest
+    environment:
+      WTC_API_BASE_URL: http://localhost:8484   # browser-facing API URL
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
