@@ -69,13 +69,21 @@ export function Diff() {
         )
       )}
 
-      <p className="text-xs text-muted-foreground">
-        An <span className="text-amber-600 dark:text-amber-500">amber</span> cell is behind
-        the newest deploy in its row (the laggard to promote). State:{" "}
-        <span className="text-emerald-600 dark:text-emerald-500">in sync</span> (all match) ·{" "}
-        drift (versions differ) · partial (not deployed in every env).{" "}
-        <sup>rev</sup> = revision-only (no artifact reported). Click a version to trace it.
-      </p>
+      <div className="space-y-1 text-xs text-muted-foreground">
+        <p>
+          An <span className="text-amber-600 dark:text-amber-500">amber</span> cell is behind
+          the newest deploy in its row — the laggard to promote.
+        </p>
+        <p>
+          State:{" "}
+          <span className="text-emerald-600 dark:text-emerald-500">in sync</span> (all match) ·{" "}
+          <span className="text-amber-600 dark:text-amber-500">drift</span> (versions differ) ·{" "}
+          partial (not deployed in every env).
+        </p>
+        <p>
+          <sup>rev</sup> = revision-only (no artifact reported). Click a version to trace it.
+        </p>
+      </div>
     </div>
   );
 }
