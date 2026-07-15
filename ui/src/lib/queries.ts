@@ -91,6 +91,20 @@ export function useFacets() {
   });
 }
 
+/** Services × environments current-deploy grid (Diff view). */
+export function useMatrix(envs: string[]) {
+  return useQuery({
+    queryKey: ["matrix", envs],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/matrix", {
+        params: { query: envs.length ? { envs: envs.join(",") } : {} },
+      });
+      if (error) throw new Error("matrix request failed");
+      return data;
+    },
+  });
+}
+
 /** The where-journey for a ref (git sha / tag / artifact), for the drawer. */
 export function useWhere(ref: string | null) {
   return useQuery({

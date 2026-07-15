@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/model"
@@ -76,4 +77,25 @@ func (s *Server) handleFacets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeJSON(w, http.StatusOK, facets)
+}
+
+// handleMatrix returns the services × environments current-deploy grid. The
+// optional ?envs= is an ordered comma-separated column list; omitted => the
+// distinct non-ephemeral envs.
+func (s *Server) handleMatrix(w http.ResponseWriter, r *http.Request) {
+	var envs []string
+	if v := r.URL.Query().Get("envs"); v != "" {
+		for _, e := range strings.Split(v, ",") {
+			if e = strings.TrimSpace(e); e != "" {
+				envs = append(envs, e)
+			}
+		}
+	}
+	matrix, err := s.store.Matrix(r.Context(), envs)
+	if err != nil {
+		s.log.Error("matrix", "error", err)
+		s.writeError(w, http.StatusInternalServerError, "query error")
+		return
+	}
+	s.writeJSON(w, http.StatusOK, matrix)
 }

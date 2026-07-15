@@ -191,6 +191,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/matrix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Services × environments current-deploy grid (diff visualized). */
+        get: operations["matrix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -388,6 +405,26 @@ export interface components {
             envs: string[];
             services: string[];
             actors: string[];
+        };
+        MatrixCell: {
+            /** @description Deploy event id, for deep-linking. */
+            id: string;
+            ref?: string;
+            artifact?: string;
+            /** Format: date-time */
+            ts: string;
+        };
+        MatrixRow: {
+            service: string;
+            /** @description Keyed by env; a missing env means not deployed there. */
+            cells: {
+                [key: string]: components["schemas"]["MatrixCell"];
+            };
+        };
+        Matrix: {
+            /** @description Column order as requested. */
+            envs: string[];
+            services: components["schemas"]["MatrixRow"][];
         };
     };
     responses: {
@@ -706,6 +743,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Facets"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    matrix: {
+        parameters: {
+            query?: {
+                /** @description Ordered comma-separated column list. Omitted => distinct non-ephemeral envs. */
+                envs?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The current-deploy grid. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Matrix"];
                 };
             };
             401: components["responses"]["Unauthorized"];
