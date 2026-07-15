@@ -4,6 +4,27 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 8 (portal core views)
+
+- **Dashboard** (`ui/`): window control (14/30/90d), headline tiles, an activity
+  bar chart (events with failures stacked, palette validated for light+dark),
+  per-env health cards (deploy count, failure rate, last-deploy status), and a
+  recent-changes feed.
+- **Timeline** (`ui/`): faceted filter bar (env/service/kind/status/actor +
+  full-text search), infinite scroll over cursor pagination, saved filters
+  (client-side), and an event-detail drawer showing the full redacted payload
+  and the event's inline `where`-journey. Routes are code-split so Recharts
+  loads only with the dashboard.
+- **Aggregation endpoints** (Go, no new deps): `GET /api/v1/stats/activity`
+  (gap-filled day/hour event-count buckets, capped), `GET /api/v1/stats/deploys`
+  (per-env deploy count/failures/services/last-deploy health), and
+  `GET /api/v1/facets` (distinct env/service/actor for filter dropdowns).
+- **`/api/v1/events`** gains an exact `actor=` filter (FTS `q` already searched
+  actor text; this is the facet equality filter). Stats windows are inclusive of
+  `until` so "just now" events aren't dropped.
+- OpenAPI spec extended for all of the above; the drift test and the generated
+  typed client cover them.
+
 ### Added — Phase 7 (portal foundation)
 
 - **Portal SPA scaffold** (`ui/`): a separate rich client — Vite + React 18 +

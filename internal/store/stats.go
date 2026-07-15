@@ -74,7 +74,7 @@ SELECT strftime('`+spec.sqlFmt+`', ts) AS bucket,
        SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END),
        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END)
 FROM events
-WHERE ts >= ? AND ts < ?
+WHERE ts >= ? AND ts <= ?
 GROUP BY bucket`, model.FormatTS(since), model.FormatTS(until))
 	if err != nil {
 		return nil, fmt.Errorf("activity stats: %w", err)
@@ -134,7 +134,7 @@ func (s *Store) DeployStats(ctx context.Context, since, until time.Time) (*Deplo
 	rows, err := s.readDB.QueryContext(ctx, `
 SELECT env, status, ts, service
 FROM events
-WHERE kind = 'deploy' AND env != '' AND ts >= ? AND ts < ?
+WHERE kind = 'deploy' AND env != '' AND ts >= ? AND ts <= ?
 ORDER BY ts DESC`, model.FormatTS(since), model.FormatTS(until))
 	if err != nil {
 		return nil, fmt.Errorf("deploy stats: %w", err)
@@ -185,4 +185,53 @@ ORDER BY ts DESC`, model.FormatTS(since), model.FormatTS(until))
 	}
 	sort.Slice(envs, func(i, j int) bool { return envs[i].Env < envs[j].Env })
 	return &DeployStats{Since: since, Until: until, Envs: envs}, nil
+}
+
+// Facets are the distinct dimension values present in the ledger, for the
+// timeline's filter dropdowns. Kind and status are fixed enums (the client
+// knows them); env/service/actor are dynamic.
+type Facets struct {
+	Envs     []string `json:"envs"`
+	Services []string `json:"services"`
+	Actors   []string `json:"actors"`
+}
+
+// maxFacetValues caps each dimension so a high-cardinality column (many
+// actors/ephemeral envs) can't return an unbounded list.
+const maxFacetValues = 500
+
+// Facets returns the sorted distinct non-empty env/service/actor values.
+func (s *Store) Facets(ctx context.Context) (*Facets, error) {
+	distinct := func(col string) ([]string, error) {
+		// col is a fixed literal from the call sites below, never user input.
+		rows, err := s.readDB.QueryContext(ctx,
+			`SELECT DISTINCT `+col+` FROM events WHERE `+col+` != '' ORDER BY `+col+` LIMIT ?`,
+			maxFacetValues)
+		if err != nil {
+			return nil, fmt.Errorf("facets %s: %w", col, err)
+		}
+		defer func() { _ = rows.Close() }()
+		var out []string
+		for rows.Next() {
+			var v string
+			if err := rows.Scan(&v); err != nil {
+				return nil, fmt.Errorf("facets %s scan: %w", col, err)
+			}
+			out = append(out, v)
+		}
+		return out, rows.Err()
+	}
+
+	f := &Facets{}
+	var err error
+	if f.Envs, err = distinct("env"); err != nil {
+		return nil, err
+	}
+	if f.Services, err = distinct("service"); err != nil {
+		return nil, err
+	}
+	if f.Actors, err = distinct("actor"); err != nil {
+		return nil, err
+	}
+	return f, nil
 }

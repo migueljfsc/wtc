@@ -28,14 +28,17 @@ each verified against live infrastructure:
 - **Engine**: ordered env/service inference rules with globs + templates;
   strict-outrank dedup upsert (at-least-once ingestion, zero duplicates);
   PR-diff enrichment; redaction before storage
-- **Surfaces**: embedded timeline UI at `/`, Slack digest, `wtc demo` seed
+- **Surfaces**: embedded timeline UI at `/`, a **rich portal SPA** (dashboard +
+  faceted timeline), Slack digest, `wtc demo` seed
 - **Ops**: opt-in retention prune (`pr-*` ephemeral windows + `incremental_vacuum`)
 - **Packaging**: `ghcr.io/migueljfsc/wtc` multi-arch image (auto-versioned),
   goreleaser binaries (linux/darwin × amd64/arm64), Helm chart, docker-compose
 
-Remaining: a **rich portal UI** track (P7–P10: dashboards, metrics,
-change-intelligence views) built as a separate SPA alongside the embedded
-timeline.
+The **portal UI** track (separate SPA, alongside the embedded timeline) is
+underway: P7 foundation (app shell, token login, `/api/v1` + CORS + OpenAPI) and
+P8 core views (dashboard + rich timeline) are done; P9–P10 (change-intelligence
+views, live updates, config surfaces) remain. See `ui/` and
+[docs/setup/portal.md](docs/setup/portal.md).
 
 ## Quickstart (local)
 

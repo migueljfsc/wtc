@@ -48,6 +48,7 @@
           { "name": "service", "in": "query", "schema": { "type": "string" } },
           { "name": "kind", "in": "query", "schema": { "type": "string" } },
           { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "actor", "in": "query", "description": "Exact actor match (facet).", "schema": { "type": "string" } },
           { "name": "q", "in": "query", "description": "Full-text search over event text.", "schema": { "type": "string" } },
           { "name": "since", "in": "query", "schema": { "type": "string", "format": "date-time" } },
           { "name": "until", "in": "query", "schema": { "type": "string", "format": "date-time" } },
@@ -158,6 +159,16 @@
         "responses": {
           "200": { "description": "Per-env deploy summary.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeployStats" } } } },
           "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/facets": {
+      "get": {
+        "operationId": "facets",
+        "summary": "Distinct env/service/actor values for filter dropdowns.",
+        "responses": {
+          "200": { "description": "Sorted distinct dimension values.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Facets" } } } },
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       }
@@ -361,6 +372,15 @@
           "since": { "type": "string", "format": "date-time" },
           "until": { "type": "string", "format": "date-time" },
           "envs": { "type": "array", "items": { "$ref": "#/components/schemas/EnvDeployStats" }, "description": "Non-empty envs only, sorted by name." }
+        }
+      },
+      "Facets": {
+        "type": "object",
+        "required": ["envs", "services", "actors"],
+        "properties": {
+          "envs": { "type": "array", "items": { "type": "string" } },
+          "services": { "type": "array", "items": { "type": "string" } },
+          "actors": { "type": "array", "items": { "type": "string" } }
         }
       }
     }

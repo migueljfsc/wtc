@@ -67,3 +67,13 @@ func (s *Server) handleStatsDeploys(w http.ResponseWriter, r *http.Request) {
 	}
 	s.writeJSON(w, http.StatusOK, report)
 }
+
+func (s *Server) handleFacets(w http.ResponseWriter, r *http.Request) {
+	facets, err := s.store.Facets(r.Context())
+	if err != nil {
+		s.log.Error("facets", "error", err)
+		s.writeError(w, http.StatusInternalServerError, "query error")
+		return
+	}
+	s.writeJSON(w, http.StatusOK, facets)
+}
