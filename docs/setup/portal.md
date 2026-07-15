@@ -52,37 +52,46 @@ docker compose up -d
 
 ## 3. Helm (in-cluster)
 
-The chart ships the portal as an opt-in component (`ui.enabled=false` by
-default). Enable it and tell both sides about each other:
+The chart deploys the portal **by default** (`ui.enabled: true`) — a `wtc-ui`
+Deployment + Service alongside the `wtc` API. It also ships an **opt-in
+single-host Ingress** that serves the SPA at `/` and proxies `/api` to the API
+on the **same origin**, so no CORS is needed and `apiBaseUrl` stays empty:
 
 ```yaml
-# values.yaml
-ui:
+# values.yaml — the recommended same-origin setup
+ingress:
   enabled: true
-  apiBaseUrl: https://wtc-api.example.com   # what the browser calls
-
-config:
-  server:
-    cors:
-      allowed_origins:
-        - https://wtc-portal.example.com    # where the SPA is served
+  className: nginx
+  host: wtc.example.com
+# ui.apiBaseUrl: ""   # default; same origin via the ingress above
 ```
 
 ```sh
 helm upgrade --install wtc deploy/helm/wtc -f values.yaml
 ```
 
-This adds a `wtc-ui` Deployment + Service (port 80). Front it with your own
-Ingress. Point an Ingress host at the `wtc-ui` Service for the SPA and at the
-`wtc` Service (8484) for the API.
+Open `https://wtc.example.com` and sign in with an `auth.api_tokens` value. The
+Ingress routes `/api/*` to the `wtc` Service (8484) and everything else to the
+`wtc-ui` Service (80). (With `ui.enabled: false`, the same Ingress routes
+everything to `wtc`, which serves the embedded timeline + API.)
 
-### Same-origin alternative (no CORS)
+### Cross-origin alternative (CORS)
 
-If you put the SPA and the API behind **one** Ingress host — SPA at `/`, API
-proxied at `/api` — set `ui.apiBaseUrl: ""` (same origin) and leave
-`cors.allowed_origins` empty. The browser then makes same-origin calls and no
-CORS config is needed. (The bundled compose/Helm defaults use the direct
-cross-origin path instead, which is what the CORS setting is for.)
+To serve the SPA on a **different** origin from the API (e.g. two Ingress hosts,
+or your own routing), set `ui.apiBaseUrl` to the API's URL and add the SPA's
+origin to the server's CORS allow-list:
+
+```yaml
+ui:
+  apiBaseUrl: https://wtc-api.example.com    # what the browser calls
+config:
+  server:
+    cors:
+      allowed_origins:
+        - https://wtc-portal.example.com     # where the SPA is served
+```
+
+To skip the portal entirely, set `ui.enabled: false`.
 
 ## 4. Auth
 

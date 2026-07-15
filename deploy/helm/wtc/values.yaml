@@ -47,12 +47,14 @@ config:
   #     hmac_key: ${WTC_FLUX_HMAC_KEY}
   #     suppression_window: 10m
 
-# Portal SPA (P7+). Optional and additive — the Go binary is the backend
-# either way. When enabled, add the origin the SPA is served from to
-# config.server.cors.allowed_origins above, since the browser calls the API
-# cross-origin (or front both with one ingress host and leave apiBaseUrl empty).
+# Portal SPA (P7+). Deployed by default alongside the API. With the bundled
+# ingress below, the browser loads the SPA and calls the API on the SAME origin
+# (the ingress routes /api to wtc), so apiBaseUrl stays empty and no CORS is
+# needed. To instead serve the SPA on a DIFFERENT origin from the API, set
+# apiBaseUrl to the API's URL and add that SPA origin to
+# config.server.cors.allowed_origins above.
 ui:
-  enabled: false
+  enabled: true
   image:
     repository: ghcr.io/migueljfsc/wtc-ui
     tag: latest
@@ -60,8 +62,8 @@ ui:
   service:
     type: ClusterIP
     port: 80
-  # Browser-facing wtc API URL (what the user's browser calls — e.g. the API
-  # ingress host). Empty => same origin, for reverse-proxy/single-host setups.
+  # Browser-facing wtc API URL. Empty => same origin (works with the ingress
+  # below, which proxies /api to wtc). Set it only for the cross-origin model.
   apiBaseUrl: ""
   replicas: 1
   resources:
@@ -70,3 +72,13 @@ ui:
       memory: 32Mi
     limits:
       memory: 128Mi
+
+# Optional single-host ingress: serves the portal at / and proxies /api to the
+# wtc API on the same origin (no CORS). Enable it and set host to expose the
+# portal; k8s probes hit the pods directly, so health isn't routed here.
+ingress:
+  enabled: false
+  className: ""            # e.g. "nginx"
+  host: wtc.example.com
+  annotations: {}
+  tls: []                  # e.g. [{ secretName: wtc-tls, hosts: [wtc.example.com] }]
