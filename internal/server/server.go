@@ -34,6 +34,9 @@ type Options struct {
 	Tags *normalize.TagResolver
 	// CaptureDir, when non-empty, dumps every raw ingest body to disk.
 	CaptureDir string
+	// CORSAllowedOrigins enables cross-origin access from the portal SPA. Empty
+	// means CORS is off (no headers emitted); a single "*" allows any origin.
+	CORSAllowedOrigins []string
 }
 
 // Server routes ingest and query requests onto a Store.
@@ -46,6 +49,7 @@ type Server struct {
 	engine         *normalize.Engine
 	tags           *normalize.TagResolver
 	captureDir     string
+	corsOrigins    []string
 	log            *slog.Logger
 	mux            *http.ServeMux
 }
@@ -72,6 +76,7 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 		engine:         engine,
 		tags:           tags,
 		captureDir:     opts.CaptureDir,
+		corsOrigins:    opts.CORSAllowedOrigins,
 		log:            log,
 		mux:            http.NewServeMux(),
 	}
@@ -82,23 +87,54 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 	s.mux.Handle("GET /", http.FileServerFS(web.FS()))
 
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
+	// OpenAPI document for the portal's typed client generator. Public, like
+	// healthz — it describes the (bearer-authed) API but leaks no data.
+	s.mux.HandleFunc("GET /api/openapi.json", s.handleOpenAPI)
 	s.mux.Handle("POST /ingest/generic", s.requireBearer(http.HandlerFunc(s.handleIngestGeneric)))
 	s.mux.Handle("POST /ingest/alertmanager", s.requireBearer(http.HandlerFunc(s.handleIngestAlertmanager)))
 	s.mux.HandleFunc("POST /ingest/github", s.handleIngestGitHub) // HMAC-verified inside
 	s.mux.HandleFunc("POST /ingest/flux", s.handleIngestFlux)     // HMAC-verified inside
-	s.mux.Handle("GET /api/events", s.requireBearer(http.HandlerFunc(s.handleListEvents)))
-	s.mux.Handle("GET /api/doctor", s.requireBearer(http.HandlerFunc(s.handleDoctor)))
-	s.mux.Handle("GET /api/where/{ref}", s.requireBearer(http.HandlerFunc(s.handleWhere)))
-	s.mux.Handle("GET /api/around", s.requireBearer(http.HandlerFunc(s.handleAround)))
-	s.mux.Handle("GET /api/diff", s.requireBearer(http.HandlerFunc(s.handleDiff)))
-	s.mux.Handle("GET /api/handoff", s.requireBearer(http.HandlerFunc(s.handleHandoff)))
+
+	// Query API. Every route is registered under both the legacy /api prefix
+	// (CLI client + embedded web depend on it) and the versioned /api/v1
+	// prefix (the portal SPA's client) — same handler, so the two can never
+	// drift. apiRoutes() is the single source the OpenAPI drift test checks.
+	for _, rt := range s.apiRoutes() {
+		h := s.requireBearer(rt.handler)
+		s.mux.Handle(rt.method+" /api"+rt.path, h)
+		s.mux.Handle(rt.method+" /api/v1"+rt.path, h)
+	}
 
 	return s
 }
 
-// Handler returns the root handler (with request logging).
+// apiRoute is one query-API endpoint, registered under both /api and /api/v1.
+// The path is relative to the version prefix and uses Go 1.22 mux wildcards
+// ({ref}), which are identical to OpenAPI path templating.
+type apiRoute struct {
+	method  string
+	path    string
+	handler http.Handler
+}
+
+// apiRoutes is the authoritative list of query-API endpoints. The OpenAPI
+// drift test asserts every entry here is documented in openapi.json, so a new
+// route cannot ship without its contract.
+func (s *Server) apiRoutes() []apiRoute {
+	return []apiRoute{
+		{"GET", "/events", http.HandlerFunc(s.handleListEvents)},
+		{"GET", "/doctor", http.HandlerFunc(s.handleDoctor)},
+		{"GET", "/where/{ref}", http.HandlerFunc(s.handleWhere)},
+		{"GET", "/around", http.HandlerFunc(s.handleAround)},
+		{"GET", "/diff", http.HandlerFunc(s.handleDiff)},
+		{"GET", "/handoff", http.HandlerFunc(s.handleHandoff)},
+		{"GET", "/auth/verify", http.HandlerFunc(s.handleAuthVerify)},
+	}
+}
+
+// Handler returns the root handler (request logging + CORS).
 func (s *Server) Handler() http.Handler {
-	return s.logRequests(s.mux)
+	return s.logRequests(s.withCORS(s.mux))
 }
 
 // ErrorResponse is the wire shape of every error reply. Shared with the CLI

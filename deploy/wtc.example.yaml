@@ -2,6 +2,12 @@
 server:
   listen: ":8484"
   db: /data/wtc.db
+  # Portal (ui/) support — allow the SPA's browser origin to call the API
+  # cross-origin. Off (no origins) by default. The compose stack sets this via
+  # WTC_SERVER_CORS_ALLOWED_ORIGINS; uncomment here for a hand-run server.
+  # cors:
+  #   allowed_origins:
+  #     - http://localhost:8080
 auth:
   api_tokens:
     - ${WTC_API_TOKEN}

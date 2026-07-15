@@ -90,6 +90,7 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 			Engine:              engine,
 			Tags:                tags,
 			CaptureDir:          cfg.Server.CaptureDir,
+			CORSAllowedOrigins:  cfg.Server.CORS.AllowedOrigins,
 		}, log).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

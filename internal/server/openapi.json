@@ -1,0 +1,295 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "wtc query API",
+    "description": "Versioned read API served by `wtc serve`. The portal SPA generates its typed client from this document. Ingest endpoints (/ingest/*) are source-authenticated (HMAC / bearer) and out of scope for the portal client.",
+    "version": "v1",
+    "license": { "name": "Apache-2.0", "url": "https://www.apache.org/licenses/LICENSE-2.0" }
+  },
+  "servers": [{ "url": "/", "description": "The wtc server, relative to its own origin." }],
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "healthz",
+        "summary": "Liveness probe (unauthenticated).",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Server is up.",
+            "content": { "application/json": { "schema": {
+              "type": "object", "properties": { "status": { "type": "string", "example": "ok" } }
+            } } }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/verify": {
+      "get": {
+        "operationId": "verifyAuth",
+        "summary": "Validate the supplied bearer token.",
+        "responses": {
+          "200": {
+            "description": "Token is valid.",
+            "content": { "application/json": { "schema": {
+              "type": "object", "required": ["ok"], "properties": { "ok": { "type": "boolean" } }
+            } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/events": {
+      "get": {
+        "operationId": "listEvents",
+        "summary": "List change events, newest first, cursor-paginated.",
+        "parameters": [
+          { "name": "env", "in": "query", "schema": { "type": "string" } },
+          { "name": "service", "in": "query", "schema": { "type": "string" } },
+          { "name": "kind", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "q", "in": "query", "description": "Full-text search over event text.", "schema": { "type": "string" } },
+          { "name": "since", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "until", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "cursor", "in": "query", "description": "Opaque cursor from a prior response's next_cursor.", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "A page of events.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EventsResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/where/{ref}": {
+      "get": {
+        "operationId": "where",
+        "summary": "Trace a commit/tag across builds, intents and per-env applies.",
+        "parameters": [
+          { "name": "ref", "in": "path", "required": true, "description": "A git sha (short or long), image tag, or artifact ref.", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "The change's journey.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WhereReport" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/diff": {
+      "get": {
+        "operationId": "diff",
+        "summary": "Compare what is deployed across two environments right now.",
+        "parameters": [
+          { "name": "a", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "b", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Per-service comparison.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DiffReport" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/handoff": {
+      "get": {
+        "operationId": "handoff",
+        "summary": "Summarize deploy activity since an instant (shift-handoff view).",
+        "parameters": [
+          { "name": "since", "in": "query", "description": "Defaults to 7 days ago.", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": { "description": "Activity summary.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HandoffReport" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/around": {
+      "get": {
+        "operationId": "around",
+        "summary": "List the changes in a window before an instant or an event.",
+        "parameters": [
+          { "name": "ts", "in": "query", "description": "Anchor instant. One of ts or id is required.", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "id", "in": "query", "description": "Anchor on an event id (e.g. an alert). One of ts or id is required.", "schema": { "type": "string" } },
+          { "name": "window", "in": "query", "description": "Lookback duration (Go format, e.g. 30m). Default 30m.", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Events preceding the anchor.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EventsResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/doctor": {
+      "get": {
+        "operationId": "doctor",
+        "summary": "Report ingest health, source watermarks and unmapped events.",
+        "responses": {
+          "200": { "description": "Health report.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DoctorReport" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "description": "A value from the server's auth.api_tokens." }
+    },
+    "responses": {
+      "BadRequest": { "description": "Malformed request.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+      "Unauthorized": { "description": "Missing or invalid bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+      "NotFound": { "description": "No such resource.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["error"],
+        "properties": { "error": { "type": "string" } }
+      },
+      "Event": {
+        "type": "object",
+        "required": ["id", "ts", "ingested_at", "source", "kind", "status", "env", "cluster", "namespace", "service", "actor", "ref", "artifact", "title", "url", "dedup_key"],
+        "properties": {
+          "id": { "type": "string", "description": "ULID." },
+          "ts": { "type": "string", "format": "date-time", "description": "Source event time (UTC)." },
+          "ingested_at": { "type": "string", "format": "date-time", "description": "When wtc stored it (UTC)." },
+          "source": { "type": "string", "enum": ["github", "flux", "helm", "terraform", "manual", "generic", "alertmanager"] },
+          "kind": { "type": "string", "enum": ["build", "merge", "push", "deploy", "config_change", "infra_change", "rollback", "alert", "manual"] },
+          "status": { "type": "string", "enum": ["started", "succeeded", "failed", "unknown"] },
+          "env": { "type": "string", "description": "Empty string means unmapped (surfaced by doctor)." },
+          "cluster": { "type": "string" },
+          "namespace": { "type": "string" },
+          "service": { "type": "string" },
+          "actor": { "type": "string" },
+          "ref": { "type": "string", "description": "Git sha / revision." },
+          "artifact": { "type": "string", "description": "Primary artifact, e.g. registry/app:tag." },
+          "title": { "type": "string" },
+          "url": { "type": "string" },
+          "duration_ms": { "type": "integer", "format": "int64", "nullable": true },
+          "dedup_key": { "type": "string" },
+          "payload": { "type": "string", "description": "Redacted raw JSON; may be omitted." }
+        }
+      },
+      "EventsResponse": {
+        "type": "object",
+        "required": ["events"],
+        "properties": {
+          "events": { "type": "array", "items": { "$ref": "#/components/schemas/Event" } },
+          "next_cursor": { "type": "string", "description": "Pass as ?cursor= to fetch the next page; absent on the last page." }
+        }
+      },
+      "WhereEnv": {
+        "type": "object",
+        "required": ["env"],
+        "properties": {
+          "env": { "type": "string" },
+          "intent": { "allOf": [{ "$ref": "#/components/schemas/Event" }], "nullable": true, "description": "Merge/push that targeted this env." },
+          "applied": { "allOf": [{ "$ref": "#/components/schemas/Event" }], "nullable": true, "description": "Latest deploy carrying the change." },
+          "lag_ms": { "type": "integer", "format": "int64", "nullable": true, "description": "applied.ts - intent.ts." },
+          "unknown": { "type": "array", "items": { "type": "string" }, "description": "Explicit gaps, never guessed." }
+        }
+      },
+      "WhereReport": {
+        "type": "object",
+        "required": ["input", "sha", "builds", "intents", "envs"],
+        "properties": {
+          "input": { "type": "string" },
+          "sha": { "type": "string", "description": "Longest known form of the resolved sha." },
+          "builds": { "type": "array", "items": { "$ref": "#/components/schemas/Event" } },
+          "intents": { "type": "array", "items": { "$ref": "#/components/schemas/Event" } },
+          "envs": { "type": "array", "items": { "$ref": "#/components/schemas/WhereEnv" } },
+          "notes": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "DiffRow": {
+        "type": "object",
+        "required": ["service", "a", "b", "in_sync", "revision_only"],
+        "properties": {
+          "service": { "type": "string" },
+          "a": { "type": "string", "description": "Artifact (fallback ref) in env A; empty = not deployed." },
+          "b": { "type": "string", "description": "Same for env B." },
+          "a_ts": { "type": "string", "format": "date-time", "nullable": true },
+          "b_ts": { "type": "string", "format": "date-time", "nullable": true },
+          "drift_seconds": { "type": "integer", "format": "int64", "nullable": true, "description": "|aTS - bTS| when both exist and differ." },
+          "last_actor": { "type": "string" },
+          "in_sync": { "type": "boolean" },
+          "only_in": { "type": "string", "description": "Env name when deployed to exactly one side." },
+          "revision_only": { "type": "boolean", "description": "Compared refs because artifact data was missing." }
+        }
+      },
+      "DiffReport": {
+        "type": "object",
+        "required": ["env_a", "env_b", "rows"],
+        "properties": {
+          "env_a": { "type": "string" },
+          "env_b": { "type": "string" },
+          "rows": { "type": "array", "items": { "$ref": "#/components/schemas/DiffRow" } }
+        }
+      },
+      "EnvStats": {
+        "type": "object",
+        "required": ["total", "failed"],
+        "properties": {
+          "total": { "type": "integer" },
+          "failed": { "type": "integer" }
+        }
+      },
+      "ActorCount": {
+        "type": "object",
+        "required": ["actor", "count"],
+        "properties": {
+          "actor": { "type": "string" },
+          "count": { "type": "integer" }
+        }
+      },
+      "HandoffReport": {
+        "type": "object",
+        "required": ["since", "deploys_by_env", "infra_changes", "rollbacks", "unmapped"],
+        "properties": {
+          "since": { "type": "string", "format": "date-time" },
+          "deploys_by_env": { "type": "object", "additionalProperties": { "$ref": "#/components/schemas/EnvStats" } },
+          "failures": { "type": "array", "items": { "$ref": "#/components/schemas/Event" }, "description": "Failed deploys in window." },
+          "infra_changes": { "type": "integer" },
+          "rollbacks": { "type": "integer" },
+          "unmapped": { "type": "integer" },
+          "top_actors": { "type": "array", "items": { "$ref": "#/components/schemas/ActorCount" } },
+          "new_services": { "type": "array", "items": { "type": "string" }, "description": "First ever seen inside the window." }
+        }
+      },
+      "SourceHealth": {
+        "type": "object",
+        "required": ["source", "count_24h", "last_ts"],
+        "properties": {
+          "source": { "type": "string" },
+          "count_24h": { "type": "integer" },
+          "last_ts": { "type": "string", "format": "date-time" }
+        }
+      },
+      "PollState": {
+        "type": "object",
+        "required": ["repo", "resource", "watermark", "updated_at"],
+        "properties": {
+          "repo": { "type": "string" },
+          "resource": { "type": "string" },
+          "watermark": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "DoctorReport": {
+        "type": "object",
+        "required": ["total_events", "db_size_bytes", "sources", "unmapped_24h", "clock_skew_24h"],
+        "properties": {
+          "total_events": { "type": "integer", "format": "int64" },
+          "db_size_bytes": { "type": "integer", "format": "int64" },
+          "oldest_event": { "type": "string", "format": "date-time", "nullable": true, "description": "Absent on an empty ledger." },
+          "sources": { "type": "array", "items": { "$ref": "#/components/schemas/SourceHealth" } },
+          "unmapped_24h": { "type": "integer" },
+          "unmapped_samples": { "type": "array", "items": { "type": "string" } },
+          "clock_skew_24h": { "type": "integer" },
+          "poll": { "type": "array", "items": { "$ref": "#/components/schemas/PollState" } }
+        }
+      }
+    }
+  }
+}

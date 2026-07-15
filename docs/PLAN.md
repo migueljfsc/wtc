@@ -13,7 +13,7 @@ Lives at `docs/PLAN.md`. Each phase ≈ 1–3 Claude Code sessions. A phase is d
 | P4 gap closers | ✅ 2026-07-14 | wrap verified against a live helm install; chart+compose verified; image on GHCR |
 | P5 surfaces | ✅ 2026-07-14 | embedded timeline UI, Alertmanager + `wtc around`, Slack digest — all live-verified |
 | P6 release hygiene | ✅ done | auto cz-versioning, multi-arch images, goreleaser binaries, retention job, `wtc demo` seed, load sanity, LICENSE |
-| **P7 portal foundation** | ⬜ | separate SPA + API hardening (CORS, versioning, aggregation endpoints) |
+| **P7 portal foundation** | ✅ 2026-07-15 | `ui/` SPA scaffold (Vite/React/TS/Tailwind/shadcn/TanStack Query) + `/api/v1` alias, CORS, OpenAPI spec + drift test, token-login; `wtc-ui` image, CI `ui` job, compose+Helm `ui` service, `docs/setup/portal.md` |
 | **P8 portal core views** | ⬜ | dashboard, rich timeline, service pages |
 | **P9 change-intelligence views** | ⬜ | `where`/`diff`/`around` visualized; env matrix |
 | **P10 live + config surfaces** | ⬜ | SSE live updates, rules/sources settings UI, deploy path |

@@ -26,6 +26,41 @@ func (s *Server) requireBearer(next http.Handler) http.Handler {
 	})
 }
 
+// withCORS emits cross-origin headers for the portal SPA and answers
+// preflight OPTIONS requests. Off (no headers) when no origins are configured;
+// a lone "*" allows any origin. The Origin is always echoed (never a literal
+// "*") with Vary: Origin, so responses stay correct behind shared caches and a
+// future credentialed mode keeps working.
+func (s *Server) withCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if origin != "" && s.originAllowed(origin) {
+			h := w.Header()
+			h.Set("Access-Control-Allow-Origin", origin)
+			h.Add("Vary", "Origin")
+			if r.Method == http.MethodOptions {
+				h.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+				h.Set("Access-Control-Max-Age", "600")
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// originAllowed reports whether origin is permitted by the configured
+// allow-list. A single "*" entry permits any origin.
+func (s *Server) originAllowed(origin string) bool {
+	for _, o := range s.corsOrigins {
+		if o == "*" || o == origin {
+			return true
+		}
+	}
+	return false
+}
+
 // statusRecorder captures the response code for request logging.
 type statusRecorder struct {
 	http.ResponseWriter

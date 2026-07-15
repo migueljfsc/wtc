@@ -11,14 +11,18 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    # Only propose a version that has been public for >=7 days — skip
+    # same-week releases that may still get yanked or patched.
+    cooldown:
+      default-days: 7
     groups:
       go-deps:
         patterns:
           - "*"
 
-  # GitHub Actions across .github/workflows (ci, release, demo-*). This is what
-  # keeps actions off deprecated runtimes — e.g. the checkout/setup-go Node 20
-  # notice that surfaced on the v0.3.0 release run.
+  # GitHub Actions across .github/workflows (ci, build-publish*, demo-*). This
+  # is what keeps actions off deprecated runtimes — e.g. the checkout/setup-go
+  # Node 20 notice that surfaced on the v0.3.0 release run.
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -27,24 +31,45 @@ updates:
     commit-message:
       prefix: ci
       include: scope
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns:
           - "*"
 
-  # Container base images (root Dockerfile + the three demo service images) —
-  # bumps golang:<ver>-alpine as new releases land.
+  # Container base images (root Dockerfile, the three demo service images, and
+  # the portal ui/ Dockerfile: node:<ver>-alpine + nginx:<ver>-alpine).
   - package-ecosystem: docker
     directories:
       - "/"
       - "/demo/*"
+      - "/ui"
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore
       include: scope
+    cooldown:
+      default-days: 7
     groups:
       docker:
+        patterns:
+          - "*"
+
+  # Portal SPA npm dependencies (ui/). Grouped into one PR to keep volume low.
+  - package-ecosystem: npm
+    directory: /ui
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    cooldown:
+      default-days: 7
+    groups:
+      npm:
         patterns:
           - "*"

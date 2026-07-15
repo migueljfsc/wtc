@@ -20,6 +20,13 @@ func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 	s.writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// handleAuthVerify lets the portal validate a bearer token without a
+// side-effecting call: reaching this handler means requireBearer already
+// accepted the token, so a 200 confirms it, a 401 rejects it.
+func (s *Server) handleAuthVerify(w http.ResponseWriter, _ *http.Request) {
+	s.writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
 // IngestResponse is returned by all ingest endpoints.
 type IngestResponse struct {
 	ID      string `json:"id"`

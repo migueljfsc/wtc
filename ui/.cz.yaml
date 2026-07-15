@@ -1,0 +1,11 @@
+---
+commitizen:
+  bump_message: 'bump(ui): $current_version -> $new_version [skip ci]'
+  name: cz_conventional_commits
+  tag_format: wtc-ui-v$version
+  update_changelog_on_bump: false
+  version: 0.0.0
+  version_files:
+  - .cz.yaml:version
+  - package.json:version
+  version_scheme: semver
