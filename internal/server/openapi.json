@@ -130,6 +130,37 @@
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       }
+    },
+    "/api/v1/stats/activity": {
+      "get": {
+        "operationId": "statsActivity",
+        "summary": "Event counts over time (gap-filled), for the activity chart.",
+        "parameters": [
+          { "name": "since", "in": "query", "description": "Window start. Default 30 days ago.", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "until", "in": "query", "description": "Window end. Default now.", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "bucket", "in": "query", "description": "Time granularity. Default day.", "schema": { "type": "string", "enum": ["day", "hour"] } }
+        ],
+        "responses": {
+          "200": { "description": "Contiguous count series.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActivityStats" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/stats/deploys": {
+      "get": {
+        "operationId": "statsDeploys",
+        "summary": "Per-environment deploy frequency, failures and health.",
+        "parameters": [
+          { "name": "since", "in": "query", "description": "Window start. Default 30 days ago.", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "until", "in": "query", "description": "Window end. Default now.", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": { "description": "Per-env deploy summary.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeployStats" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
     }
   },
   "components": {
@@ -288,6 +319,48 @@
           "unmapped_samples": { "type": "array", "items": { "type": "string" } },
           "clock_skew_24h": { "type": "integer" },
           "poll": { "type": "array", "items": { "$ref": "#/components/schemas/PollState" } }
+        }
+      },
+      "ActivityBucket": {
+        "type": "object",
+        "required": ["ts", "total", "succeeded", "failed"],
+        "properties": {
+          "ts": { "type": "string", "description": "Bucket start (UTC): YYYY-MM-DD for day, YYYY-MM-DDThh:00 for hour." },
+          "total": { "type": "integer" },
+          "succeeded": { "type": "integer" },
+          "failed": { "type": "integer" }
+        }
+      },
+      "ActivityStats": {
+        "type": "object",
+        "required": ["since", "until", "bucket", "buckets"],
+        "properties": {
+          "since": { "type": "string", "format": "date-time" },
+          "until": { "type": "string", "format": "date-time" },
+          "bucket": { "type": "string", "enum": ["day", "hour"] },
+          "buckets": { "type": "array", "items": { "$ref": "#/components/schemas/ActivityBucket" }, "description": "Contiguous (gap-filled) oldest-first." }
+        }
+      },
+      "EnvDeployStats": {
+        "type": "object",
+        "required": ["env", "total", "succeeded", "failed", "services"],
+        "properties": {
+          "env": { "type": "string" },
+          "total": { "type": "integer", "description": "Deploy events in the window." },
+          "succeeded": { "type": "integer" },
+          "failed": { "type": "integer" },
+          "services": { "type": "integer", "description": "Distinct services deployed." },
+          "last_ts": { "type": "string", "format": "date-time", "nullable": true, "description": "Most recent deploy in the window." },
+          "last_status": { "type": "string", "description": "Status of the most recent deploy (env-health signal)." }
+        }
+      },
+      "DeployStats": {
+        "type": "object",
+        "required": ["since", "until", "envs"],
+        "properties": {
+          "since": { "type": "string", "format": "date-time" },
+          "until": { "type": "string", "format": "date-time" },
+          "envs": { "type": "array", "items": { "$ref": "#/components/schemas/EnvDeployStats" }, "description": "Non-empty envs only, sorted by name." }
         }
       }
     }

@@ -1,7 +1,7 @@
 {
   "name": "wtc-ui",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "wtc portal — the rich SPA client of the wtc query API (P7-P10).",
   "scripts": {
@@ -21,6 +21,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.0",
+    "recharts": "^3.9.2",
     "tailwind-merge": "^2.5.0"
   },
   "devDependencies": {
