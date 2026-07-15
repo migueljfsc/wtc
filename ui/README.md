@@ -21,7 +21,11 @@ from the server's OpenAPI spec.
 - **Diff** — services × environments matrix, drift and not-yet-promoted flagged.
 - **Services** — per-service current versions, deploy freq / failure rate /
   MTBF, recent failures, deploy history.
-- **Settings** — stub until P10.
+- **Settings** — source health (from `/doctor`) + edit the normalization rules
+  and tag patterns, hot-reloaded server-side (no restart).
+
+The timeline and dashboard update **live** over SSE (`/api/v1/stream`); a header
+indicator shows the connection state.
 
 Routes are code-split, so Recharts loads only with the dashboard.
 

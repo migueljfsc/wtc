@@ -167,12 +167,27 @@ GET /api/v1/stats/activity?since=&until=&bucket=day|hour   # gap-filled event-co
 GET /api/v1/stats/deploys?since=&until=                    # per-env deploy count/failures/health
 GET /api/v1/facets                                          # distinct env/service/actor values (filter dropdowns)
 GET /api/v1/matrix?envs=dev,staging,prod                    # services × envs current-deploy grid (portal diff view)
+GET    /api/v1/stream            # SSE: newly-stored events pushed live (text/event-stream; consume with fetch)
+GET    /api/v1/config            # effective rules + tag_patterns (+ overridden flags)
+PUT    /api/v1/config/rules          # replace rules; validated, persisted (DB), hot-reloaded — no restart
+DELETE /api/v1/config/rules          # drop the override; revert to the YAML baseline
+PUT    /api/v1/config/tag_patterns   # same, for tag_patterns
+DELETE /api/v1/config/tag_patterns
 ```
 
 All timestamps RFC3339 (UTC). Cursor pagination on `(ts, id)`. `q` is FTS5 over
 title/service/actor/artifact; `actor=` is an exact-match facet. Stats windows
 are inclusive of `until`. Cross-origin access for a separately-served portal is
 off by default (`server.cors.allowed_origins`, §2).
+
+**Editable config (P10).** `rules` and `tag_patterns` may be edited from the
+portal. Edits are validated (compiled), persisted to a `config_overrides` DB
+table, and hot-reloaded by atomically swapping the engine/resolver — every
+ingest path (webhook handlers + poller) re-routes at once, no restart, and it
+works when `wtc.yaml` is mounted read-only. Precedence: a DB override wins over
+the YAML value; deleting it reverts to the YAML baseline. The YAML remains the
+source for everything else (server/auth/sources). Tokens are NOT UI-editable in
+v1 (they bootstrap auth; the RBAC non-goal stands).
 
 ## 5. CLI surface
 

@@ -42,6 +42,74 @@ func TestConfigEndpoint(t *testing.T) {
 	}
 }
 
+func TestConfigEdit(t *testing.T) {
+	st := newTestStore(t)
+	fileRules := []normalize.Rule{{
+		Match: normalize.RuleMatch{Source: "flux"},
+		Set:   normalize.RuleSet{Env: "file-env"},
+	}}
+	newSrv := func() string {
+		eng, _ := normalize.NewEngine(fileRules)
+		srv := New(st, Options{
+			Tokens:      []string{testToken},
+			Engine:      normalize.NewEngineHolder(eng),
+			Rules:       fileRules,
+			TagPatterns: normalize.DefaultTagPatterns,
+		}, slog.New(slog.DiscardHandler))
+		return newHTTPTest(t, srv)
+	}
+	url := newSrv()
+
+	get := func(u string) ConfigResponse {
+		_, body := doRequest(t, http.MethodGet, u+"/api/v1/config", testToken, nil)
+		var cfg ConfigResponse
+		if err := json.Unmarshal(body, &cfg); err != nil {
+			t.Fatal(err)
+		}
+		return cfg
+	}
+
+	if cfg := get(url); cfg.RulesOverridden {
+		t.Fatal("baseline must not be marked overridden")
+	}
+
+	// Edit: valid rules → hot-reloaded + persisted.
+	put := []byte(`{"rules":[{"match":{"source":"flux"},"set":{"env":"edited"}}]}`)
+	if resp, body := doRequest(t, http.MethodPut, url+"/api/v1/config/rules", testToken, put); resp.StatusCode != http.StatusOK {
+		t.Fatalf("put rules = %d %s", resp.StatusCode, body)
+	}
+	if cfg := get(url); !cfg.RulesOverridden || len(cfg.Rules) != 1 || cfg.Rules[0].Set.Env != "edited" {
+		t.Fatalf("after edit config = %+v", cfg)
+	}
+
+	// A rule that won't compile (unclosed template) is rejected; nothing changes.
+	bad := []byte(`{"rules":[{"match":{"source":"flux"},"set":{"env":"{{ .Repo"}}]}`)
+	if resp, _ := doRequest(t, http.MethodPut, url+"/api/v1/config/rules", testToken, bad); resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("invalid rule must be 400")
+	}
+	if cfg := get(url); cfg.Rules[0].Set.Env != "edited" {
+		t.Fatal("rejected edit must not change the live config")
+	}
+
+	// Persisted: a fresh server over the same store loads the override.
+	if cfg := get(newSrv()); !cfg.RulesOverridden || cfg.Rules[0].Set.Env != "edited" {
+		t.Fatalf("override not persisted/reloaded: %+v", cfg)
+	}
+
+	// Reset: back to the YAML baseline.
+	if resp, _ := doRequest(t, http.MethodDelete, url+"/api/v1/config/rules", testToken, nil); resp.StatusCode != http.StatusOK {
+		t.Fatalf("reset failed")
+	}
+	if cfg := get(url); cfg.RulesOverridden || cfg.Rules[0].Set.Env != "file-env" {
+		t.Fatalf("after reset config = %+v", cfg)
+	}
+
+	// Auth enforced on the mutating routes.
+	if resp, _ := doRequest(t, http.MethodPut, url+"/api/v1/config/rules", "", put); resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("put without token = %d, want 401", resp.StatusCode)
+	}
+}
+
 func TestStream(t *testing.T) {
 	ts := newTestServer(t)
 

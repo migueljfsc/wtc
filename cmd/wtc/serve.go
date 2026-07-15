@@ -86,6 +86,12 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 		effectiveTagPatterns = normalize.DefaultTagPatterns
 	}
 
+	// Hot-reloadable holders (P10) — shared by the server AND the poller so a
+	// live rule edit re-routes every ingest path. server.New applies any DB
+	// overrides on top, swapping these before ingest starts.
+	engineHolder := normalize.NewEngineHolder(engine)
+	tagHolder := normalize.NewTagResolverHolder(tags)
+
 	httpSrv := &http.Server{
 		Addr: cfg.Server.Listen,
 		Handler: server.New(st, server.Options{
@@ -93,8 +99,8 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 			GitHubWebhookSecret: cfg.Sources.GitHub.WebhookSecret,
 			FluxHMACKey:         cfg.Sources.Flux.HMACKey,
 			FluxSuppression:     cfg.Sources.Flux.SuppressionWindow.Std(),
-			Engine:              engine,
-			Tags:                tags,
+			Engine:              engineHolder,
+			Tags:                tagHolder,
 			CaptureDir:          cfg.Server.CaptureDir,
 			CORSAllowedOrigins:  cfg.Server.CORS.AllowedOrigins,
 			Rules:               cfg.Rules,
@@ -110,7 +116,7 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 	if gh := cfg.Sources.GitHub; gh.APIToken != "" && len(gh.Repos) > 0 && gh.PollInterval.Std() > 0 {
 		poller := github.NewPoller(
 			github.NewClient(gh.APIToken, ""),
-			st, engine, gh.Repos, gh.PollInterval.Std(), cfg.Server.CaptureDir, log,
+			st, engineHolder, gh.Repos, gh.PollInterval.Std(), cfg.Server.CaptureDir, log,
 		)
 		go poller.Run(ctx)
 	} else {

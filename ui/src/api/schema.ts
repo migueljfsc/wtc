@@ -215,11 +215,47 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read-only view of the normalization rules and tag patterns in use. */
+        /** The normalization rules and tag patterns in effect. */
         get: operations["config"];
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace the inference rules (validated, persisted, hot-reloaded). */
+        put: operations["putRules"];
+        post?: never;
+        /** Drop the rules override; revert to the YAML baseline. */
+        delete: operations["resetRules"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config/tag_patterns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace the tag patterns (validated, persisted, hot-reloaded). */
+        put: operations["putTagPatterns"];
+        post?: never;
+        /** Drop the tag-patterns override; revert to the YAML baseline. */
+        delete: operations["resetTagPatterns"];
         options?: never;
         head?: never;
         patch?: never;
@@ -490,6 +526,9 @@ export interface components {
         ConfigResponse: {
             rules: components["schemas"]["Rule"][];
             tag_patterns: string[];
+            /** @description true when rules come from a DB override rather than the YAML baseline. */
+            rules_overridden: boolean;
+            tag_patterns_overridden: boolean;
         };
     };
     responses: {
@@ -847,6 +886,104 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Current rules + tag patterns. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    putRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    rules: components["schemas"]["Rule"][];
+                };
+            };
+        };
+        responses: {
+            /** @description New effective config. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    resetRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description New effective config. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    putTagPatterns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    tag_patterns: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description New effective config. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    resetTagPatterns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description New effective config. */
             200: {
                 headers: {
                     [name: string]: unknown;

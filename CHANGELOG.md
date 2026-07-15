@@ -4,6 +4,30 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 10 (live + config surfaces)
+
+- **Live updates (SSE):** the store's single writer publishes each newly-stored
+  event to a broadcaster; `GET /api/v1/stream` pushes them as `text/event-stream`
+  (bearer-authed; heartbeats). The portal consumes it with `fetch` (EventSource
+  can't set the auth header) and coalesce-invalidates its queries, so the
+  timeline and dashboard update **without polling** — with a header "Live"
+  indicator. Re-ingested duplicates are suppressed so the stream can't flood.
+- **Editable config with hot-reload:** `rules` and `tag_patterns` are editable
+  from the portal's Settings page. `PUT /api/v1/config/rules` (and
+  `/tag_patterns`) validate by compiling, persist to a new `config_overrides` DB
+  table, and **atomically swap** the engine/resolver — so a **subsequently-
+  ingested event is re-routed with no restart**, and it works even when
+  `wtc.yaml` is mounted read-only. `DELETE` reverts to the YAML baseline
+  (precedence: DB override > file). Engine/resolver are held behind hot-swap
+  holders shared by the webhook handlers **and** the poller.
+- **Read-only config + source health:** `GET /api/v1/config` exposes the
+  effective rules + tag_patterns (defaults surfaced) with `*_overridden` flags;
+  the Settings page also renders `/doctor` as a source-health view.
+- Token management and multi-user auth remain out of scope (RBAC non-goal).
+- Migration `0004_config_overrides.sql`; OpenAPI + drift + tests
+  (broadcaster, SSE end-to-end, `/config`, edit/validate/persist/reset,
+  engine-holder hot-swap).
+
 ### Added — Phase 9 (change-intelligence views)
 
 - **Where visualized** (`ui/`): search a ref (or arrive via `?ref=`) → per-env

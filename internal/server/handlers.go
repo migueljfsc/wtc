@@ -70,7 +70,7 @@ func (s *Server) handleIngestGeneric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleWhere(w http.ResponseWriter, r *http.Request) {
-	report, err := query.Where(r.Context(), s.store, s.tags, r.PathValue("ref"))
+	report, err := query.Where(r.Context(), s.store, s.tags.Load(), r.PathValue("ref"))
 	if err != nil {
 		// Input-shaped errors (unresolvable ref) are the client's problem.
 		s.writeError(w, http.StatusBadRequest, err.Error())

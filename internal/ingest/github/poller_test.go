@@ -81,7 +81,7 @@ func TestPollerSweepIngestsAndDedups(t *testing.T) {
 		}
 	}
 
-	p := NewPoller(NewClient("test-token", gh.URL), st, engine,
+	p := NewPoller(NewClient("test-token", gh.URL), st, normalize.NewEngineHolder(engine),
 		[]string{"migueljfsc/wtc"}, time.Minute, "", slog.New(slog.DiscardHandler))
 
 	p.Sweep(ctx)
@@ -153,7 +153,7 @@ func TestPollerSurvivesAPIFailure(t *testing.T) {
 	defer func() { _ = st.Close() }()
 	engine, _ := normalize.NewEngine(nil)
 
-	p := NewPoller(NewClient("t", bad.URL), st, engine,
+	p := NewPoller(NewClient("t", bad.URL), st, normalize.NewEngineHolder(engine),
 		[]string{"migueljfsc/wtc"}, time.Minute, "", slog.New(slog.DiscardHandler))
 	p.Sweep(context.Background()) // must not panic or wedge
 
