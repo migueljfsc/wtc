@@ -85,7 +85,7 @@ type GitHub struct {
 	WebhookSecret string   `yaml:"webhook_secret"` // enables /ingest/github HMAC verification
 	APIToken      string   `yaml:"api_token"`      // enables the poller + PR-diff enrichment
 	PollInterval  Duration `yaml:"poll_interval"`  // 0 disables the poller (webhook-only mode)
-	Repos         []string `yaml:"repos"`          // poller scope, owner/name
+	Repos         []string `yaml:"repos"`          // poller scope, owner/name; empty = every repo the token can access
 	InfraPath     string   `yaml:"infra_path"`     // per-repo manifests dir (microservices layout)
 }
 

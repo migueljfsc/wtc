@@ -14,10 +14,30 @@ persistence:
   size: 1Gi
   storageClass: ""
 
-# Name of an existing Secret whose keys become env vars, e.g.
-# WTC_API_TOKEN, WTC_GH_API_TOKEN, WTC_FLUX_HMAC_KEY, WTC_GH_WEBHOOK_SECRET.
-# The config below references them with ${VAR}.
+# Two ways to inject secrets — use either or both:
+#
+# 1. existingSecret: a Secret whose keys become env vars verbatim (envFrom).
+#    Keys must already be named WTC_API_TOKEN, WTC_GH_API_TOKEN,
+#    WTC_FLUX_HMAC_KEY, WTC_GH_WEBHOOK_SECRET. The config references them as
+#    ${VAR}.
 existingSecret: ""
+#
+# 2. env: explicit container env vars, so you can pull each value from ANY
+#    existing Secret + key (secretKeyRef) without renaming its keys. The config
+#    still uses the ${VAR} name (or, for source tokens, the WTC_* env override
+#    sets the value directly and you can drop the ${VAR} line entirely). E.g.:
+# env:
+#   - name: WTC_GH_API_TOKEN
+#     valueFrom:
+#       secretKeyRef:
+#         name: github-credentials
+#         key: token
+#   - name: WTC_API_TOKEN
+#     valueFrom:
+#       secretKeyRef:
+#         name: wtc-api-token
+#         key: token
+env: []
 
 resources:
   requests:

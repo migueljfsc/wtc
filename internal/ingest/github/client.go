@@ -6,10 +6,12 @@ package github
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 )
 
@@ -91,6 +93,41 @@ func (c *Client) ListClosedPRs(ctx context.Context, repo string) ([]byte, error)
 		"per_page":  {"50"},
 	}
 	return c.Get(ctx, "/repos/"+repo+"/pulls", params)
+}
+
+// ListAccessibleRepos returns every non-archived repo the token can see
+// (owner + collaborator + org member), as "owner/name". Used when
+// sources.github.repos is left empty ("watch everything the token can see").
+// Pages via ?page= since Get doesn't surface Link headers.
+func (c *Client) ListAccessibleRepos(ctx context.Context) ([]string, error) {
+	const perPage = 100
+	var repos []string
+	for page := 1; ; page++ {
+		body, err := c.Get(ctx, "/user/repos", url.Values{
+			"per_page":    {strconv.Itoa(perPage)},
+			"page":        {strconv.Itoa(page)},
+			"affiliation": {"owner,collaborator,organization_member"},
+			"sort":        {"full_name"},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("list accessible repos: %w", err)
+		}
+		var batch []struct {
+			FullName string `json:"full_name"`
+			Archived bool   `json:"archived"`
+		}
+		if err := json.Unmarshal(body, &batch); err != nil {
+			return nil, fmt.Errorf("list accessible repos: decode: %w", err)
+		}
+		for _, r := range batch {
+			if r.FullName != "" && !r.Archived {
+				repos = append(repos, r.FullName)
+			}
+		}
+		if len(batch) < perPage {
+			return repos, nil
+		}
+	}
 }
 
 // ListCommits returns raw JSON of default-branch commits since the given time.

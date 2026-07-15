@@ -45,6 +45,11 @@ func fakeGitHub(t *testing.T) *httptest.Server {
 			_, _ = w.Write(body)
 		}
 	}
+	repos, _ := json.Marshal([]map[string]any{
+		{"full_name": "migueljfsc/wtc", "archived": false},
+		{"full_name": "migueljfsc/archived", "archived": true}, // skipped
+	})
+	mux.HandleFunc("GET /user/repos", serveRaw(repos))
 	mux.HandleFunc("GET /repos/migueljfsc/wtc/actions/runs", serveRaw(runs))
 	mux.HandleFunc("GET /repos/migueljfsc/wtc/pulls", serveRaw(prs))
 	mux.HandleFunc("GET /repos/migueljfsc/wtc/pulls/1/files", serveRaw(read("pull_request_files.json")))
@@ -53,6 +58,40 @@ func fakeGitHub(t *testing.T) *httptest.Server {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return srv
+}
+
+// TestPollerAutoDiscoversRepos: with no repos configured, the poller lists the
+// token's accessible repos and polls them (archived ones skipped).
+func TestPollerAutoDiscoversRepos(t *testing.T) {
+	gh := fakeGitHub(t)
+	st, err := store.Open(filepath.Join(t.TempDir(), "wtc.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = st.Close() }()
+
+	ctx := context.Background()
+	old := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	for _, res := range []string{"runs", "prs", "commits"} {
+		if err := st.SetPollWatermark(ctx, "migueljfsc/wtc", res, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	engine, _ := normalize.NewEngine(nil)
+	// nil repos => auto-discover.
+	p := NewPoller(NewClient("test-token", gh.URL), st, normalize.NewEngineHolder(engine),
+		nil, time.Minute, "", slog.New(slog.DiscardHandler))
+	p.Sweep(ctx)
+
+	events, _, err := st.ListEvents(ctx, store.Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Discovered migueljfsc/wtc (archived repo skipped) and polled its 4 events.
+	if len(events) != 4 {
+		t.Fatalf("got %d events, want 4 from the discovered repo", len(events))
+	}
 }
 
 func TestPollerSweepIngestsAndDedups(t *testing.T) {
