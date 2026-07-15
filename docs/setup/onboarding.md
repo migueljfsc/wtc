@@ -31,7 +31,13 @@ side — no webhooks required.
   Actions + Contents + Pull requests + Metadata. (Classic PAT alternative:
   `repo`.)
 - An **API token** you invent — the portal/CLI credential (any strong string).
-- An **HMAC key** you invent — shared secret Flux signs deliveries with.
+- An **HMAC key** you invent — a shared *webhook-signing* secret (any strong
+  random string). It is **not** issued by Flux or anyone; you generate it and
+  install the **same value** on both sides. Flux signs every delivery to
+  `/ingest/flux` with it (`X-Signature: sha256=…`) and wtc verifies the
+  signature, so only *your* Flux can post events. Same idea as a GitHub webhook
+  secret. (The GitHub PAT above, by contrast, *is* issued by GitHub — it's a
+  separate thing; the poller pulls GitHub, so nothing is signed there.)
 
 Generate the two secrets you own:
 
