@@ -37,7 +37,7 @@ func newFluxTestServer(t *testing.T, suppression time.Duration) (*httptest.Serve
 		Tokens:          []string{testToken},
 		FluxHMACKey:     testFluxKey,
 		FluxSuppression: suppression,
-		Engine:          engine,
+		Engine:          normalize.NewEngineHolder(engine),
 	}, slog.New(slog.DiscardHandler))
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(func() {

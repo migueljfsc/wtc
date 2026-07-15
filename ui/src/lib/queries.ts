@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import type { components } from "@/api/schema";
 import { api } from "@/lib/api";
 
 /** The timeline's faceted filter state. Empty fields mean "no constraint". */
@@ -100,6 +101,33 @@ export function useConfig() {
     },
     staleTime: 60_000,
   });
+}
+
+/** Save edited rules (validated + hot-reloaded server-side). Throws the
+ *  server's message on 400 so the editor can surface it. */
+export async function putRules(rules: unknown[]): Promise<void> {
+  // The server re-validates by compiling; cast the parsed JSON to the wire type.
+  const { error } = await api.PUT("/api/v1/config/rules", {
+    body: { rules: rules as components["schemas"]["Rule"][] },
+  });
+  if (error) throw new Error(error.error ?? "rules rejected");
+}
+
+export async function putTagPatterns(tagPatterns: string[]): Promise<void> {
+  const { error } = await api.PUT("/api/v1/config/tag_patterns", {
+    body: { tag_patterns: tagPatterns },
+  });
+  if (error) throw new Error(error.error ?? "tag patterns rejected");
+}
+
+export async function resetRules(): Promise<void> {
+  const { error } = await api.DELETE("/api/v1/config/rules", {});
+  if (error) throw new Error(error.error ?? "reset failed");
+}
+
+export async function resetTagPatterns(): Promise<void> {
+  const { error } = await api.DELETE("/api/v1/config/tag_patterns", {});
+  if (error) throw new Error(error.error ?? "reset failed");
 }
 
 export function useFacets() {

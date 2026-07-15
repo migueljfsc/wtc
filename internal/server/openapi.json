@@ -189,9 +189,61 @@
     "/api/v1/config": {
       "get": {
         "operationId": "config",
-        "summary": "Read-only view of the normalization rules and tag patterns in use.",
+        "summary": "The normalization rules and tag patterns in effect.",
         "responses": {
           "200": { "description": "Current rules + tag patterns.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfigResponse" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/config/rules": {
+      "put": {
+        "operationId": "putRules",
+        "summary": "Replace the inference rules (validated, persisted, hot-reloaded).",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": {
+            "type": "object", "required": ["rules"],
+            "properties": { "rules": { "type": "array", "items": { "$ref": "#/components/schemas/Rule" } } }
+          } } }
+        },
+        "responses": {
+          "200": { "description": "New effective config.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfigResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "delete": {
+        "operationId": "resetRules",
+        "summary": "Drop the rules override; revert to the YAML baseline.",
+        "responses": {
+          "200": { "description": "New effective config.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfigResponse" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/config/tag_patterns": {
+      "put": {
+        "operationId": "putTagPatterns",
+        "summary": "Replace the tag patterns (validated, persisted, hot-reloaded).",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": {
+            "type": "object", "required": ["tag_patterns"],
+            "properties": { "tag_patterns": { "type": "array", "items": { "type": "string" } } }
+          } } }
+        },
+        "responses": {
+          "200": { "description": "New effective config.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfigResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "delete": {
+        "operationId": "resetTagPatterns",
+        "summary": "Drop the tag-patterns override; revert to the YAML baseline.",
+        "responses": {
+          "200": { "description": "New effective config.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfigResponse" } } } },
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       }
@@ -486,10 +538,12 @@
       },
       "ConfigResponse": {
         "type": "object",
-        "required": ["rules", "tag_patterns"],
+        "required": ["rules", "tag_patterns", "rules_overridden", "tag_patterns_overridden"],
         "properties": {
           "rules": { "type": "array", "items": { "$ref": "#/components/schemas/Rule" } },
-          "tag_patterns": { "type": "array", "items": { "type": "string" } }
+          "tag_patterns": { "type": "array", "items": { "type": "string" } },
+          "rules_overridden": { "type": "boolean", "description": "true when rules come from a DB override rather than the YAML baseline." },
+          "tag_patterns_overridden": { "type": "boolean" }
         }
       }
     }

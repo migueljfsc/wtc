@@ -30,15 +30,16 @@ const (
 type Poller struct {
 	client     *Client
 	store      *store.Store
-	engine     *normalize.Engine
+	engine     *normalize.EngineHolder
 	repos      []string
 	interval   time.Duration
 	captureDir string
 	log        *slog.Logger
 }
 
-// NewPoller wires a poller; captureDir "" disables capture.
-func NewPoller(client *Client, st *store.Store, engine *normalize.Engine, repos []string, interval time.Duration, captureDir string, log *slog.Logger) *Poller {
+// NewPoller wires a poller; captureDir "" disables capture. The engine is a
+// holder so a live rule edit re-routes poller events too (P10).
+func NewPoller(client *Client, st *store.Store, engine *normalize.EngineHolder, repos []string, interval time.Duration, captureDir string, log *slog.Logger) *Poller {
 	if log == nil {
 		log = slog.Default()
 	}

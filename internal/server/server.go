@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/ingest/flux"
@@ -28,10 +29,11 @@ type Options struct {
 	// window (trap #1). <= 0 disables.
 	FluxSuppression time.Duration
 	// Engine runs the normalization rules on webhook-ingested events; nil
-	// means an empty rule set.
-	Engine *normalize.Engine
+	// means an empty rule set. A holder so rules can be hot-reloaded (P10) —
+	// the same holder must be shared with the poller.
+	Engine *normalize.EngineHolder
 	// Tags resolves image tags to shas for /api/where; nil means defaults.
-	Tags *normalize.TagResolver
+	Tags *normalize.TagResolverHolder
 	// CaptureDir, when non-empty, dumps every raw ingest body to disk.
 	CaptureDir string
 	// CORSAllowedOrigins enables cross-origin access from the portal SPA. Empty
@@ -50,14 +52,23 @@ type Server struct {
 	webhookSecret  string
 	fluxHMACKey    string
 	fluxSuppressor *flux.Suppressor
-	engine         *normalize.Engine
-	tags           *normalize.TagResolver
+	engine         *normalize.EngineHolder
+	tags           *normalize.TagResolverHolder
 	captureDir     string
 	corsOrigins    []string
-	rules          []normalize.Rule
-	tagPatterns    []string
 	log            *slog.Logger
 	mux            *http.ServeMux
+
+	// Editable normalization config (P10). fileRules/fileTags are the YAML
+	// baseline; cfg* is the effective, possibly DB-overridden, snapshot served
+	// at /config and mutated by the edit endpoints. cfgMu serializes edits.
+	fileRules   []normalize.Rule
+	fileTags    []string
+	cfgMu       sync.Mutex
+	curRules    []normalize.Rule
+	curTags     []string
+	rulesFromDB bool
+	tagsFromDB  bool
 }
 
 // New builds the HTTP surface.
@@ -67,11 +78,13 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 	}
 	engine := opts.Engine
 	if engine == nil {
-		engine, _ = normalize.NewEngine(nil) // empty rule set cannot fail
+		e, _ := normalize.NewEngine(nil) // empty rule set cannot fail
+		engine = normalize.NewEngineHolder(e)
 	}
 	tags := opts.Tags
 	if tags == nil {
-		tags, _ = normalize.NewTagResolver(nil) // defaults cannot fail
+		t, _ := normalize.NewTagResolver(nil) // defaults cannot fail
+		tags = normalize.NewTagResolverHolder(t)
 	}
 	s := &Server{
 		store:          st,
@@ -83,11 +96,18 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 		tags:           tags,
 		captureDir:     opts.CaptureDir,
 		corsOrigins:    opts.CORSAllowedOrigins,
-		rules:          opts.Rules,
-		tagPatterns:    opts.TagPatterns,
+		fileRules:      opts.Rules,
+		fileTags:       opts.TagPatterns,
+		curRules:       opts.Rules,
+		curTags:        opts.TagPatterns,
 		log:            log,
 		mux:            http.NewServeMux(),
 	}
+
+	// Apply any DB-backed config overrides (P10), rebuilding + swapping the
+	// engine/resolver holders before ingest starts. Failures fall back to the
+	// YAML baseline (already installed) and are logged.
+	s.loadConfigOverrides()
 
 	// Embedded UI at the root. Registered routes below win over this
 	// catch-all (Go 1.22 mux precedence), so the API is never shadowed.
@@ -141,6 +161,10 @@ func (s *Server) apiRoutes() []apiRoute {
 		{"GET", "/facets", http.HandlerFunc(s.handleFacets)},
 		{"GET", "/matrix", http.HandlerFunc(s.handleMatrix)},
 		{"GET", "/config", http.HandlerFunc(s.handleConfig)},
+		{"PUT", "/config/rules", http.HandlerFunc(s.handlePutRules)},
+		{"DELETE", "/config/rules", http.HandlerFunc(s.handleResetRules)},
+		{"PUT", "/config/tag_patterns", http.HandlerFunc(s.handlePutTagPatterns)},
+		{"DELETE", "/config/tag_patterns", http.HandlerFunc(s.handleResetTagPatterns)},
 		{"GET", "/stream", http.HandlerFunc(s.handleStream)},
 		{"GET", "/auth/verify", http.HandlerFunc(s.handleAuthVerify)},
 	}

@@ -1,6 +1,17 @@
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { components } from "@/api/schema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useConfig, useDoctor } from "@/lib/queries";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  putRules,
+  putTagPatterns,
+  resetRules,
+  resetTagPatterns,
+  useConfig,
+  useDoctor,
+} from "@/lib/queries";
 import { bytes, relativeTime } from "@/lib/format";
 
 type Rule = components["schemas"]["Rule"];
@@ -95,43 +106,141 @@ function RuleView({ rule }: { rule: Rule }) {
   );
 }
 
+function OverrideBadge({ on }: { on: boolean }) {
+  return on ? (
+    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium uppercase text-amber-600 dark:text-amber-500">
+      overridden
+    </span>
+  ) : (
+    <span className="text-[10px] uppercase text-muted-foreground">from file</span>
+  );
+}
+
 function ConfigView() {
+  const qc = useQueryClient();
   const cfg = useConfig();
+  const [editing, setEditing] = useState(false);
+  const [rulesText, setRulesText] = useState("");
+  const [tagsText, setTagsText] = useState("");
+
+  function startEdit() {
+    if (!cfg.data) return;
+    setRulesText(JSON.stringify(cfg.data.rules, null, 2));
+    setTagsText(JSON.stringify(cfg.data.tag_patterns, null, 2));
+    save.reset();
+    setEditing(true);
+  }
+
+  const save = useMutation({
+    mutationFn: async () => {
+      let rules: unknown, tags: unknown;
+      try {
+        rules = JSON.parse(rulesText);
+      } catch {
+        throw new Error("Rules: invalid JSON");
+      }
+      try {
+        tags = JSON.parse(tagsText);
+      } catch {
+        throw new Error("Tag patterns: invalid JSON");
+      }
+      if (!Array.isArray(rules) || !Array.isArray(tags))
+        throw new Error("Rules and tag patterns must be JSON arrays");
+      await putRules(rules);
+      await putTagPatterns(tags as string[]);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["config"] });
+      setEditing(false);
+    },
+  });
+
+  const reset = useMutation({
+    mutationFn: async () => {
+      await resetRules();
+      await resetTagPatterns();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["config"] });
+      setEditing(false);
+    },
+  });
+
   if (cfg.isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (cfg.error || !cfg.data)
     return <p className="text-sm text-destructive">Couldn’t load config.</p>;
 
+  if (editing) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h3 className="mb-1 text-sm font-medium">Inference rules</h3>
+          <Textarea rows={12} value={rulesText} onChange={(e) => setRulesText(e.target.value)} />
+        </div>
+        <div>
+          <h3 className="mb-1 text-sm font-medium">Tag patterns</h3>
+          <Textarea rows={4} value={tagsText} onChange={(e) => setTagsText(e.target.value)} />
+        </div>
+        {save.error && <p className="text-sm text-destructive">{(save.error as Error).message}</p>}
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
+            {save.isPending ? "Saving…" : "Save & apply"}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto"
+            onClick={() => reset.mutate()}
+            disabled={reset.isPending}
+          >
+            Reset to file
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Saved rules are validated, persisted, and hot-reloaded — the next ingested
+          event is routed by them, no restart.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="mb-2 text-sm font-medium">Inference rules ({cfg.data.rules.length})</h3>
-        {cfg.data.rules.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No rules configured — events land with <code>env=""</code> (see source health).
-          </p>
-        ) : (
-          <div className="space-y-1.5">
-            {cfg.data.rules.map((r, i) => (
-              <RuleView key={i} rule={r} />
-            ))}
-          </div>
-        )}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium">Inference rules ({cfg.data.rules.length})</h3>
+          <OverrideBadge on={cfg.data.rules_overridden} />
+        </div>
+        <Button size="sm" variant="outline" onClick={startEdit}>
+          Edit
+        </Button>
       </div>
-
-      <div>
-        <h3 className="mb-2 text-sm font-medium">Tag patterns ({cfg.data.tag_patterns.length})</h3>
-        <ul className="space-y-1">
-          {cfg.data.tag_patterns.map((p, i) => (
-            <li key={i} className="rounded bg-muted px-2 py-1 font-mono text-xs">
-              {p}
-            </li>
+      {cfg.data.rules.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No rules configured — events land with <code>env=""</code> (see source health).
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          {cfg.data.rules.map((r, i) => (
+            <RuleView key={i} rule={r} />
           ))}
-        </ul>
-      </div>
+        </div>
+      )}
 
-      <p className="text-xs text-muted-foreground">
-        Read-only for now — in-UI editing (with live re-routing) is the next step.
-      </p>
+      <div className="flex items-center gap-2">
+        <h3 className="text-sm font-medium">Tag patterns ({cfg.data.tag_patterns.length})</h3>
+        <OverrideBadge on={cfg.data.tag_patterns_overridden} />
+      </div>
+      <ul className="space-y-1">
+        {cfg.data.tag_patterns.map((p, i) => (
+          <li key={i} className="rounded bg-muted px-2 py-1 font-mono text-xs">
+            {p}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

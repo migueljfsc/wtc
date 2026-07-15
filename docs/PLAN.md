@@ -16,7 +16,7 @@ Lives at `docs/PLAN.md`. Each phase ≈ 1–3 Claude Code sessions. A phase is d
 | **P7 portal foundation** | ✅ 2026-07-15 | `ui/` SPA scaffold (Vite/React/TS/Tailwind/shadcn/TanStack Query) + `/api/v1` alias, CORS, OpenAPI spec + drift test, token-login; `wtc-ui` image, CI `ui` job, compose+Helm `ui` service, `docs/setup/portal.md` |
 | **P8 portal core views** | ✅ 2026-07-15 | dashboard (activity chart + per-env health + stats endpoints) + rich timeline (faceted filters, FTS, infinite scroll, saved filters, event drawer with inline `where`-journey); `/facets` + `actor` filter |
 | **P9 change-intelligence views** | ✅ 2026-07-15 | `where` pipeline, `diff` env-matrix (new `/matrix` endpoint), service detail (current versions + freq/failure-rate/MTBF), alert correlation (`around`) in the event drawer |
-| **P10 live + config surfaces** | ⬜ | SSE live updates, rules/sources settings UI, deploy path |
+| **P10 live + config surfaces** | ✅ 2026-07-15 | SSE live updates (`/api/v1/stream`, no-poll timeline/dashboard); Settings = source health + DB-backed editable rules/tag_patterns with hot-reload (`edit → next event re-routed`, no restart). Token management + multi-user auth stay out (RBAC non-goal) |
 
 Unplanned addition: `demo/` — three dummy services + fake three-cluster Flux
 wiring generating real events continuously (operator-requested test bed;
