@@ -25,9 +25,18 @@ type Options struct {
 	// FluxHMACKey enables /ingest/flux generic-hmac verification; empty
 	// means the endpoint rejects everything (fail closed).
 	FluxHMACKey string
+	// ArgoCDWebhookToken enables /ingest/argocd static shared-secret
+	// verification (X-WTC-Token, constant-time compare); empty means the
+	// endpoint rejects everything (fail closed). Argo's notification
+	// templates cannot HMAC-sign the body like Flux's generic-hmac provider.
+	ArgoCDWebhookToken string
 	// FluxSuppression drops repeats of the same flux dedup key inside this
 	// window (trap #1). <= 0 disables.
 	FluxSuppression time.Duration
+	// ArgoCDSuppression drops repeats of the same argocd suppression key
+	// (app+revision+phase|health) inside this window — Argo re-notifies on
+	// every resync, same trap as Flux. <= 0 disables.
+	ArgoCDSuppression time.Duration
 	// Engine runs the normalization rules on webhook-ingested events; nil
 	// means an empty rule set. A holder so rules can be hot-reloaded (P10) —
 	// the same holder must be shared with the poller.
@@ -47,17 +56,19 @@ type Options struct {
 
 // Server routes ingest and query requests onto a Store.
 type Server struct {
-	store          *store.Store
-	tokens         []string
-	webhookSecret  string
-	fluxHMACKey    string
-	fluxSuppressor *flux.Suppressor
-	engine         *normalize.EngineHolder
-	tags           *normalize.TagResolverHolder
-	captureDir     string
-	corsOrigins    []string
-	log            *slog.Logger
-	mux            *http.ServeMux
+	store              *store.Store
+	tokens             []string
+	webhookSecret      string
+	fluxHMACKey        string
+	argocdWebhookToken string
+	fluxSuppressor     *flux.Suppressor
+	argocdSuppressor   *flux.Suppressor // same window mechanism; keys are argocd-shaped
+	engine             *normalize.EngineHolder
+	tags               *normalize.TagResolverHolder
+	captureDir         string
+	corsOrigins        []string
+	log                *slog.Logger
+	mux                *http.ServeMux
 
 	// Editable normalization config (P10). fileRules/fileTags are the YAML
 	// baseline; cfg* is the effective, possibly DB-overridden, snapshot served
@@ -87,21 +98,23 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 		tags = normalize.NewTagResolverHolder(t)
 	}
 	s := &Server{
-		store:          st,
-		tokens:         opts.Tokens,
-		webhookSecret:  opts.GitHubWebhookSecret,
-		fluxHMACKey:    opts.FluxHMACKey,
-		fluxSuppressor: flux.NewSuppressor(opts.FluxSuppression),
-		engine:         engine,
-		tags:           tags,
-		captureDir:     opts.CaptureDir,
-		corsOrigins:    opts.CORSAllowedOrigins,
-		fileRules:      opts.Rules,
-		fileTags:       opts.TagPatterns,
-		curRules:       opts.Rules,
-		curTags:        opts.TagPatterns,
-		log:            log,
-		mux:            http.NewServeMux(),
+		store:              st,
+		tokens:             opts.Tokens,
+		webhookSecret:      opts.GitHubWebhookSecret,
+		fluxHMACKey:        opts.FluxHMACKey,
+		argocdWebhookToken: opts.ArgoCDWebhookToken,
+		fluxSuppressor:     flux.NewSuppressor(opts.FluxSuppression),
+		argocdSuppressor:   flux.NewSuppressor(opts.ArgoCDSuppression),
+		engine:             engine,
+		tags:               tags,
+		captureDir:         opts.CaptureDir,
+		corsOrigins:        opts.CORSAllowedOrigins,
+		fileRules:          opts.Rules,
+		fileTags:           opts.TagPatterns,
+		curRules:           opts.Rules,
+		curTags:            opts.TagPatterns,
+		log:                log,
+		mux:                http.NewServeMux(),
 	}
 
 	// Apply any DB-backed config overrides (P10), rebuilding + swapping the
@@ -122,6 +135,7 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 	s.mux.Handle("POST /ingest/alertmanager", s.requireBearer(http.HandlerFunc(s.handleIngestAlertmanager)))
 	s.mux.HandleFunc("POST /ingest/github", s.handleIngestGitHub) // HMAC-verified inside
 	s.mux.HandleFunc("POST /ingest/flux", s.handleIngestFlux)     // HMAC-verified inside
+	s.mux.HandleFunc("POST /ingest/argocd", s.handleIngestArgoCD) // token-verified inside
 
 	// Query API. Every route is registered under both the legacy /api prefix
 	// (CLI client + embedded web depend on it) and the versioned /api/v1

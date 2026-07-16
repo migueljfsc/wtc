@@ -24,6 +24,13 @@ type Facts struct {
 	ObjectName string
 	Namespace  string
 	Reason     string
+	// ArgoCD facts (P11). One Argo instance manages many clusters and its
+	// "cluster" is a destination server URL — env inference for argocd runs
+	// off EnvLabel/Namespace/ObjectName, never cluster=env.
+	Project    string
+	DestServer string
+	SourcePath string
+	EnvLabel   string // the Application's `env` label; "" when absent
 	Paths      []string
 	// PathsTruncated marks an unknown/truncated changed-file list (GitHub
 	// caps push payloads; list APIs omit files). Path-based rules are then
@@ -41,6 +48,8 @@ type RuleMatch struct {
 	Workflow   string   `yaml:"workflow" json:"workflow,omitempty"`
 	Cluster    string   `yaml:"cluster" json:"cluster,omitempty"`
 	ObjectKind string   `yaml:"object_kind" json:"object_kind,omitempty"`
+	ObjectName string   `yaml:"object_name" json:"object_name,omitempty"`
+	Namespace  string   `yaml:"namespace" json:"namespace,omitempty"`
 	Paths      []string `yaml:"paths" json:"paths,omitempty"`
 }
 
@@ -64,8 +73,9 @@ type Rule struct {
 type compiledRule struct {
 	match RuleMatch
 	globs struct {
-		source, repo, branch, event, workflow, cluster, objectKind *regexp.Regexp
-		paths                                                      []*regexp.Regexp
+		source, repo, branch, event, workflow, cluster *regexp.Regexp
+		objectKind, objectName, namespace              *regexp.Regexp
+		paths                                          []*regexp.Regexp
 	}
 	set map[string]*template.Template // field name → value template
 }
@@ -111,6 +121,8 @@ func NewEngine(rules []Rule) (*Engine, error) {
 		compile(&c.globs.workflow, r.Match.Workflow)
 		compile(&c.globs.cluster, r.Match.Cluster)
 		compile(&c.globs.objectKind, r.Match.ObjectKind)
+		compile(&c.globs.objectName, r.Match.ObjectName)
+		compile(&c.globs.namespace, r.Match.Namespace)
 		for _, p := range r.Match.Paths {
 			if err != nil {
 				break
@@ -171,7 +183,8 @@ func (r *compiledRule) matches(f Facts) bool {
 	if !check(r.globs.source, f.Source) || !check(r.globs.repo, f.Repo) ||
 		!check(r.globs.branch, f.Branch) || !check(r.globs.event, f.Event) ||
 		!check(r.globs.workflow, f.Workflow) ||
-		!check(r.globs.cluster, f.Cluster) || !check(r.globs.objectKind, f.ObjectKind) {
+		!check(r.globs.cluster, f.Cluster) || !check(r.globs.objectKind, f.ObjectKind) ||
+		!check(r.globs.objectName, f.ObjectName) || !check(r.globs.namespace, f.Namespace) {
 		return false
 	}
 	if len(r.globs.paths) > 0 {

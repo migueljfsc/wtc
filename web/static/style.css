@@ -1,7 +1,7 @@
 :root {
   --bg: #0f1115; --panel: #161a21; --border: #262c37;
   --fg: #d7dde6; --dim: #7d8794; --accent: #4f9cf9;
-  --ok: #3fb96b; --bad: #e05555; --run: #d9a03f;
+  --ok: #3fb96b; --bad: #e05555; --run: #d9a03f; --deg: #e0813f;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -44,6 +44,7 @@ main { padding: 8px 16px 24px; max-width: 1100px; margin: 0 auto; }
 .ev.succeeded { border-left-color: var(--ok); }
 .ev.failed    { border-left-color: var(--bad); }
 .ev.started   { border-left-color: var(--run); }
+.ev.degraded  { border-left-color: var(--deg); }
 .t { color: var(--dim); font-variant-numeric: tabular-nums; }
 .chip {
   display: inline-block; padding: 1px 8px; border-radius: 10px;

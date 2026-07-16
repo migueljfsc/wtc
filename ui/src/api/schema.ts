@@ -302,11 +302,11 @@ export interface components {
              */
             ingested_at: string;
             /** @enum {string} */
-            source: "github" | "flux" | "helm" | "terraform" | "manual" | "generic" | "alertmanager";
+            source: "github" | "flux" | "argocd" | "helm" | "terraform" | "manual" | "generic" | "alertmanager";
             /** @enum {string} */
             kind: "build" | "merge" | "push" | "deploy" | "config_change" | "infra_change" | "rollback" | "alert" | "manual";
             /** @enum {string} */
-            status: "started" | "succeeded" | "failed" | "unknown";
+            status: "started" | "succeeded" | "failed" | "degraded" | "unknown";
             /** @description Empty string means unmapped (surfaced by doctor). */
             env: string;
             cluster: string;

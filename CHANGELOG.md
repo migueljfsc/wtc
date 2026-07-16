@@ -4,6 +4,34 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 11 (ArgoCD ingest)
+
+- **`POST /ingest/argocd`** — second GitOps engine alongside Flux (the
+  vendor-neutrality proof). Argo CD has no fixed webhook schema, so wtc ships
+  the contract: `docs/setup/argocd-notifications.yaml` templates the canonical
+  body (verified against Argo CD v3.4.5 with captured fixtures, incl. four
+  empirically-found template gotchas documented inline). Auth is a static
+  `X-WTC-Token` shared secret compared constant-time (`sources.argocd.
+  webhook_secret`) — Argo's templates cannot HMAC-sign bodies.
+- **Lifecycle + spam control:** one row per sync *operation*
+  (`app`+`revision`+`startedAt`) — Running → Succeeded/Error upserts in
+  place, while a retry of the same revision is a new row so the ledger shows
+  both attempts (an (app,revision)-only key froze failed rows through later
+  successful retries — found live); `Error` (sync never applied) and `Failed`
+  both map to failed. Resync re-notifications are shed by
+  `sources.argocd.suppression_window`, with the dedup upsert as the
+  correctness backstop.
+- **New `degraded` status** (outranks succeeded/failed in the upsert):
+  `on-health-degraded` upserts the deploying operation's row instead of
+  creating an alert row; surfaced across CLI, embedded timeline, and portal.
+- **Env inference for Argo** (never cluster=env — destServer is a URL):
+  ordered tiers `env` app label > destination namespace > app-name suffix,
+  shipped as example rules; the rules engine gains `object_name`/`namespace`
+  matchers and `Project`/`DestServer`/`SourcePath`/`EnvLabel` facts.
+- **`wtc where` spans engines:** an Argo sync revision feeds APPLIED exactly
+  like a Flux reconcile revision — one journey across Flux- and Argo-managed
+  envs. Wiring guide: `docs/setup/argocd.md`.
+
 ### Operability (post-P10)
 
 - **GitHub poller auto-discovery**: leave `sources.github.repos` empty to watch

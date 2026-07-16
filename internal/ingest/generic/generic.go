@@ -12,8 +12,8 @@ import (
 )
 
 // allowedSources are the sources a generic-ingest client may claim. github,
-// flux, and alertmanager are reserved for their own ingest paths so a bearer
-// token cannot spoof or overwrite rows those sources own.
+// flux, argocd, and alertmanager are reserved for their own ingest paths so a
+// bearer token cannot spoof or overwrite rows those sources own.
 var allowedSources = map[model.Source]bool{
 	model.SourceGeneric:   true,
 	model.SourceManual:    true,
@@ -23,7 +23,7 @@ var allowedSources = map[model.Source]bool{
 
 // reservedDedupPrefixes namespace the dedup keys of dedicated ingest paths
 // (SPEC §1). Generic clients may not collide with them.
-var reservedDedupPrefixes = []string{"gh:", "flux:", "am:"}
+var reservedDedupPrefixes = []string{"gh:", "flux:", "argocd:", "am:"}
 
 // Request is the JSON body accepted by POST /ingest/generic — an Event
 // subset; the server fills id, ingested_at, and defaults.

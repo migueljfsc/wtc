@@ -14,12 +14,38 @@ auth:
 
 # GitHub ingest — poller activates when api_token AND repos are set.
 # Export WTC_GH_API_TOKEN before `make run`; never commit a token.
-#sources:
-#  github:
-#    api_token: ${WTC_GH_API_TOKEN}
-#    poll_interval: 60s
-#    repos:
-#      - owner/repo
+# ArgoCD ingest — dev-only test secret, matches the Secret applied via
+# docs/setup/argocd-notifications.yaml on the wtc-dev kind cluster.
+sources:
+  argocd:
+    webhook_secret: dev-argocd-secret
+    suppression_window: 10m
+  #github:
+  #  api_token: ${WTC_GH_API_TOKEN}
+  #  poll_interval: 60s
+  #  repos:
+  #    - migueljfsc/wtc
+
+# ArgoCD env/service inference (SPEC §2/§3): env label > destination
+# namespace > app-name suffix; never cluster=env (destServer is a URL).
+# Matches the test apps on the wtc-dev kind cluster.
+rules:
+  - match: { source: argocd }
+    set:   { env: "{{ .EnvLabel }}" }       # no label → empty render → tier falls through
+  - match: { source: argocd, namespace: dev }
+    set:   { env: dev }
+  - match: { source: argocd, namespace: staging }
+    set:   { env: staging }
+  - match: { source: argocd, namespace: prod }
+    set:   { env: prod }
+  - match: { source: argocd, object_name: "*-dev" }
+    set:   { env: dev, service: '{{ trimSuffix .ObjectName "-dev" }}' }
+  - match: { source: argocd, object_name: "*-staging" }
+    set:   { env: staging, service: '{{ trimSuffix .ObjectName "-staging" }}' }
+  - match: { source: argocd, object_name: "*-prod" }
+    set:   { env: prod, service: '{{ trimSuffix .ObjectName "-prod" }}' }
+  - match: { source: argocd }
+    set:   { service: "{{ .ObjectName }}" }
 
 # Retention prune — opt-in: the whole job stays off until `keep` is set, so a
 # fresh box never silently deletes. Ephemeral pr-* envs get a shorter window.

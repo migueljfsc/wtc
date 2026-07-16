@@ -12,7 +12,7 @@ const KINDS = [
   "build", "merge", "push", "deploy", "config_change",
   "infra_change", "rollback", "alert", "manual",
 ];
-const STATUSES = ["started", "succeeded", "failed", "unknown"];
+const STATUSES = ["started", "succeeded", "failed", "degraded", "unknown"];
 
 type SelectKey = "env" | "service" | "kind" | "status" | "actor";
 
