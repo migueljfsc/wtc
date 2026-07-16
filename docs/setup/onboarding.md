@@ -1,11 +1,11 @@
-# Onboarding: run wtc in your cluster and wire GitHub + Flux (+ Argo CD)
+# Onboarding: run wtc in your cluster and wire GitHub + your GitOps engine
 
 End-to-end setup for a fresh cluster: install the Helm chart, connect the
-**GitHub API poller** (primary ingest — outbound only), and connect **Flux
-notification-controller** (in-cluster reconcile events). If you deploy with
-**Argo CD** — instead of or alongside Flux — wire its notifications-controller
-the same way (Step 4b). By the end, `wtc log` and the portal show real builds,
-merges, and deploys.
+**GitHub API poller** (primary ingest — outbound only), and connect whichever
+GitOps engine(s) deploy your workloads — **Flux** (Step 4), **Argo CD**
+(Step 4b), or both. wtc is vendor-neutral: the engines are peers, and every
+step below marks what belongs to which. By the end, `wtc log` and the portal
+show real builds, merges, and deploys.
 
 For deeper reference on each source see
 [github-poller.md](github-poller.md), [flux.md](flux.md), and
@@ -17,44 +17,43 @@ with the chart.
 ```
    GitHub API  ──(outbound HTTPS, poller)──▶  ┌──────────┐
                                               │   wtc    │ ── portal (/) + API (/api)
-   Flux (this cluster) ──(in-cluster POST)──▶ │  (Helm)  │
-   Flux (other clusters) ──(via ingress)────▶ │          │
-   Argo CD (optional) ──(notifications)─────▶ └──────────┘
+   Flux (per cluster) ──(notification POST)─▶ │  (Helm)  │
+   Argo CD (per instance) ──(notifications)─▶ └──────────┘
 ```
 
-wtc runs **once**. GitHub is pulled by the poller (no inbound needed). Flux in
-the **same** cluster posts to wtc's in-cluster Service; Flux in **other**
-clusters posts to wtc's ingress URL; Argo CD's notifications-controller posts
-the same way from wherever it runs. All ingest is outbound from the source's
-side — no webhooks required.
+wtc runs **once**. GitHub is pulled by the poller (no inbound needed). Your
+GitOps engine posts to wtc from wherever it runs: same cluster → wtc's
+in-cluster Service; other clusters → wtc's ingress URL. All ingest is outbound
+from the source's side — no webhooks required.
 
 ## Prerequisites
 
 - A cluster + `kubectl` and `helm`, and permission to create Secrets/Ingress.
-- **Flux v2.x** running in the clusters you want to track (notification-controller).
+- Your GitOps engine running where your workloads deploy: **Flux v2.x**
+  (notification-controller) and/or **Argo CD** (notifications-controller,
+  bundled in modern versions).
 - A **GitHub fine-grained PAT**, read-only, scoped to the repos to watch:
   Actions + Contents + Pull requests + Metadata. (Classic PAT alternative:
   `repo`.)
 - An **API token** you invent — the portal/CLI credential (any strong string).
-- An **HMAC key** you invent — a shared *webhook-signing* secret (any strong
-  random string). It is **not** issued by Flux or anyone; you generate it and
-  install the **same value** on both sides. Flux signs every delivery to
+- *(Flux)* an **HMAC key** you invent — a shared *webhook-signing* secret (any
+  strong random string). It is **not** issued by Flux or anyone; you generate
+  it and install the **same value** on both sides. Flux signs every delivery to
   `/ingest/flux` with it (`X-Signature: sha256=…`) and wtc verifies the
   signature, so only *your* Flux can post events. Same idea as a GitHub webhook
   secret. (The GitHub PAT above, by contrast, *is* issued by GitHub — it's a
   separate thing; the poller pulls GitHub, so nothing is signed there.)
+- *(Argo CD)* a **webhook token** you invent — same idea as the HMAC key, but a
+  plain shared secret: Argo's notification templates can't HMAC-sign bodies, so
+  deliveries to `/ingest/argocd` carry it verbatim in an `X-WTC-Token` header
+  and wtc compares it constant-time.
 
-- *(Argo CD only)* a **webhook token** you invent — same idea as the HMAC key,
-  but a plain shared secret: Argo's notification templates can't HMAC-sign
-  bodies, so deliveries to `/ingest/argocd` carry it verbatim in an
-  `X-WTC-Token` header and wtc compares it constant-time.
-
-Generate the secrets you own:
+Generate the secrets you own (skip the engine you don't run):
 
 ```bash
 API_TOKEN=$(openssl rand -hex 24)
-FLUX_HMAC=$(openssl rand -hex 24)
-ARGOCD_TOKEN=$(openssl rand -hex 24)   # only if wiring Argo CD
+FLUX_HMAC=$(openssl rand -hex 24)      # Flux
+ARGOCD_TOKEN=$(openssl rand -hex 24)   # Argo CD
 ```
 
 ## Step 1 — Create the secret
@@ -70,8 +69,12 @@ kubectl -n wtc create secret generic wtc-secrets \
   --from-literal=WTC_API_TOKEN="$API_TOKEN" \
   --from-literal=WTC_GH_API_TOKEN="ghp_your_github_pat" \
   --from-literal=WTC_FLUX_HMAC_KEY="$FLUX_HMAC" \
-  --from-literal=WTC_ARGOCD_WEBHOOK_SECRET="$ARGOCD_TOKEN"   # only if wiring Argo CD
+  --from-literal=WTC_ARGOCD_WEBHOOK_SECRET="$ARGOCD_TOKEN"
 ```
+
+Include only the keys for the engine(s) you run — each key pairs with its
+`sources.*` block in Step 2 (a referenced `${VAR}` missing from the Secret is a
+fatal startup error, so drop or keep block and key **together**).
 
 ## Step 2 — Write `values.yaml`
 
@@ -102,16 +105,21 @@ config:
         - your-org/app-api         #   OMIT this whole list to auto-discover
         - your-org/app-web         #   every repo the token can access
       infra_path: infrastructure/  # per-repo manifests dir (kustomize layout)
-    flux:
+    # GitOps engines are peers — keep the block(s) for what you run, delete
+    # the rest (together with its wtc-secrets key; see Step 1).
+    flux:                            # if you run Flux (Step 4)
       hmac_key: ${WTC_FLUX_HMAC_KEY}
       suppression_window: 10m
-    # Only if wiring Argo CD (Step 4b):
-    #argocd:
-    #  webhook_secret: ${WTC_ARGOCD_WEBHOOK_SECRET}
-    #  suppression_window: 10m
+    argocd:                          # if you run Argo CD (Step 4b)
+      webhook_secret: ${WTC_ARGOCD_WEBHOOK_SECRET}
+      suppression_window: 10m
 
   # Env/service inference (SPEC §3). Without rules, events land with env="".
+  # Keep the rule groups for the engine(s) you run.
   rules:
+    # GitHub: per-service CI workflow -> service (repo name minus the org).
+    - match: { source: github, event: workflow_run }
+      set:   { kind: build, service: "{{ trimPrefix .Repo \"your-org/\" }}" }
     # Flux: cluster name -> env (cluster-per-env). One per cluster you track.
     - match: { source: flux, cluster: dev }
       set:   { env: dev }
@@ -122,20 +130,17 @@ config:
     # Flux: the reconciled object's name -> service.
     - match: { source: flux }
       set:   { service: "{{ .ObjectName }}" }
-    # GitHub: per-service CI workflow -> service (repo name minus the org).
-    - match: { source: github, event: workflow_run }
-      set:   { kind: build, service: "{{ trimPrefix .Repo \"your-org/\" }}" }
     # Argo CD: NEVER cluster=env (one Argo manages many clusters). Ordered
-    # tiers: env app label > destination namespace > app-name suffix — see
-    # argocd.md for the full block; minimal example:
-    #- match: { source: argocd }
-    #  set:   { env: "{{ .EnvLabel }}" }   # empty render falls through
-    #- match: { source: argocd, namespace: prod }
-    #  set:   { env: prod }
-    #- match: { source: argocd, object_name: "*-prod" }
-    #  set:   { env: prod, service: '{{ trimSuffix .ObjectName "-prod" }}' }
-    #- match: { source: argocd }
-    #  set:   { service: "{{ .ObjectName }}" }
+    # tiers: env app label > destination namespace > app-name suffix — this is
+    # the minimal shape; see argocd.md for the full block.
+    - match: { source: argocd }
+      set:   { env: "{{ .EnvLabel }}" }   # empty render falls through
+    - match: { source: argocd, namespace: prod }
+      set:   { env: prod }
+    - match: { source: argocd, object_name: "*-prod" }
+      set:   { env: prod, service: '{{ trimSuffix .ObjectName "-prod" }}' }
+    - match: { source: argocd }
+      set:   { service: "{{ .ObjectName }}" }
 
   # tag_patterns default to sha-<shortsha> and <semver>-<sha>; only set this if
   # your image tags use a different convention (SPEC §2).
@@ -148,8 +153,9 @@ Notes:
   re-checked each poll, so repos added to the token appear automatically. Mind
   the rate budget: each repo costs ~3 requests per poll.
 - GitHub build/push events legitimately land `env=""` — REST payloads carry no
-  changed-file list and wtc never guesses. **Env comes from Flux** (the
-  cluster→env rules) and the tag↔sha join (`wtc where`).
+  changed-file list and wtc never guesses. **Env comes from your GitOps
+  engine** (Flux: cluster→env rules; Argo CD: label/namespace/name tiers) and
+  the tag↔sha join (`wtc where`).
 
 ### Secrets: `existingSecret` vs `env`/`secretKeyRef`
 
@@ -184,7 +190,7 @@ Ingress. Open `https://wtc.example.com` and sign in with your `API_TOKEN`. The
 poller starts immediately; within one interval (~60s + a 24h first-run
 backfill) GitHub builds/merges appear in the timeline.
 
-## Step 4 — Wire Flux (per cluster)
+## Step 4 — Wire Flux (per cluster, if you run Flux)
 
 For **each** cluster whose Flux you want to track, apply a Provider + Alert +
 Secret. Start from [`flux-provider.yaml`](flux-provider.yaml) and edit three
@@ -211,7 +217,7 @@ Because wtc runs once, every cluster's Flux points at the **same** wtc address
 but tags its events with its **own** `cluster` name — that is what
 cluster-per-env inference relies on.
 
-## Step 4b — Wire Argo CD (optional, per instance)
+## Step 4b — Wire Argo CD (per instance, if you run Argo CD)
 
 Argo CD has **no fixed webhook schema** — its notifications-controller sends
 whatever the operator templates. wtc therefore ships the contract:
@@ -236,10 +242,13 @@ notification gotchas found live).
 # Point the CLI at wtc (or just use the portal).
 export WTC_SERVER=https://wtc.example.com WTC_API_TOKEN="$API_TOKEN"
 
-wtc doctor                      # per-source health: github + flux (+ argocd) counts, watermarks
+wtc doctor                      # per-source health: github + your engine(s), watermarks
 wtc log --since 24h             # builds/merges from GitHub
-flux reconcile kustomization <name> -n flux-system    # force a reconcile
-wtc log --env prod --kind deploy --since 10m           # the reconcile shows up
+
+# Force a deploy event from your engine:
+flux reconcile kustomization <name> -n flux-system                  # Flux
+argocd app sync <app>           # Argo CD (or sync from its UI)
+wtc log --kind deploy --since 10m                     # the sync/reconcile shows up
 wtc diff staging prod           # once a service is deployed to both
 ```
 
@@ -248,9 +257,11 @@ In the portal: **Settings → Source health** shows the same counts; the
 
 Signs it's working:
 - `wtc doctor` shows non-zero `github` counts and advancing poll watermarks.
-- After a reconcile, a `flux` `deploy` event appears with the right `env`.
-- If Flux events land with `env=""`, your `eventMetadata.cluster` doesn't match
-  a rule — fix the cluster name or the rule.
+- After a reconcile/sync, a `flux`/`argocd` `deploy` event appears with the
+  right `env`.
+- If events land with `env=""`: for Flux, `eventMetadata.cluster` doesn't match
+  a rule — fix the cluster name or the rule; for Argo CD, no inference tier
+  matched — label the app, map the namespace, or add a name-suffix rule.
 
 ## Tuning env/service inference
 
@@ -264,10 +275,12 @@ config read-only (the edit is stored in the DB).
 ## Multi-cluster (cluster-per-env)
 
 The operator model is one cluster per env (`dev`/`staging`/`prod`), wtc deployed
-once. Wire each cluster's Flux to the single wtc address (Step 4), each tagging
-its own `cluster` name. The GitHub poller is global (it watches repos, not
-clusters). `wtc diff staging prod` and the portal's env matrix then compare
-what's actually running per env.
+once. With Flux, wire each cluster's notification-controller to the single wtc
+address (Step 4), each tagging its own `cluster` name. With Argo CD the shape
+inverts — one instance already manages many clusters, so a single Step 4b
+wiring covers all of them and env comes from the app tiers, not the cluster.
+The GitHub poller is global (it watches repos, not clusters). `wtc diff staging
+prod` and the portal's env matrix then compare what's actually running per env.
 
 ## Troubleshooting
 
