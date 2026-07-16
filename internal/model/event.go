@@ -15,6 +15,7 @@ type Source string
 const (
 	SourceGitHub       Source = "github"
 	SourceFlux         Source = "flux"
+	SourceArgoCD       Source = "argocd"
 	SourceHelm         Source = "helm"
 	SourceTerraform    Source = "terraform"
 	SourceManual       Source = "manual"
@@ -23,8 +24,8 @@ const (
 )
 
 var validSources = map[Source]bool{
-	SourceGitHub: true, SourceFlux: true, SourceHelm: true, SourceTerraform: true,
-	SourceManual: true, SourceGeneric: true, SourceAlertmanager: true,
+	SourceGitHub: true, SourceFlux: true, SourceArgoCD: true, SourceHelm: true,
+	SourceTerraform: true, SourceManual: true, SourceGeneric: true, SourceAlertmanager: true,
 }
 
 // ValidSource reports whether s is a known source.
@@ -61,11 +62,13 @@ const (
 	StatusStarted   Status = "started"
 	StatusSucceeded Status = "succeeded"
 	StatusFailed    Status = "failed"
+	StatusDegraded  Status = "degraded" // post-deploy health regression (argocd on-health-degraded)
 	StatusUnknown   Status = "unknown"
 )
 
 var validStatuses = map[Status]bool{
-	StatusStarted: true, StatusSucceeded: true, StatusFailed: true, StatusUnknown: true,
+	StatusStarted: true, StatusSucceeded: true, StatusFailed: true,
+	StatusDegraded: true, StatusUnknown: true,
 }
 
 // ValidStatus reports whether s is a known status.
@@ -74,11 +77,16 @@ func ValidStatus(s Status) bool { return validStatuses[s] }
 // StatusRank orders statuses for the upsert rule (SPEC §1): an incoming event
 // overwrites a stored one only when its rank STRICTLY outranks the stored
 // rank, so a late-arriving "started" never regresses a completed row and a
-// stale equal-rank terminal event never flips succeeded↔failed. The incoming
-// side is bound as a query parameter; the stored side is the SQL CASE in
-// store.upsertSQL — keep the two in sync.
+// stale equal-rank terminal event never flips succeeded↔failed. "degraded"
+// outranks the terminal pair: a health regression is observed AFTER the sync
+// operation's row already completed and must win the upsert; recovery becomes
+// visible on the next operation's row. The incoming side is bound as a
+// query parameter; the stored side is the SQL CASE in store.upsertSQL — keep
+// the two in sync.
 func StatusRank(s Status) int {
 	switch s {
+	case StatusDegraded:
+		return 3
 	case StatusSucceeded, StatusFailed:
 		return 2
 	case StatusStarted:

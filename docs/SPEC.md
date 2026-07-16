@@ -11,9 +11,9 @@ CREATE TABLE events (
   id          TEXT PRIMARY KEY,            -- ULID
   ts          TEXT NOT NULL,               -- RFC3339 UTC, source event time
   ingested_at TEXT NOT NULL,               -- RFC3339 UTC
-  source      TEXT NOT NULL,               -- github | flux | helm | terraform | manual | generic | alertmanager
+  source      TEXT NOT NULL,               -- github | flux | argocd | helm | terraform | manual | generic | alertmanager
   kind        TEXT NOT NULL,               -- build | merge | push | deploy | config_change | infra_change | rollback | alert | manual
-  status      TEXT NOT NULL DEFAULT 'unknown', -- started | succeeded | failed | unknown
+  status      TEXT NOT NULL DEFAULT 'unknown', -- started | succeeded | failed | degraded | unknown
   env         TEXT NOT NULL DEFAULT '',    -- prod | staging | dev | pr-123 | '' (unmapped)
   cluster     TEXT NOT NULL DEFAULT '',
   namespace   TEXT NOT NULL DEFAULT '',
@@ -36,7 +36,7 @@ CREATE INDEX idx_events_kind_ts    ON events(kind, ts);
 
 Full-text search: FTS5 external-content table over `(title, service, actor, artifact)` maintained by triggers; backs `wtc log -q <text>`.
 
-Upsert rule: `INSERT ... ON CONFLICT(dedup_key) DO UPDATE` — only when the incoming status **strictly outranks** the stored one (`unknown < started < succeeded|failed`; equal rank never overwrites, so a stale terminal replay cannot flip `succeeded↔failed` or move `ts` backward). On update: `status`, `ts`, `title` always; `duration_ms`, `payload`, `url`, and identity fields (`env`, `cluster`, `namespace`, `service`, `actor`, `ref`, `artifact`) follow **non-empty-wins merge** — a later event enriches the row but never blanks what an earlier event recorded. `kind` and `source` are set by the first event and never updated.
+Upsert rule: `INSERT ... ON CONFLICT(dedup_key) DO UPDATE` — only when the incoming status **strictly outranks** the stored one (`unknown < started < succeeded|failed < degraded`; equal rank never overwrites, so a stale terminal replay cannot flip `succeeded↔failed` or move `ts` backward). `degraded` (argocd on-health-degraded, P11) outranks the terminal pair by design: a health regression is observed AFTER the sync operation's row already completed and must win the upsert; a fix arrives as a new revision (or a retry — a new operation, hence a new row), so recovery stays visible. On update: `status`, `ts`, `title` always; `duration_ms`, `payload`, `url`, and identity fields (`env`, `cluster`, `namespace`, `service`, `actor`, `ref`, `artifact`) follow **non-empty-wins merge** — a later event enriches the row but never blanks what an earlier event recorded. `kind` and `source` are set by the first event and never updated.
 
 ### kind semantics
 
@@ -58,6 +58,7 @@ Upsert rule: `INSERT ... ON CONFLICT(dedup_key) DO UPDATE` — only when the inc
 - github pull_request merged → `gh:pr:<repo>:<number>:merged`
 - github push → `gh:push:<repo>:<after_sha>`
 - flux → `flux:<cluster>:<kind>/<ns>/<name>:<revision>:<reason>`
+- argocd → `argocd:<app>:<revision>:<startedAt>` (RFC3339 UTC) — one row per sync **operation**, which is trap #5's "logical change" for Argo: a retry of the same revision IS a new change and the ledger shows both attempts. Keying on (app, revision) alone freezes rows — a Failed sync followed by a Succeeded retry of the same revision can never update (equal terminal ranks never overwrite; found live). Within one operation startedAt is constant, so Running→Succeeded/Error still upserts a single row; health-degraded carries the previous operation's startedAt and lands on that row. A zero startedAt (pre-first-sync health events) omits the segment. The suppression-window key appends `:<phase|Degraded>`; the window plus Argo's own trigger-hash gating (`notified.notifications.argoproj.io` annotation) bound beyond-window resync rows.
 - wrap/record → `local:<ulid>` generated at start, reused for the completion update (a `wtc record` retry without an explicit `--dedup-key` is a NEW event)
 - alertmanager → `am:<fingerprint>:<startsAt>`
 
@@ -91,6 +92,10 @@ sources:
     hmac_key: ${WTC_FLUX_HMAC_KEY}
     suppression_window: 10m
 
+  argocd:
+    webhook_secret: ${WTC_ARGOCD_WEBHOOK_SECRET}  # static shared secret (X-WTC-Token); Argo templates can't HMAC-sign bodies
+    suppression_window: 10m              # drop repeats of (app,revision,phase|health) — Argo re-notifies on every resync
+
 tag_patterns:                            # ordered; first regex with a <sha> group that matches an image tag wins
   - '^sha-(?P<sha>[0-9a-f]{7,40})$'                     # sha-abc1234
   - '^v?\d+\.\d+\.\d+-(?P<sha>[0-9a-f]{7,40})$'         # 1.4.2-abc1234
@@ -112,6 +117,24 @@ rules:                                   # ordered; see §3
     set:   { env: dev, service: "{{ trimPrefix .Repo \"org/\" }}" }
   - match: { source: flux, object_kind: HelmRelease }
     set:   { service: "{{ .ObjectName }}" }
+  # ArgoCD (P11): env label > destination namespace > app-name suffix — NEVER
+  # cluster=env (one Argo instance manages many clusters; destServer is a URL).
+  - match: { source: argocd }
+    set:   { env: "{{ .EnvLabel }}" }    # no label → empty render → tier falls through
+  - match: { source: argocd, namespace: prod }
+    set:   { env: prod }
+  - match: { source: argocd, namespace: staging }
+    set:   { env: staging }
+  - match: { source: argocd, namespace: dev }
+    set:   { env: dev }
+  - match: { source: argocd, object_name: "*-prod" }
+    set:   { env: prod, service: '{{ trimSuffix .ObjectName "-prod" }}' }
+  - match: { source: argocd, object_name: "*-staging" }
+    set:   { env: staging, service: '{{ trimSuffix .ObjectName "-staging" }}' }
+  - match: { source: argocd, object_name: "*-dev" }
+    set:   { env: dev, service: '{{ trimSuffix .ObjectName "-dev" }}' }
+  - match: { source: argocd }
+    set:   { service: "{{ .ObjectName }}" }
 
 retention:
   keep: 180d
@@ -128,7 +151,7 @@ Env expansion `${VAR}` at load. `WTC_SERVER_LISTEN`-style overrides win over fil
 
 ## 3. Normalization rules engine
 
-Runs after each source-specific parser produces a partially-filled Event plus a **fact map** (repo, branch, event, paths[], cluster, object_kind, object_name, namespace, actor, reason…).
+Runs after each source-specific parser produces a partially-filled Event plus a **fact map** (repo, branch, event, paths[], cluster, object_kind, object_name, namespace, actor, reason…; argocd adds project, dest_server, source_path, env_label — templates render them as `.Project`/`.DestServer`/`.SourcePath`/`.EnvLabel`). `match` keys: source, repo, branch, event, workflow, cluster, object_kind, object_name, namespace, paths.
 
 - Rules evaluate **in order**. A rule matches when every `match` key matches its fact (globs `*`/`**` allowed on strings and path lists; `paths` matches if ANY changed path matches ANY pattern).
 - A matching rule sets only fields **not yet set** (first-writer-wins per field). Evaluation continues through all rules (no short-circuit) so later rules can fill remaining fields.
@@ -143,8 +166,10 @@ Ingest (serve only):
 ```
 POST /ingest/github     HMAC X-Hub-Signature-256 (webhook_secret)
 POST /ingest/flux       HMAC X-Signature (flux generic-hmac)
+POST /ingest/argocd     Static shared secret X-WTC-Token (sources.argocd.webhook_secret), constant-time compare — Argo's notification
+                        templates cannot HMAC-sign the body. Body = the canonical shape shipped in docs/setup/argocd-notifications.yaml.
 POST /ingest/generic    Bearer token; body = Event JSON subset (kind, title, env?, service?, cluster?, namespace?, actor?, ts?, ref?, artifact?, artifacts?, status?, duration_ms?, url?, source?, dedup_key?)
-                        source restricted to generic|manual|helm|terraform; dedup_key prefixes gh:/flux:/am: rejected (reserved for dedicated ingest paths).
+                        source restricted to generic|manual|helm|terraform; dedup_key prefixes gh:/flux:/argocd:/am: rejected (reserved for dedicated ingest paths).
                         Omitting dedup_key ⇒ server generates a random key: the delivery is NOT idempotent — clients needing retry-safety must send a stable key.
 POST /ingest/alertmanager   Bearer token
 GET  /healthz
@@ -250,5 +275,6 @@ Daily job: delete events older than `keep` (`ephemeral_keep` for envs matching `
 
 - `github-webhook.md` — org/repo webhook: URL `/ingest/github`, content-type json, secret, events: `workflow_run, push, pull_request` (+ `release` optional).
 - `flux-provider.yaml` — per cluster: `Provider` (type generic-hmac → `/ingest/flux`, secretRef) + `Alert` (eventSeverity: info, sources: Kustomization/*, HelmRelease/*, ImageUpdateAutomation/*) + note to set a cluster identifier (Alert `eventMetadata` or summary) so the fact map carries `cluster`. Validate exact field names against captured fixtures before finalizing.
+- `argocd-notifications.yaml` — per Argo instance: notifications-controller webhook service (`X-WTC-Token` from `argocd-notifications-secret`) + the canonical body template `/ingest/argocd` parses (Argo's webhook body is operator-templated — this file IS the contract) + triggers (sync succeeded/failed/running, deployed, health-degraded) + a global default subscription. Verified against Argo CD v3.4.5 captures.
 - `gha-report-step.md` — optional composite-action/curl step POSTing `/ingest/generic` with `{kind: build, ref: $GITHUB_SHA, artifacts: [...]}` for pipelines whose tags don't embed the sha (not needed by the operator; kept for generality).
 - `Dockerfile` + Helm chart under `deploy/helm/` (primary, in-cluster) + `deploy/docker-compose.yaml` (VMs/local).

@@ -99,6 +99,8 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 			GitHubWebhookSecret: cfg.Sources.GitHub.WebhookSecret,
 			FluxHMACKey:         cfg.Sources.Flux.HMACKey,
 			FluxSuppression:     cfg.Sources.Flux.SuppressionWindow.Std(),
+			ArgoCDWebhookToken:  cfg.Sources.ArgoCD.WebhookSecret,
+			ArgoCDSuppression:   cfg.Sources.ArgoCD.SuppressionWindow.Std(),
 			Engine:              engineHolder,
 			Tags:                tagHolder,
 			CaptureDir:          cfg.Server.CaptureDir,

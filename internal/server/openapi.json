@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "wtc query API",
-    "description": "Versioned read API served by `wtc serve`. The portal SPA generates its typed client from this document. Ingest endpoints (/ingest/*) are source-authenticated (HMAC / bearer) and out of scope for the portal client.",
+    "description": "Versioned read API served by `wtc serve`. The portal SPA generates its typed client from this document. Ingest endpoints (/ingest/*) are source-authenticated (HMAC / bearer / shared-secret header) and out of scope for the portal client.",
     "version": "v1",
     "license": { "name": "Apache-2.0", "url": "https://www.apache.org/licenses/LICENSE-2.0" }
   },
@@ -285,9 +285,9 @@
           "id": { "type": "string", "description": "ULID." },
           "ts": { "type": "string", "format": "date-time", "description": "Source event time (UTC)." },
           "ingested_at": { "type": "string", "format": "date-time", "description": "When wtc stored it (UTC)." },
-          "source": { "type": "string", "enum": ["github", "flux", "helm", "terraform", "manual", "generic", "alertmanager"] },
+          "source": { "type": "string", "enum": ["github", "flux", "argocd", "helm", "terraform", "manual", "generic", "alertmanager"] },
           "kind": { "type": "string", "enum": ["build", "merge", "push", "deploy", "config_change", "infra_change", "rollback", "alert", "manual"] },
-          "status": { "type": "string", "enum": ["started", "succeeded", "failed", "unknown"] },
+          "status": { "type": "string", "enum": ["started", "succeeded", "failed", "degraded", "unknown"] },
           "env": { "type": "string", "description": "Empty string means unmapped (surfaced by doctor)." },
           "cluster": { "type": "string" },
           "namespace": { "type": "string" },

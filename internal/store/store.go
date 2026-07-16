@@ -93,7 +93,7 @@ ON CONFLICT(dedup_key) DO UPDATE SET
   actor       = coalesce(nullif(excluded.actor, ''), actor),
   ref         = coalesce(nullif(excluded.ref, ''), ref),
   artifact    = coalesce(nullif(excluded.artifact, ''), artifact)
-WHERE ? > (CASE events.status WHEN 'succeeded' THEN 2 WHEN 'failed' THEN 2 WHEN 'started' THEN 1 ELSE 0 END)
+WHERE ? > (CASE events.status WHEN 'degraded' THEN 3 WHEN 'succeeded' THEN 2 WHEN 'failed' THEN 2 WHEN 'started' THEN 1 ELSE 0 END)
 RETURNING id`
 
 // Open opens (creating if needed) the database at path, applies pragmas and

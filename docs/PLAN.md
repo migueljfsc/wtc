@@ -17,6 +17,7 @@ Lives at `docs/PLAN.md`. Each phase ≈ 1–3 Claude Code sessions. A phase is d
 | **P8 portal core views** | ✅ 2026-07-15 | dashboard (activity chart + per-env health + stats endpoints) + rich timeline (faceted filters, FTS, infinite scroll, saved filters, event drawer with inline `where`-journey); `/facets` + `actor` filter |
 | **P9 change-intelligence views** | ✅ 2026-07-15 | `where` pipeline, `diff` env-matrix (new `/matrix` endpoint), service detail (current versions + freq/failure-rate/MTBF), alert correlation (`around`) in the event drawer |
 | **P10 live + config surfaces** | ✅ 2026-07-15 | SSE live updates (`/api/v1/stream`, no-poll timeline/dashboard); Settings = source health + DB-backed editable rules/tag_patterns with hot-reload (`edit → next event re-routed`, no restart). Token management + multi-user auth stay out (RBAC non-goal) |
+| **P11 ArgoCD ingest** | ✅ 2026-07-16 | fixture-first vs live Argo v3.4.5 on kind; canonical template ships the contract (4 template gotchas found live); per-sync-operation dedup keys (failed→succeeded retry = two rows); new `degraded` status (rank 3, upserts terminal rows); env tiers label>ns>name-suffix live-verified; full join proven live: github push INTENT → argocd APPLIED, 23h lag |
 
 Unplanned addition: `demo/` — three dummy services + fake three-cluster Flux
 wiring generating real events continuously (operator-requested test bed;
@@ -188,3 +189,41 @@ rule in the UI and sees a subsequently-ingested event re-routed.
 - Q3 re-order applied: the GitHub poller (formerly P4 sweeper) is now in P1 as the primary ingest path; HMAC middleware still built in P1 (webhook mode stays supported; Flux traffic is in-cluster/private anyway).
 - **UI track (P7–P10)** is independent of the remaining P6 work and can proceed in parallel. P7 is the gate — the OpenAPI spec + `/api/v1` + CORS + login unblock everything after it. P8/P9 need only P3-era query data (already present); P9 leans on the aggregation endpoints added in P8. P10 (live/config) last.
 - Portal work must not regress the embedded timeline or the CLI; the Go API is extended additively (new `/api/v1` routes; existing `/api/*` and `/` stay).
+- **ArgoCD ingest (P11)** is a data-plane phase parallel to P2 (Flux), independent of the UI track. It reuses the existing dedup/suppression + rules engine + `where` revision join, adding only a new parser, ingest route, and a canonical notification template. Fixture-first against a stood-up Argo instance — not the operator's Flux-only clusters. Once landed, the portal's `where`/`diff`/matrix views render argocd deploys with no UI change (same Event schema).
+
+---
+
+# Additional GitOps ingest (post-v1)
+
+Vendor neutrality is the product (CLAUDE.md mission). Flux and Argo CD are the two dominant GitOps CD controllers; shipping Argo CD ingest alongside Flux is the neutrality proof. The operator's own stack is Flux-only, so this phase is fixture-driven against a stood-up Argo instance, not their clusters.
+
+## Phase 11 — ArgoCD ingest
+
+`/ingest/argocd` accepting Argo CD **notifications-controller** webhooks. Fixture-first: stand up Argo CD (local kind), wire its notifications config at wtc, capture real payloads, freeze fixtures, then implement.
+
+**Define the contract — don't parse Argo's native shape.** Argo CD's notification body is *operator-templated* (`argocd-notifications-cm` decides the JSON); there is no fixed webhook schema like Flux's eventv1. So wtc **ships** the contract: `docs/setup/argocd-notifications.yaml` with a canonical template emitting a stable shape — `app`, `project`, `revision` (sync git sha), `syncStatus`, `healthStatus`, `operationPhase`, `destServer`, `destNamespace`, `repoURL`, `sourcePath`, `targetRevision`, `startedAt`, `finishedAt`, `triggeredBy`. The parser targets that shape; the doc is the wiring the operator must apply for the parser to work.
+
+**Trigger → kind/status map.** `on-sync-succeeded`/`on-deployed` → kind=deploy, status=succeeded; `on-sync-failed` → deploy/failed; sync-running → started; `on-health-degraded` → status carries health (correlate like an alert). Status-upsert lifecycle as everywhere: one row per `(app, revision)`, transitions update in place.
+
+**Dedup + suppression.** Argo re-notifies on every resync/refresh — same spam trap as Flux (known-trap #1). Dedup `argocd:<app>:<revision>:<phase|healthReason>`; drop repeats within the suppression window (reuse Flux's `suppression_window`).
+
+**Inference differs from Flux — do NOT reuse cluster=env.** One Argo instance manages many clusters, and its "cluster" is a destination *server URL*, not an env. Fact map carries app, project, destNamespace, destServer, sourcePath, app labels — env/service inference runs off **app-name pattern / destination namespace / an `env` app label / source path**, never off cluster name. Ship a default `rules` example for Argo (mirroring the Flux block but keyed on app/namespace). Unmatched → `env=""`, surfaced by `doctor` (known-trap #2 unchanged).
+
+**tag↔sha join stays intact.** Argo's sync `revision` is the manifest-repo git sha (multi-source apps 2.6+ expose `revisions[]` — capture all) → feeds `where` APPLIED exactly like a Flux reconcile revision. A commit traced through GitHub INTENT lands on Argo-applied envs the same way; `wtc where <sha>` then spans Flux- and Argo-applied envs in one picture.
+
+**Companion changes this phase carries** (per the per-phase definition of done): SPEC §1 `source` enum + dedup_key table gain `argocd`; §2 config gains a `sources.argocd` block; §4 HTTP surface gains `POST /ingest/argocd`; §9 docs/setup gains `argocd-notifications.yaml`; CLAUDE.md operator/known-traps note Argo is fixture-supported but not the operator's stack.
+
+**Accept:** golden fixtures for sync-succeeded, sync-failed, health-degraded (+ app-of-apps if present); a resync loop firing N identical notifications stores 1 row; an Argo-managed flow visible end-to-end — PR merge (github) → Argo sync (argocd) carrying the same manifest revision — in `wtc log`; `wtc where <sha>` shows the Argo-applied env with correct intent→applied lag alongside Flux envs; `wtc diff`/`doctor` treat argocd deploys identically to flux; operator can wire a real Argo instance using only `docs/setup/argocd-notifications.yaml`.
+
+**Resolved (operator answers, 2026-07-16):**
+- Auth: **static shared-secret header** `X-WTC-Token` (`sources.argocd.webhook_secret`), constant-time compare. Argo templates can't body-HMAC; in-cluster traffic bounds the exposure.
+- Health-degraded: **kind=deploy with new `degraded` status** (rank 3, outranks the terminal pair so it wins the upsert on the completed operation's row); recovery is visible on the next revision's row; doctor/dashboards surface it.
+- Env default rule: **ordered tiers, all three shipped** — `env` app label > destination namespace > `<service>-<env>` name suffix; unmatched → `env=""` per trap #2.
+
+**Follow-ups (filed 2026-07-16, not blocking):**
+- Fixture gaps: capture `revisions[]` (needs a multi-source Application) and a populated `triggeredBy` (needs an authenticated argocd-cli/UI sync) — extend the goldens when captured.
+- Demo stack: the kind rig's Argo apps sync manually; consider `syncPolicy.automated` + pointing Argo at the remaining demo overlays so the demo continuously exercises both GitOps engines.
+
+**Live-validation addenda (found in stage 3, fixed same day):**
+- Row keys are per sync **operation** (`argocd:<app>:<revision>:<startedAt>`), not per (app,revision): with equal-rank terminal statuses, a revision-keyed row made a failed→succeeded retry of the same revision permanently invisible. A retry is a new logical change (trap #5); Flux gets the same separation via `reason` in its key.
+- Argo's notified-annotation gating cuts both ways: it re-fires on observed state flips (suppression window handles the spam) but sends nothing for transitions it never observed — a same-revision resync can be legitimately missed; documented as an Argo-side limitation (known trap #10).

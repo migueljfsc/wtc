@@ -102,7 +102,7 @@ function row(ev, ts) {
 
   const env = el("span", "chip env-" + (ev.env || "none"), ev.env || "—");
   r.append(env);
-  r.append(el("span", "chip kind", ev.kind + (ev.status === "failed" ? " ✗" : ev.status === "started" ? " …" : "")));
+  r.append(el("span", "chip kind", ev.kind + (ev.status === "failed" ? " ✗" : ev.status === "started" ? " …" : ev.status === "degraded" ? " ⚠" : "")));
 
   const title = el("span", "title");
   if (ev.url) {

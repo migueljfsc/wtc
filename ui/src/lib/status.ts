@@ -5,6 +5,7 @@ const STATUS: Record<string, { dot: string; text: string; label: string }> = {
   succeeded: { dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-500", label: "succeeded" },
   failed: { dot: "bg-red-500", text: "text-red-600 dark:text-red-500", label: "failed" },
   started: { dot: "bg-blue-500", text: "text-blue-600 dark:text-blue-500", label: "started" },
+  degraded: { dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-500", label: "degraded" },
   unknown: { dot: "bg-zinc-400", text: "text-muted-foreground", label: "unknown" },
 };
 

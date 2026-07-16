@@ -1,0 +1,145 @@
+# Argo CD notifications-controller → wtc wiring, one per cluster. Verified
+# against Argo CD v3.4.5 (bundled notifications-controller) with real
+# captured deliveries from a kind cluster.
+#
+# Argo CD's webhook body is operator-templated — there is no fixed schema
+# like Flux's eventv1. This file *is* the contract: it defines the one
+# canonical JSON shape wtc's /ingest/argocd parser expects. Do not rename the
+# emitted fields without updating internal/ingest/argocd accordingly.
+#
+# 1. Replace CHANGE-ME with the same value as sources.argocd.webhook_secret
+#    in wtc.yaml (prefer: create the secret out-of-band instead of
+#    committing it). Unlike Flux's generic-hmac provider, Argo's templates
+#    cannot HMAC-sign the body, so this is a static shared secret sent
+#    verbatim as the X-WTC-Token header — treat it exactly like a password.
+# 2. Set service.webhook.wtc.url to wtc's /ingest/argocd base, reachable FROM
+#    the cluster Argo CD runs in.
+# 3. Apply both resources into the SAME namespace Argo CD (and its
+#    notifications-controller) runs in — "argocd" below, adjust if yours
+#    differs.
+# 4. The `subscriptions` block below is a *global default*: every
+#    Application in the cluster reports to wtc with no per-app annotations
+#    needed (mirrors flux-provider.yaml's wildcarded Alert). If you'd rather
+#    opt in per-app, delete `subscriptions` and annotate each Application
+#    instead:
+#      notifications.argoproj.io/subscribe.on-sync-succeeded.wtc: ""
+#      notifications.argoproj.io/subscribe.on-sync-failed.wtc: ""
+#      notifications.argoproj.io/subscribe.on-sync-running.wtc: ""
+#      notifications.argoproj.io/subscribe.on-deployed.wtc: ""
+#      notifications.argoproj.io/subscribe.on-health-degraded.wtc: ""
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-notifications-secret
+  namespace: argocd
+stringData:
+  wtc-token: CHANGE-ME
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+  namespace: argocd
+data:
+  # Base URL only; each template supplies its own `path` (appended to this),
+  # same pattern as Argo's own github-commit-status catalog example.
+  service.webhook.wtc: |
+    url: http://host.docker.internal:8484
+    headers:
+    - name: Content-Type
+      value: application/json
+    - name: X-WTC-Token
+      value: $wtc-token
+
+  # The one shared template every trigger below sends through. Field values
+  # go through `toJson` so quoting/escaping is never hand-rolled — this is
+  # the exact contract internal/ingest/argocd parses against.
+  #
+  # app.spec.source is nil on multi-source Applications (2.6+); fall back to
+  # the first entry of app.spec.sources for repoURL/sourcePath/targetRevision.
+  # app.status.operationState is nil until the app's first sync operation —
+  # guarded so pre-first-sync events (e.g. an early health transition) still
+  # produce valid JSON instead of a template execution error.
+  #
+  # `envLabel` is ONE ADDITION beyond the originally specified field list
+  # (app/project/revision/.../triggeredBy): the env-inference matrix
+  # (CLAUDE.md/PLAN.md P11) ranks "env app label" above destination-namespace
+  # and name-suffix, but no field in the original list carries Application
+  # labels — without this the label tier is untestable from the webhook body
+  # alone. Flagged for operator confirmation before the parser stage; easy to
+  # drop or rename if a different shape is preferred.
+  #
+  # Guarded with `{{if .app.metadata.labels}}`: an Application with NO labels
+  # at all doesn't get an empty map in the unstructured object, it gets a
+  # true untyped nil, and `index` on that (unlike a typed nil Go map) is a
+  # hard template execution error — verified empirically (every notification
+  # to an unlabeled app failed with "index of untyped nil" until this guard
+  # was added).
+  template.wtc-webhook: |
+    webhook:
+      wtc:
+        method: POST
+        path: /ingest/argocd
+        body: |
+          {
+            "app": {{.app.metadata.name | toJson}},
+            "project": {{.app.spec.project | toJson}},
+            "revision": {{.app.status.sync.revision | toJson}},
+            "revisions": {{if .app.status.sync.revisions}}{{.app.status.sync.revisions | toJson}}{{else}}null{{end}},
+            "syncStatus": {{.app.status.sync.status | toJson}},
+            "healthStatus": {{.app.status.health.status | toJson}},
+            "operationPhase": {{if .app.status.operationState}}{{.app.status.operationState.phase | toJson}}{{else}}null{{end}},
+            "destServer": {{.app.spec.destination.server | toJson}},
+            "destNamespace": {{.app.spec.destination.namespace | toJson}},
+            "repoURL": {{if .app.spec.source}}{{.app.spec.source.repoURL | toJson}}{{else}}{{(index .app.spec.sources 0).repoURL | toJson}}{{end}},
+            "sourcePath": {{if .app.spec.source}}{{.app.spec.source.path | toJson}}{{else}}{{(index .app.spec.sources 0).path | toJson}}{{end}},
+            "targetRevision": {{if .app.spec.source}}{{.app.spec.source.targetRevision | toJson}}{{else}}{{(index .app.spec.sources 0).targetRevision | toJson}}{{end}},
+            "startedAt": {{if .app.status.operationState}}{{.app.status.operationState.startedAt | toJson}}{{else}}null{{end}},
+            "finishedAt": {{if and .app.status.operationState .app.status.operationState.finishedAt}}{{.app.status.operationState.finishedAt | toJson}}{{else}}null{{end}},
+            "triggeredBy": {{if .app.status.operationState}}{{.app.status.operationState.operation.initiatedBy.username | toJson}}{{else}}null{{end}},
+            "envLabel": {{if .app.metadata.labels}}{{index .app.metadata.labels "env" | toJson}}{{else}}null{{end}}
+          }
+
+  # Triggers wtc cares about. `send` always points at the single shared
+  # template above — the trigger only decides WHEN, never the payload shape.
+  #
+  # `when` is evaluated by expr-lang against the Application as an
+  # unstructured map (NOT the Go template engine used in the body above), and
+  # app.status.operationState is absent until the app's first sync — hence
+  # the `?.` safe-navigation right after `.status` (verified empirically:
+  # without it, the controller logs "cannot fetch phase from <nil>" and the
+  # trigger silently fails to fire on a brand-new Application).
+  trigger.on-sync-succeeded: |
+    - when: app.status?.operationState.phase == 'Succeeded'
+      send: [wtc-webhook]
+  trigger.on-sync-failed: |
+    - when: app.status?.operationState.phase in ['Error', 'Failed']
+      send: [wtc-webhook]
+  trigger.on-sync-running: |
+    - when: app.status?.operationState.phase == 'Running'
+      send: [wtc-webhook]
+  trigger.on-deployed: |
+    - when: app.status?.operationState.phase in ['Succeeded'] and app.status.health.status == 'Healthy'
+      oncePer: app.status.sync.revision
+      send: [wtc-webhook]
+  trigger.on-health-degraded: |
+    - when: app.status.health.status == 'Degraded'
+      send: [wtc-webhook]
+
+  # Global default: every Application reports to wtc without per-app
+  # annotations. Remove this block if you'd rather opt in per-Application
+  # (see the annotation list at the top of this file).
+  #
+  # Recipient is the NAME half of `service.webhook.<name>` above ("wtc"), NOT
+  # "webhook:wtc" — notifications-engine registers services by that name and
+  # looks up dest.Service against it directly (verified empirically: the
+  # wrong format logs "notification service 'webhook' is not supported").
+  subscriptions: |
+    - recipients:
+      - wtc
+      triggers:
+      - on-sync-succeeded
+      - on-sync-failed
+      - on-sync-running
+      - on-deployed
+      - on-health-degraded

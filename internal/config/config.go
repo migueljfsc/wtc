@@ -95,10 +95,20 @@ type Flux struct {
 	SuppressionWindow Duration `yaml:"suppression_window"` // drop repeats of (object,revision,reason) inside this window
 }
 
+// ArgoCD configures the notifications-controller webhook ingest path
+// (SPEC §2, P11). Argo's notification templates can't HMAC-sign the body
+// like Flux's generic-hmac provider, so auth is a static shared secret sent
+// as the X-WTC-Token header (see docs/setup/argocd-notifications.yaml).
+type ArgoCD struct {
+	WebhookSecret     string   `yaml:"webhook_secret"`     // static shared secret, X-WTC-Token header
+	SuppressionWindow Duration `yaml:"suppression_window"` // drop repeats of (app,revision,phase|health) inside this window
+}
+
 // Sources groups per-source ingest configuration.
 type Sources struct {
 	GitHub GitHub `yaml:"github"`
 	Flux   Flux   `yaml:"flux"`
+	ArgoCD ArgoCD `yaml:"argocd"`
 }
 
 // Digest configures the optional serve-side scheduled Slack digest. Enabled
@@ -145,6 +155,9 @@ func Default() Config {
 				InfraPath:    "infrastructure/",
 			},
 			Flux: Flux{
+				SuppressionWindow: Duration(10 * time.Minute),
+			},
+			ArgoCD: ArgoCD{
 				SuppressionWindow: Duration(10 * time.Minute),
 			},
 		},
@@ -269,6 +282,7 @@ func applyEnvOverrides(cfg *Config) {
 	set(&cfg.Sources.GitHub.APIToken, "WTC_GH_API_TOKEN")
 	set(&cfg.Sources.GitHub.WebhookSecret, "WTC_GH_WEBHOOK_SECRET")
 	set(&cfg.Sources.Flux.HMACKey, "WTC_FLUX_HMAC_KEY")
+	set(&cfg.Sources.ArgoCD.WebhookSecret, "WTC_ARGOCD_WEBHOOK_SECRET")
 	set(&cfg.Digest.SlackWebhook, "WTC_SLACK_WEBHOOK")
 
 	if v, ok := os.LookupEnv("WTC_API_TOKEN"); ok && v != "" {

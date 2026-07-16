@@ -1,0 +1,18 @@
+{
+  "app": "wtc-guestbook-labeled",
+  "project": "default",
+  "revision": "8088f4c0d970abb09e250248cc97e35623447cb5",
+  "revisions": null,
+  "syncStatus": "Synced",
+  "healthStatus": "Healthy",
+  "operationPhase": "Running",
+  "destServer": "https://kubernetes.default.svc",
+  "destNamespace": "default",
+  "repoURL": "https://github.com/argoproj/argocd-example-apps.git",
+  "sourcePath": "guestbook",
+  "targetRevision": "HEAD",
+  "startedAt": "2026-07-16T10:22:05Z",
+  "finishedAt": null,
+  "triggeredBy": null,
+  "envLabel": "staging"
+}
