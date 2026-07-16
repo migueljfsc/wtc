@@ -15,6 +15,7 @@ import (
 
 	"github.com/migueljfsc/wtc/internal/config"
 	"github.com/migueljfsc/wtc/internal/ingest/github"
+	"github.com/migueljfsc/wtc/internal/ingest/gitlab"
 	"github.com/migueljfsc/wtc/internal/normalize"
 	"github.com/migueljfsc/wtc/internal/server"
 	"github.com/migueljfsc/wtc/internal/store"
@@ -101,6 +102,7 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 			FluxSuppression:     cfg.Sources.Flux.SuppressionWindow.Std(),
 			ArgoCDWebhookToken:  cfg.Sources.ArgoCD.WebhookSecret,
 			ArgoCDSuppression:   cfg.Sources.ArgoCD.SuppressionWindow.Std(),
+			GitLabWebhookToken:  cfg.Sources.GitLab.WebhookSecret,
 			Engine:              engineHolder,
 			Tags:                tagHolder,
 			CaptureDir:          cfg.Server.CaptureDir,
@@ -126,6 +128,20 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 	} else {
 		log.Info("github poller disabled",
 			"has_token", gh.APIToken != "", "repos", len(gh.Repos), "interval", gh.PollInterval.Std())
+	}
+
+	// GitLab API poller — primary GitLab ingest for private deployments.
+	// Projects must be configured explicitly (no accessible-project discovery
+	// analog that fits the poller model).
+	if gl := cfg.Sources.GitLab; gl.APIToken != "" && gl.PollInterval.Std() > 0 && len(gl.Projects) > 0 {
+		poller := gitlab.NewPoller(
+			gitlab.NewClient(gl.APIToken, gl.BaseURL),
+			st, engineHolder, gl.Projects, gl.PollInterval.Std(), cfg.Server.CaptureDir, log,
+		)
+		go poller.Run(ctx)
+	} else {
+		log.Info("gitlab poller disabled",
+			"has_token", gl.APIToken != "", "projects", len(gl.Projects), "interval", gl.PollInterval.Std())
 	}
 
 	// Optional scheduled Slack digest (nil when unconfigured).

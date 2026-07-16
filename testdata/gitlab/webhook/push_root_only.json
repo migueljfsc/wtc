@@ -1,0 +1,63 @@
+{
+  "object_kind": "push",
+  "event_name": "push",
+  "before": "c21a94b7160e486f9c3a2bf6118695c04e6629ce",
+  "after": "fc4f6eb9e2b20994cdd143d93d2057ddbf39d6cc",
+  "ref": "refs/heads/main",
+  "ref_protected": true,
+  "checkout_sha": "fc4f6eb9e2b20994cdd143d93d2057ddbf39d6cc",
+  "message": null,
+  "user_id": 40392618,
+  "user_name": "claude",
+  "user_username": "project_84532466_bot_5b0e1601bad329d23294de81abe11e0b",
+  "user_email": null,
+  "user_avatar": "https://secure.gravatar.com/avatar/39050ae7b9f6a72b7a132b1f3a8c20330687fb80b664f817cf3804b9911e084d?s=80&d=identicon",
+  "project_id": 84532466,
+  "project": {
+    "id": 84532466,
+    "name": "wtc-demo-gitlab",
+    "description": "",
+    "web_url": "https://gitlab.com/migueljfsc/wtc-demo-gitlab",
+    "avatar_url": null,
+    "git_ssh_url": "git@gitlab.com:migueljfsc/wtc-demo-gitlab.git",
+    "git_http_url": "https://gitlab.com/migueljfsc/wtc-demo-gitlab.git",
+    "namespace": "Miguel Cardoso",
+    "visibility_level": 0,
+    "path_with_namespace": "migueljfsc/wtc-demo-gitlab",
+    "default_branch": "main",
+    "ci_config_path": "",
+    "homepage": "https://gitlab.com/migueljfsc/wtc-demo-gitlab",
+    "url": "git@gitlab.com:migueljfsc/wtc-demo-gitlab.git",
+    "ssh_url": "git@gitlab.com:migueljfsc/wtc-demo-gitlab.git",
+    "http_url": "https://gitlab.com/migueljfsc/wtc-demo-gitlab.git"
+  },
+  "commits": [
+    {
+      "id": "fc4f6eb9e2b20994cdd143d93d2057ddbf39d6cc",
+      "message": "revert: remove FAIL marker",
+      "title": "revert: remove FAIL marker",
+      "timestamp": "2026-07-16T20:10:39+00:00",
+      "url": "https://gitlab.com/migueljfsc/wtc-demo-gitlab/-/commit/fc4f6eb9e2b20994cdd143d93d2057ddbf39d6cc",
+      "author": {
+        "name": "claude",
+        "email": "[REDACTED]"
+      },
+      "added": [],
+      "modified": [],
+      "removed": [
+        "FAIL"
+      ]
+    }
+  ],
+  "total_commits_count": 1,
+  "push_options": {},
+  "repository": {
+    "name": "wtc-demo-gitlab",
+    "url": "git@gitlab.com:migueljfsc/wtc-demo-gitlab.git",
+    "description": "",
+    "homepage": "https://gitlab.com/migueljfsc/wtc-demo-gitlab",
+    "git_http_url": "https://gitlab.com/migueljfsc/wtc-demo-gitlab.git",
+    "git_ssh_url": "git@gitlab.com:migueljfsc/wtc-demo-gitlab.git",
+    "visibility_level": 0
+  }
+}

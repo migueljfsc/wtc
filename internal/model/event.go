@@ -14,6 +14,7 @@ type Source string
 
 const (
 	SourceGitHub       Source = "github"
+	SourceGitLab       Source = "gitlab"
 	SourceFlux         Source = "flux"
 	SourceArgoCD       Source = "argocd"
 	SourceHelm         Source = "helm"
@@ -24,7 +25,7 @@ const (
 )
 
 var validSources = map[Source]bool{
-	SourceGitHub: true, SourceFlux: true, SourceArgoCD: true, SourceHelm: true,
+	SourceGitHub: true, SourceGitLab: true, SourceFlux: true, SourceArgoCD: true, SourceHelm: true,
 	SourceTerraform: true, SourceManual: true, SourceGeneric: true, SourceAlertmanager: true,
 }
 

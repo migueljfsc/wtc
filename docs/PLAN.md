@@ -18,7 +18,7 @@ Lives at `docs/PLAN.md`. Each phase ≈ 1–3 Claude Code sessions. A phase is d
 | **P9 change-intelligence views** | ✅ 2026-07-15 | `where` pipeline, `diff` env-matrix (new `/matrix` endpoint), service detail (current versions + freq/failure-rate/MTBF), alert correlation (`around`) in the event drawer |
 | **P10 live + config surfaces** | ✅ 2026-07-15 | SSE live updates (`/api/v1/stream`, no-poll timeline/dashboard); Settings = source health + DB-backed editable rules/tag_patterns with hot-reload (`edit → next event re-routed`, no restart). Token management + multi-user auth stay out (RBAC non-goal) |
 | **P11 ArgoCD ingest** | ✅ 2026-07-16 | fixture-first vs live Argo v3.4.5 on kind; canonical template ships the contract (4 template gotchas found live); per-sync-operation dedup keys (failed→succeeded retry = two rows); new `degraded` status (rank 3, upserts terminal rows); env tiers label>ns>name-suffix live-verified; full join proven live: github push INTENT → argocd APPLIED, 23h lag |
-| **P12 GitLab ingest** | ⬜ planned | SCM/CI-axis neutrality proof (GitHub↔GitLab, as Flux↔Argo was for GitOps); poller parity + `X-Gitlab-Token` webhooks, pipeline/MR/push normalizers, MR-diff enrichment |
+| **P12 GitLab ingest** | ✅ 2026-07-16 | SCM/CI-axis neutrality proof (GitHub↔GitLab, as Flux↔Argo was for GitOps); poller + `X-Gitlab-Token` webhook converge on shared dedup keys (`gl:pipeline`/`gl:mr`/`gl:push`); pipeline/MR/push normalizers + MR-diff enrichment; env inference via shared path rules. Verified live on a gitlab.com project: `wtc where` spans pipeline BUILD → MR merge INTENT → Argo CD APPLIED (private repo via Argo credential) |
 | **P13 GitHub webhook completion** | ⬜ planned | reachability posture change (2026-07-16): webhook envelope parsing lands (fixtures via hook-deliveries API, no tunnel needed); poller and webhooks become peer modes |
 | **P14 Mapping webhook** | ⬜ planned | `/ingest/webhook/<name>`: config-declared auth + payload→Event template mapping + dedup_key template; shipped presets (Grafana, Jenkins, Harbor, TFC); doctor guards unstable keys |
 
@@ -250,6 +250,16 @@ tail** (any tool that POSTs JSON becomes config, not code), and
 reachability decision update above: wtc is designed as reachable from anywhere.
 
 ## Phase 12 — GitLab ingest
+
+**Shipped 2026-07-16.** Poller + `/ingest/gitlab` webhook, both converging on
+`gl:pipeline`/`gl:mr`/`gl:push` dedup keys; pipeline/MR/push normalizers +
+MR-diff enrichment; env inference via the shared path-glob rules. Golden
+fixtures (7 API + 3 webhook) with poller-twice + webhook-replay idempotency;
+capture helper extracted to `internal/capture` to keep ingest packages free of
+a `server` import. Verified live on a gitlab.com project: `wtc where
+sha-<sha>` spans pipeline BUILD → MR merge INTENT → Argo CD APPLIED (private
+repo pulled via an Argo repository credential). See
+[docs/setup/gitlab.md](setup/gitlab.md).
 
 The SCM/CI-axis neutrality proof, mirroring the P11 playbook: fixture-first
 against a stood-up instance (gitlab.com free project or docker `gitlab-ce`; the

@@ -1,57 +1,20 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
 
-	"github.com/migueljfsc/wtc/internal/model"
+	"github.com/migueljfsc/wtc/internal/capture"
 )
 
 // Capture mode (CLAUDE.md fixture-first workflow): when a capture directory
 // is configured, every raw ingest body plus its headers is dumped to disk so
 // real payloads can be frozen into testdata/ fixtures. Dev-only by design.
 
-// CaptureBody writes one raw payload under dir/<source>/. name should carry
-// the source-side identity (delivery id, repo+resource) — it is sanitized and
-// timestamped. Errors are returned, not fatal: capture must never break ingest.
+// CaptureBody is retained as the server-side spelling of capture.Body; the
+// implementation lives in internal/capture so ingest packages can capture
+// without importing server (avoiding an import cycle).
 func CaptureBody(dir, source, name string, headers map[string]string, body []byte) error {
-	sub := filepath.Join(dir, source)
-	if err := os.MkdirAll(sub, 0o750); err != nil {
-		return fmt.Errorf("capture mkdir: %w", err)
-	}
-	base := time.Now().UTC().Format("20060102T150405.000Z") + "-" + sanitizeFilename(name)
-
-	if err := os.WriteFile(filepath.Join(sub, base+".json"), body, 0o600); err != nil {
-		return fmt.Errorf("capture body: %w", err)
-	}
-	if len(headers) > 0 {
-		var b strings.Builder
-		for k, v := range headers {
-			fmt.Fprintf(&b, "%s: %s\n", k, v)
-		}
-		if err := os.WriteFile(filepath.Join(sub, base+".headers"), []byte(b.String()), 0o600); err != nil {
-			return fmt.Errorf("capture headers: %w", err)
-		}
-	}
-	return nil
-}
-
-func sanitizeFilename(s string) string {
-	if s == "" {
-		return model.NewID()
-	}
-	return strings.Map(func(r rune) rune {
-		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_', r == '.':
-			return r
-		default:
-			return '_'
-		}
-	}, s)
+	return capture.Body(dir, source, name, headers, body)
 }
 
 // capture dumps an incoming ingest request's body and interesting headers.

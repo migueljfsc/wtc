@@ -1,0 +1,80 @@
+[
+  {
+    "id": 2682908197,
+    "iid": 6,
+    "project_id": 84532466,
+    "sha": "fc4f6eb9e2b20994cdd143d93d2057ddbf39d6cc",
+    "ref": "main",
+    "status": "running",
+    "source": "push",
+    "created_at": "2026-07-16T20:10:41.128Z",
+    "updated_at": "2026-07-16T20:10:42.386Z",
+    "web_url": "https://gitlab.com/migueljfsc/wtc-demo-gitlab/-/pipelines/2682908197",
+    "name": null
+  },
+  {
+    "id": 2682903696,
+    "iid": 5,
+    "project_id": 84532466,
+    "sha": "c21a94b7160e486f9c3a2bf6118695c04e6629ce",
+    "ref": "main",
+    "status": "failed",
+    "source": "push",
+    "created_at": "2026-07-16T20:08:05.787Z",
+    "updated_at": "2026-07-16T20:08:39.867Z",
+    "web_url": "https://gitlab.com/migueljfsc/wtc-demo-gitlab/-/pipelines/2682903696",
+    "name": null
+  },
+  {
+    "id": 2682902699,
+    "iid": 4,
+    "project_id": 84532466,
+    "sha": "c8dc94ce80551cb4fb0770452bcc059833e22839",
+    "ref": "main",
+    "status": "success",
+    "source": "push",
+    "created_at": "2026-07-16T20:07:49.556Z",
+    "updated_at": "2026-07-16T20:08:32.745Z",
+    "web_url": "https://gitlab.com/migueljfsc/wtc-demo-gitlab/-/pipelines/2682902699",
+    "name": null
+  },
+  {
+    "id": 2682902640,
+    "iid": 3,
+    "project_id": 84532466,
+    "sha": "14f099315c8e1b58d1d634c80b905c3262f80cfb",
+    "ref": "bump-dev-190b65d7",
+    "status": "failed",
+    "source": "push",
+    "created_at": "2026-07-16T20:07:47.662Z",
+    "updated_at": "2026-07-16T20:07:55.340Z",
+    "web_url": "https://gitlab.com/migueljfsc/wtc-demo-gitlab/-/pipelines/2682902640",
+    "name": null
+  },
+  {
+    "id": 2682890363,
+    "iid": 2,
+    "project_id": 84532466,
+    "sha": "190b65d788aebbb7b76029da0c40ef4b69871620",
+    "ref": "main",
+    "status": "success",
+    "source": "api",
+    "created_at": "2026-07-16T20:04:09.290Z",
+    "updated_at": "2026-07-16T20:04:57.535Z",
+    "web_url": "https://gitlab.com/migueljfsc/wtc-demo-gitlab/-/pipelines/2682890363",
+    "name": null
+  },
+  {
+    "id": 2682885320,
+    "iid": 1,
+    "project_id": 84532466,
+    "sha": "190b65d788aebbb7b76029da0c40ef4b69871620",
+    "ref": "main",
+    "status": "failed",
+    "source": "push",
+    "created_at": "2026-07-16T20:01:51.349Z",
+    "updated_at": "2026-07-16T20:01:51.349Z",
+    "web_url": "https://gitlab.com/migueljfsc/wtc-demo-gitlab/-/pipelines/2682885320",
+    "name": null
+  }
+]
