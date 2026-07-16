@@ -18,6 +18,9 @@ Lives at `docs/PLAN.md`. Each phase ≈ 1–3 Claude Code sessions. A phase is d
 | **P9 change-intelligence views** | ✅ 2026-07-15 | `where` pipeline, `diff` env-matrix (new `/matrix` endpoint), service detail (current versions + freq/failure-rate/MTBF), alert correlation (`around`) in the event drawer |
 | **P10 live + config surfaces** | ✅ 2026-07-15 | SSE live updates (`/api/v1/stream`, no-poll timeline/dashboard); Settings = source health + DB-backed editable rules/tag_patterns with hot-reload (`edit → next event re-routed`, no restart). Token management + multi-user auth stay out (RBAC non-goal) |
 | **P11 ArgoCD ingest** | ✅ 2026-07-16 | fixture-first vs live Argo v3.4.5 on kind; canonical template ships the contract (4 template gotchas found live); per-sync-operation dedup keys (failed→succeeded retry = two rows); new `degraded` status (rank 3, upserts terminal rows); env tiers label>ns>name-suffix live-verified; full join proven live: github push INTENT → argocd APPLIED, 23h lag |
+| **P12 GitLab ingest** | ⬜ planned | SCM/CI-axis neutrality proof (GitHub↔GitLab, as Flux↔Argo was for GitOps); poller parity + `X-Gitlab-Token` webhooks, pipeline/MR/push normalizers, MR-diff enrichment |
+| **P13 GitHub webhook completion** | ⬜ planned | reachability posture change (2026-07-16): webhook envelope parsing lands (fixtures via hook-deliveries API, no tunnel needed); poller and webhooks become peer modes |
+| **P14 Mapping webhook** | ⬜ planned | `/ingest/webhook/<name>`: config-declared auth + payload→Event template mapping + dedup_key template; shipped presets (Grafana, Jenkins, Harbor, TFC); doctor guards unstable keys |
 
 Unplanned addition: `demo/` — three dummy services + fake three-cluster Flux
 wiring generating real events continuously (operator-requested test bed;
@@ -43,6 +46,14 @@ single-binary embedding are explicitly NOT requirements for the portal.
 | Q5 | Terraform runs in CI only — `wtc wrap` terraform support targets non-interactive CI usage (`WTC_SERVER`/`WTC_API_TOKEN` env config). |
 | Q6 | Flux v2.x confirmed: notification-controller with Provider/Alert CRDs, `generic-hmac`, image-automation on dev. |
 | Q7 | Packaging: Helm chart (in-cluster, primary) + docker-compose (VMs/local). No systemd unit in v1. |
+
+**Decision update (2026-07-16, operator):** Q3's "no public endpoint" describes
+the operator's own deployment, not the product. wtc is designed **as if
+reachable from anywhere** — each installation chooses its exposure. Consequences:
+GitHub webhook mode is completed as a first-class peer of the poller (P13); the
+mapping webhook (P14) may target SaaS senders; the poller remains the
+recommended default for private deployments and keeps its sweeper role
+regardless.
 
 ## Phase 0 — Skeleton (foundation)
 
@@ -227,3 +238,91 @@ Vendor neutrality is the product (CLAUDE.md mission). Flux and Argo CD are the t
 **Live-validation addenda (found in stage 3, fixed same day):**
 - Row keys are per sync **operation** (`argocd:<app>:<revision>:<startedAt>`), not per (app,revision): with equal-rank terminal statuses, a revision-keyed row made a failed→succeeded retry of the same revision permanently invisible. A retry is a new logical change (trap #5); Flux gets the same separation via `reason` in its key.
 - Argo's notified-annotation gating cuts both ways: it re-fires on observed state flips (suppression window handles the spam) but sends nothing for transitions it never observed — a same-revision resync can be legitimately missed; documented as an Argo-side limitation (known trap #10).
+
+---
+
+# Ingest breadth track (P12–P14, operator decision 2026-07-16)
+
+Ingest strategy by layer: **parsers for the top two per category** (SCM/CI:
+GitHub + GitLab; GitOps: Flux + Argo — done), a **mapping webhook for the long
+tail** (any tool that POSTs JSON becomes config, not code), and
+`/ingest/generic` when the operator owns the sender. Underpinned by the
+reachability decision update above: wtc is designed as reachable from anywhere.
+
+## Phase 12 — GitLab ingest
+
+The SCM/CI-axis neutrality proof, mirroring the P11 playbook: fixture-first
+against a stood-up instance (gitlab.com free project or docker `gitlab-ce`; the
+operator's stack is GitHub-only, so this is not their infra).
+
+Poller parity with GitHub (SPEC §7 shape): per-project watermarks over
+pipelines, merged MRs, default-branch commits; bounded first-run backfill;
+doubles as the webhook-loss sweeper. Webhook receiver `/ingest/gitlab`
+verifying GitLab's static `X-Gitlab-Token` header (constant-time; GitLab does
+not HMAC-sign — same auth shape as argocd) covering Pipeline / Push / Merge
+Request hooks. Status-upsert lifecycle keyed on pipeline id (same trap-#5 shape
+as `workflow_run`). MR-diff enrichment via the MR changes API (the §7 analog
+that links tag bumps to manifest revisions). Facts/rules parity: repo, branch,
+event, paths, actor. Dedup keys `gl:…` added to the SPEC §1 table.
+
+**Accept:** golden fixtures ≥6 across poller + webhook shapes (pipeline
+started/success/failure, merged MR, push, unknown-paths case → `env=""`);
+poller-twice / webhook-replay = one row; a GitLab-hosted flow visible
+end-to-end — pipeline → MR merge → Flux or Argo applying the same revision —
+with `wtc where` spanning it; `docs/setup/gitlab.md` wires a real project using
+only the docs.
+
+## Phase 13 — GitHub webhook completion (reachability posture)
+
+Per the 2026-07-16 decision update: exposure is per-installation, so the
+P1-deferred webhook envelope parsing lands and the poller/webhook pair becomes
+two peer modes of one source.
+
+Capture real webhook payloads via the **hook-deliveries API** — a registered
+hook records delivery request bodies even when its target URL 404s, so no
+tunnel is needed — freeze fixtures, then parse envelopes for `workflow_run` /
+`push` / `pull_request` into the existing normalizers. REST and webhook shapes
+must converge on the same Events and dedup keys, so both modes can run
+simultaneously (webhooks for latency, poller as the loss-recovery sweeper —
+idempotent by design). Docs rework: `github-webhook.md` graduates from
+capture-only to full wiring; a posture guide (private → poller-primary;
+public → webhooks + sweeper) added to onboarding.
+
+**Accept:** webhook fixtures for the three event families; webhook replay +
+poller double-ingest = one row each; a live delivery lands in `wtc log` within
+seconds where the poller alone would take a poll interval; both modes running
+together produce zero duplicates over a real day of activity.
+
+## Phase 14 — Mapping webhook (long-tail ingest)
+
+`/ingest/webhook/<name>` — operator-declared sources in config: auth (static
+token header, or HMAC where the sender signs), a payload→Event field mapping
+(go-template over the parsed JSON body — the same template engine rules `set:`
+uses), a `dedup_key` template, and optional facts feeding the rules engine.
+Mapped events enter the standard pipeline (redaction → rules → status-rank
+upsert), so lifecycle transitions work when a sender emits phase updates.
+
+Shipped **presets** — mapping + fixtures, tested like any parser: Grafana
+alerting, Jenkins notification plugin, Harbor, Terraform Cloud run
+notifications (SaaS senders in scope per P13's posture). Capture mode is the
+authoring loop for novel tools: point the tool at wtc, read the captured body,
+write the mapping.
+
+Guardrails: `dedup_key` templates are the footgun (an unstable key silently
+breaks idempotency) — doctor gains a per-webhook-source duplicate-churn
+heuristic; template eval errors surface in doctor, never guessed. Decide at
+build time whether `/ingest/generic` folds in or stays separate (leaning
+separate — it is the "you own the sender" path and needs no mapping).
+
+**Accept:** an unmodified third-party payload (fixture) ingests via a
+config-only mapping with correct kind/status/dedup lifecycle; a deliberately
+unstable dedup_key template is flagged by doctor; ≥2 shipped presets validated
+against live tools; `docs/setup/mapping-webhook.md` lets an operator wire a
+novel tool using only capture mode + the doc.
+
+### Sequencing (P12–P14)
+
+Independent of each other and of the UI track. P13 is the smallest and touches
+only existing github code — good gap-filler. P12 is the biggest neutrality win
+and next by default. P14 last: its presets benefit from the P13 posture docs,
+and doctor's churn heuristic is easier once two SCM sources exercise it.
