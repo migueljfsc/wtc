@@ -40,6 +40,17 @@ headers (`raw/` is gitignored). Fixtures here are curated copies:
   triggeredBy) — no field in that list carries Application labels, and the
   "env app label" inference tier is untestable without it; flagged for
   operator confirmation before the parser stage.
+- `gitlab/api/` — poller REST responses from a real gitlab.com project
+  (`migueljfsc/wtc-demo-gitlab`, GitLab 19.x): pipeline detail
+  success/failed, the sparse pipelines list, merged MRs, an MR *changes* diff
+  carrying the kustomize `newTag` bump (`sha-0000000`→`sha-190b65d7`), a
+  commit, all captured via `curl` with `PRIVATE-TOKEN`.
+- `gitlab/webhook/` — Pipeline / Merge Request / Push hook bodies read back
+  from the project **hook-events log** (`GET
+  /projects/:id/hooks/:id/events` — GitLab records the real request body even
+  when delivery to an unreachable URL fails, so no tunnel is needed;
+  `X-Gitlab-Token` comes back `[REDACTED]`, never a secret on disk).
+  `push_root_only.json` touches only a root file → the `env=""` case.
 
 ## Gaps (deliberate)
 

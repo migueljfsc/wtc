@@ -31,7 +31,7 @@ func TestEventValidate(t *testing.T) {
 		{"missing ingested_at", func(e *Event) { e.IngestedAt = time.Time{} }, "ingested_at is required"},
 		{"missing title", func(e *Event) { e.Title = "" }, "title is required"},
 		{"missing dedup_key", func(e *Event) { e.DedupKey = "" }, "dedup_key is required"},
-		{"bad source", func(e *Event) { e.Source = "gitlab" }, "invalid source"},
+		{"bad source", func(e *Event) { e.Source = "bitbucket" }, "invalid source"},
 		{"bad kind", func(e *Event) { e.Kind = "release" }, "invalid kind"},
 		{"bad status", func(e *Event) { e.Status = "done" }, "invalid status"},
 	}

@@ -57,6 +57,9 @@ Upsert rule: `INSERT ... ON CONFLICT(dedup_key) DO UPDATE` — only when the inc
 - github workflow_run → `gh:run:<repo>:<run_id>:<run_attempt>`
 - github pull_request merged → `gh:pr:<repo>:<number>:merged`
 - github push → `gh:push:<repo>:<after_sha>`
+- gitlab pipeline → `gl:pipeline:<project>:<pipeline_id>` — the pipeline id is stable across queued→running→completed, so one row is upserted through the lifecycle (trap #5). A *retried* pipeline gets a new id from GitLab and is a truthful second row (a job-retry keeps the id and upserts the one row). `<project>` is the `path_with_namespace`.
+- gitlab merge_request merged → `gl:mr:<project>:<iid>:merged`
+- gitlab push → `gl:push:<project>:<commit_sha>` — one event per commit, so a push webhook and the poller's commit list coalesce on the same key.
 - flux → `flux:<cluster>:<kind>/<ns>/<name>:<revision>:<reason>`
 - argocd → `argocd:<app>:<revision>:<startedAt>` (RFC3339 UTC) — one row per sync **operation**, which is trap #5's "logical change" for Argo: a retry of the same revision IS a new change and the ledger shows both attempts. Keying on (app, revision) alone freezes rows — a Failed sync followed by a Succeeded retry of the same revision can never update (equal terminal ranks never overwrite; found live). Within one operation startedAt is constant, so Running→Succeeded/Error still upserts a single row; health-degraded carries the previous operation's startedAt and lands on that row. A zero startedAt (pre-first-sync health events) omits the segment. The suppression-window key appends `:<phase|Degraded>`; the window plus Argo's own trigger-hash gating (`notified.notifications.argoproj.io` annotation) bound beyond-window resync rows.
 - wrap/record → `local:<ulid>` generated at start, reused for the completion update (a `wtc record` retry without an explicit `--dedup-key` is a NEW event)
@@ -87,6 +90,16 @@ sources:
       - org/app-api
       - org/app-web
     infra_path: infrastructure/          # per-repo manifests dir (microservices layout)
+
+  gitlab:                                # SCM/CI-axis peer of github (P12)
+    base_url: https://gitlab.com         # instance root; set for self-managed GitLab
+    webhook_secret: ${WTC_GITLAB_WEBHOOK_SECRET}  # static X-Gitlab-Token (GitLab can't HMAC-sign bodies) — same shape as argocd
+    api_token: ${WTC_GITLAB_API_TOKEN}   # PRIVATE-TOKEN; enables the poller (primary when private) + MR-diff enrichment
+    poll_interval: 60s                   # 0 disables the poller (webhook-only mode)
+    projects:                            # poller scope, group/service paths (no auto-discovery analog)
+      - group/app-api
+      - group/app-web
+    infra_path: infrastructure/          # per-project manifests dir (microservices layout)
 
   flux:
     hmac_key: ${WTC_FLUX_HMAC_KEY}
@@ -266,6 +279,10 @@ Per source: last event age, 24h counts, dedup-drop counts, unmapped (`env=""`) c
 **Poller — primary ingest when wtc has no public endpoint.** Every `poll_interval`, for each configured repo: list workflow runs, merged PRs, and default-branch commits since the per-repo high-water mark (persisted in the DB); normalize through the same parsers and rules pipeline as webhooks. Idempotent via dedup_key, so poller and webhooks can run simultaneously — the poller doubles as the webhook-loss sweeper. First run backfills a bounded window (default 24h).
 
 **PR-diff enrichment.** On merged PRs touching `infra_path`: fetch changed files, extract image-tag bumps via configurable regexes (defaults: `tag:\s*["']?(?P<new>\S+)` on YAML, `newTag:\s*(?P<new>\S+)` for kustomize), store old→new tags in payload. This creates the tag↔manifest-revision link that `where` step 2/3 depends on. Diff bodies beyond matched lines are not stored.
+
+### 7a. GitLab API integration (requires `sources.gitlab.api_token`)
+
+Parity with the GitHub poller on the SCM/CI axis (P12). Every `poll_interval`, for each configured project (`group/service` path): list pipelines, merged MRs, and default-branch commits since the per-project high-water mark; normalize through the same parsers + rules pipeline as the `/ingest/gitlab` webhook, so the two modes converge on identical Events + dedup keys and the poller doubles as the webhook-loss sweeper. First run backfills 24h; each poll re-reads a 1h overlap. Pipeline list items are sparse, so each in-window pipeline gets one detail fetch (finished_at/duration/actor). Auth is `PRIVATE-TOKEN`; `base_url` targets self-managed instances. **MR-diff enrichment** uses the MR *changes* API (same bump regexes as GitHub) to attach real paths + image bumps to the merge event.
 
 ## 8. Retention
 

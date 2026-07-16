@@ -89,6 +89,19 @@ type GitHub struct {
 	InfraPath     string   `yaml:"infra_path"`     // per-repo manifests dir (microservices layout)
 }
 
+// GitLab configures the GitLab ingest paths (SPEC §2, P12) — the SCM/CI-axis
+// neutrality peer of GitHub. The poller is the primary path for private
+// deployments; the webhook needs a public endpoint. BaseURL targets
+// self-managed instances (empty = gitlab.com).
+type GitLab struct {
+	BaseURL       string   `yaml:"base_url"`       // instance root; empty = https://gitlab.com
+	WebhookSecret string   `yaml:"webhook_secret"` // enables /ingest/gitlab X-Gitlab-Token verification
+	APIToken      string   `yaml:"api_token"`      // enables the poller + MR-diff enrichment (PRIVATE-TOKEN)
+	PollInterval  Duration `yaml:"poll_interval"`  // 0 disables the poller (webhook-only mode)
+	Projects      []string `yaml:"projects"`       // poller scope, group/service paths (no auto-discovery)
+	InfraPath     string   `yaml:"infra_path"`     // per-project manifests dir (microservices layout)
+}
+
 // Flux configures the notification-controller ingest path (SPEC §2).
 type Flux struct {
 	HMACKey           string   `yaml:"hmac_key"`           // generic-hmac provider shared key
@@ -107,6 +120,7 @@ type ArgoCD struct {
 // Sources groups per-source ingest configuration.
 type Sources struct {
 	GitHub GitHub `yaml:"github"`
+	GitLab GitLab `yaml:"gitlab"`
 	Flux   Flux   `yaml:"flux"`
 	ArgoCD ArgoCD `yaml:"argocd"`
 }
@@ -151,6 +165,10 @@ func Default() Config {
 		},
 		Sources: Sources{
 			GitHub: GitHub{
+				PollInterval: Duration(60 * time.Second),
+				InfraPath:    "infrastructure/",
+			},
+			GitLab: GitLab{
 				PollInterval: Duration(60 * time.Second),
 				InfraPath:    "infrastructure/",
 			},
@@ -281,6 +299,9 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	set(&cfg.Sources.GitHub.APIToken, "WTC_GH_API_TOKEN")
 	set(&cfg.Sources.GitHub.WebhookSecret, "WTC_GH_WEBHOOK_SECRET")
+	set(&cfg.Sources.GitLab.APIToken, "WTC_GITLAB_API_TOKEN")
+	set(&cfg.Sources.GitLab.WebhookSecret, "WTC_GITLAB_WEBHOOK_SECRET")
+	set(&cfg.Sources.GitLab.BaseURL, "WTC_GITLAB_BASE_URL")
 	set(&cfg.Sources.Flux.HMACKey, "WTC_FLUX_HMAC_KEY")
 	set(&cfg.Sources.ArgoCD.WebhookSecret, "WTC_ARGOCD_WEBHOOK_SECRET")
 	set(&cfg.Digest.SlackWebhook, "WTC_SLACK_WEBHOOK")

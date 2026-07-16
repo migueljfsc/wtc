@@ -4,6 +4,41 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 12 (GitLab ingest)
+
+- **GitLab as the SCM/CI-axis neutrality peer of GitHub** (mirroring Flux↔Argo
+  for GitOps). Both ingest modes converge on the same Events and dedup keys, so
+  the poller doubles as the webhook-loss sweeper exactly like GitHub.
+- **API poller** (`sources.gitlab`, primary for private deploys) — per-project
+  watermarks over pipelines, merged MRs, and default-branch commits; bounded
+  24h first-run backfill with a 1h re-read overlap. Pipeline list items are
+  sparse, so each in-window pipeline gets a detail fetch for
+  finished_at/duration/actor. `base_url` targets self-managed instances (empty
+  = gitlab.com); `PRIVATE-TOKEN` auth.
+- **`POST /ingest/gitlab`** — the peer webhook mode covering Pipeline / Push /
+  Merge Request hooks. GitLab does not HMAC-sign bodies (it sends the secret
+  verbatim), so auth is a constant-time compare of `X-Gitlab-Token`
+  (`sources.gitlab.webhook_secret`) — the same shape as `/ingest/argocd`. A
+  push hook fans out to one event per commit; a non-merge MR action is
+  acknowledged and dropped.
+- **Dedup keys** (SPEC §1): `gl:pipeline:<project>:<id>` (the pipeline id is
+  stable across queued→running→completed — one row upserted through the
+  lifecycle, trap #5; a *retried* pipeline gets a fresh id and is a truthful
+  second row), `gl:mr:<project>:<iid>:merged`, `gl:push:<project>:<sha>`. The
+  project `path_with_namespace` plays GitHub's `owner/repo` role.
+- **MR-diff enrichment** (SPEC §7 analog) via the MR changes API — real changed
+  paths (env inference for promotion MRs) + kustomize/yaml image-tag bumps
+  (the tag↔revision link `wtc where` traverses). Reuses the GitHub bump
+  patterns; only matched lines stored, never diff bodies.
+- **Facts/rules parity** — `source: gitlab` with repo/branch/event/paths/actor,
+  so the same path-glob env rules that route GitHub route GitLab. Revert MRs
+  land as `kind=rollback`.
+- Verified end-to-end against a real gitlab.com project: `wtc where
+  sha-<sha>` spans GitLab pipeline (BUILD) → MR merge (INTENT, from the
+  enriched bump payload) → Argo CD sync (APPLIED). `docs/setup/gitlab.md` wires
+  a real project using only the docs. Capture helper extracted to
+  `internal/capture` so ingest packages capture without importing `server`.
+
 ### Added — Phase 11 (ArgoCD ingest)
 
 - **`POST /ingest/argocd`** — second GitOps engine alongside Flux (the

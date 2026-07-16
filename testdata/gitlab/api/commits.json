@@ -1,0 +1,96 @@
+[
+  {
+    "id": "fc4f6eb9e2b20994cdd143d93d2057ddbf39d6cc",
+    "short_id": "fc4f6eb9",
+    "created_at": "2026-07-16T20:10:39.000+00:00",
+    "parent_ids": [
+      "c21a94b7160e486f9c3a2bf6118695c04e6629ce"
+    ],
+    "title": "revert: remove FAIL marker",
+    "message": "revert: remove FAIL marker",
+    "author_name": "claude",
+    "author_email": "project_84532466_bot_5b0e1601bad329d23294de81abe11e0b@noreply.gitlab.com",
+    "authored_date": "2026-07-16T20:10:39.000+00:00",
+    "committer_name": "claude",
+    "committer_email": "project_84532466_bot_5b0e1601bad329d23294de81abe11e0b@noreply.gitlab.com",
+    "committed_date": "2026-07-16T20:10:39.000+00:00",
+    "trailers": {},
+    "extended_trailers": {},
+    "web_url": "https://gitlab.com/migueljfsc/wtc-demo-gitlab/-/commit/fc4f6eb9e2b20994cdd143d93d2057ddbf39d6cc"
+  },
+  {
+    "id": "c21a94b7160e486f9c3a2bf6118695c04e6629ce",
+    "short_id": "c21a94b7",
+    "created_at": "2026-07-16T20:08:04.000+00:00",
+    "parent_ids": [
+      "c8dc94ce80551cb4fb0770452bcc059833e22839"
+    ],
+    "title": "test: trigger failing pipeline (FAIL marker)",
+    "message": "test: trigger failing pipeline (FAIL marker)",
+    "author_name": "claude",
+    "author_email": "project_84532466_bot_5b0e1601bad329d23294de81abe11e0b@noreply.gitlab.com",
+    "authored_date": "2026-07-16T20:08:04.000+00:00",
+    "committer_name": "claude",
+    "committer_email": "project_84532466_bot_5b0e1601bad329d23294de81abe11e0b@noreply.gitlab.com",
+    "committed_date": "2026-07-16T20:08:04.000+00:00",
+    "trailers": {},
+    "extended_trailers": {},
+    "web_url": "https://gitlab.com/migueljfsc/wtc-demo-gitlab/-/commit/c21a94b7160e486f9c3a2bf6118695c04e6629ce"
+  },
+  {
+    "id": "c8dc94ce80551cb4fb0770452bcc059833e22839",
+    "short_id": "c8dc94ce",
+    "created_at": "2026-07-16T20:07:47.000+00:00",
+    "parent_ids": [
+      "190b65d788aebbb7b76029da0c40ef4b69871620",
+      "14f099315c8e1b58d1d634c80b905c3262f80cfb"
+    ],
+    "title": "Merge branch 'bump-dev-190b65d7' into 'main'",
+    "message": "Merge branch 'bump-dev-190b65d7' into 'main'\n\nchore(dev): bump image to sha-190b65d7\n\nSee merge request migueljfsc/wtc-demo-gitlab!1",
+    "author_name": "claude",
+    "author_email": "project_84532466_bot_5b0e1601bad329d23294de81abe11e0b@noreply.gitlab.com",
+    "authored_date": "2026-07-16T20:07:47.000+00:00",
+    "committer_name": "claude",
+    "committer_email": "project_84532466_bot_5b0e1601bad329d23294de81abe11e0b@noreply.gitlab.com",
+    "committed_date": "2026-07-16T20:07:47.000+00:00",
+    "trailers": {},
+    "extended_trailers": {},
+    "web_url": "https://gitlab.com/migueljfsc/wtc-demo-gitlab/-/commit/c8dc94ce80551cb4fb0770452bcc059833e22839"
+  },
+  {
+    "id": "14f099315c8e1b58d1d634c80b905c3262f80cfb",
+    "short_id": "14f09931",
+    "created_at": "2026-07-16T20:07:11.000+00:00",
+    "parent_ids": [
+      "190b65d788aebbb7b76029da0c40ef4b69871620"
+    ],
+    "title": "chore(dev): bump image to sha-190b65d7",
+    "message": "chore(dev): bump image to sha-190b65d7",
+    "author_name": "claude",
+    "author_email": "project_84532466_bot_5b0e1601bad329d23294de81abe11e0b@noreply.gitlab.com",
+    "authored_date": "2026-07-16T20:07:11.000+00:00",
+    "committer_name": "claude",
+    "committer_email": "project_84532466_bot_5b0e1601bad329d23294de81abe11e0b@noreply.gitlab.com",
+    "committed_date": "2026-07-16T20:07:11.000+00:00",
+    "trailers": {},
+    "extended_trailers": {},
+    "web_url": "https://gitlab.com/migueljfsc/wtc-demo-gitlab/-/commit/14f099315c8e1b58d1d634c80b905c3262f80cfb"
+  },
+  {
+    "id": "190b65d788aebbb7b76029da0c40ef4b69871620",
+    "short_id": "190b65d7",
+    "created_at": "2026-07-16T21:01:35.000+01:00",
+    "parent_ids": [],
+    "title": "feat: initial demo service — app, CI, kustomize overlays",
+    "message": "feat: initial demo service — app, CI, kustomize overlays\n",
+    "author_name": "Miguel Cardoso",
+    "author_email": "migueljfscardoso@gmail.com",
+    "authored_date": "2026-07-16T20:54:22.000+01:00",
+    "committer_name": "Miguel Cardoso",
+    "committer_email": "migueljfscardoso@gmail.com",
+    "committed_date": "2026-07-16T21:01:35.000+01:00",
+    "trailers": {},
+    "extended_trailers": {},
+    "web_url": "https://gitlab.com/migueljfsc/wtc-demo-gitlab/-/commit/190b65d788aebbb7b76029da0c40ef4b69871620"
+  }
+]

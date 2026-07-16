@@ -30,6 +30,11 @@ type Options struct {
 	// endpoint rejects everything (fail closed). Argo's notification
 	// templates cannot HMAC-sign the body like Flux's generic-hmac provider.
 	ArgoCDWebhookToken string
+	// GitLabWebhookToken enables /ingest/gitlab static shared-secret
+	// verification (X-Gitlab-Token, constant-time compare); empty means the
+	// endpoint rejects everything (fail closed). GitLab does not HMAC-sign
+	// webhook bodies — same auth shape as argocd.
+	GitLabWebhookToken string
 	// FluxSuppression drops repeats of the same flux dedup key inside this
 	// window (trap #1). <= 0 disables.
 	FluxSuppression time.Duration
@@ -61,6 +66,7 @@ type Server struct {
 	webhookSecret      string
 	fluxHMACKey        string
 	argocdWebhookToken string
+	gitlabWebhookToken string
 	fluxSuppressor     *flux.Suppressor
 	argocdSuppressor   *flux.Suppressor // same window mechanism; keys are argocd-shaped
 	engine             *normalize.EngineHolder
@@ -103,6 +109,7 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 		webhookSecret:      opts.GitHubWebhookSecret,
 		fluxHMACKey:        opts.FluxHMACKey,
 		argocdWebhookToken: opts.ArgoCDWebhookToken,
+		gitlabWebhookToken: opts.GitLabWebhookToken,
 		fluxSuppressor:     flux.NewSuppressor(opts.FluxSuppression),
 		argocdSuppressor:   flux.NewSuppressor(opts.ArgoCDSuppression),
 		engine:             engine,
@@ -136,6 +143,7 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 	s.mux.HandleFunc("POST /ingest/github", s.handleIngestGitHub) // HMAC-verified inside
 	s.mux.HandleFunc("POST /ingest/flux", s.handleIngestFlux)     // HMAC-verified inside
 	s.mux.HandleFunc("POST /ingest/argocd", s.handleIngestArgoCD) // token-verified inside
+	s.mux.HandleFunc("POST /ingest/gitlab", s.handleIngestGitLab) // token-verified inside
 
 	// Query API. Every route is registered under both the legacy /api prefix
 	// (CLI client + embedded web depend on it) and the versioned /api/v1

@@ -7,10 +7,14 @@ GitOps engine(s) deploy your workloads — **Flux** (Step 4), **Argo CD**
 step below marks what belongs to which. By the end, `wtc log` and the portal
 show real builds, merges, and deploys.
 
+This guide wires GitHub, but the SCM/CI layer is vendor-neutral too: **GitLab**
+is a first-class peer (poller + webhook, same Events and queries) — see
+[gitlab.md](gitlab.md) to wire it instead of, or alongside, GitHub.
+
 For deeper reference on each source see
-[github-poller.md](github-poller.md), [flux.md](flux.md), and
-[argocd.md](argocd.md); this guide is the happy path that ties them together
-with the chart.
+[github-poller.md](github-poller.md), [gitlab.md](gitlab.md),
+[flux.md](flux.md), and [argocd.md](argocd.md); this guide is the happy path
+that ties them together with the chart.
 
 ## How the pieces fit
 
