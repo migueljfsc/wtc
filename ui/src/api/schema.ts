@@ -432,6 +432,23 @@ export interface components {
             unmapped_samples?: string[];
             clock_skew_24h: number;
             poll?: components["schemas"]["PollState"][];
+            /** @description Mapping-webhook sources with a probable unstable dedup_key (P14 heuristic). */
+            webhook_churn?: components["schemas"]["WebhookChurn"][];
+            /** @description Recent per-source mapping-template eval failures (P14). */
+            webhook_mapping_errors?: components["schemas"]["WebhookMappingError"][];
+        };
+        WebhookChurn: {
+            source: string;
+            title: string;
+            rows: number;
+            window_s: number;
+        };
+        WebhookMappingError: {
+            source: string;
+            count: number;
+            last_error: string;
+            /** Format: date-time */
+            last_at: string;
         };
         ActivityBucket: {
             /** @description Bucket start (UTC): YYYY-MM-DD for day, YYYY-MM-DDThh:00 for hour. */
