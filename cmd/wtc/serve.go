@@ -16,6 +16,8 @@ import (
 	"github.com/migueljfsc/wtc/internal/config"
 	"github.com/migueljfsc/wtc/internal/ingest/github"
 	"github.com/migueljfsc/wtc/internal/ingest/gitlab"
+	"github.com/migueljfsc/wtc/internal/ingest/mapping"
+	"github.com/migueljfsc/wtc/internal/model"
 	"github.com/migueljfsc/wtc/internal/normalize"
 	"github.com/migueljfsc/wtc/internal/server"
 	"github.com/migueljfsc/wtc/internal/store"
@@ -87,6 +89,21 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 		effectiveTagPatterns = normalize.DefaultTagPatterns
 	}
 
+	// Mapping webhooks (P14) — compile config-declared sources; template/config
+	// errors surface at startup. Each name is registered as a first-class source
+	// so it appears under its real name in log/facets/doctor.
+	mappers, err := mapping.Compile(cfg.Sources.Webhooks)
+	if err != nil {
+		_ = st.Close()
+		return fmt.Errorf("mapping webhooks: %w", err)
+	}
+	for name := range mappers {
+		model.RegisterSource(model.Source(name))
+	}
+	if len(mappers) > 0 {
+		log.Info("mapping webhooks enabled", "count", len(mappers))
+	}
+
 	// Hot-reloadable holders (P10) — shared by the server AND the poller so a
 	// live rule edit re-routes every ingest path. server.New applies any DB
 	// overrides on top, swapping these before ingest starts.
@@ -109,6 +126,7 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 			CORSAllowedOrigins:  cfg.Server.CORS.AllowedOrigins,
 			Rules:               cfg.Rules,
 			TagPatterns:         effectiveTagPatterns,
+			Mappers:             mappers,
 		}, log).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

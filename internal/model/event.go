@@ -4,6 +4,7 @@ package model
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -29,8 +30,41 @@ var validSources = map[Source]bool{
 	SourceTerraform: true, SourceManual: true, SourceGeneric: true, SourceAlertmanager: true,
 }
 
-// ValidSource reports whether s is a known source.
-func ValidSource(s Source) bool { return validSources[s] }
+// registeredSources holds operator-declared mapping-webhook source names
+// (P14). Each configured `sources.webhooks[].name` becomes a first-class source
+// so it appears under its real name in `wtc log --source <name>`, facets, and
+// doctor per-source health — the vendor-neutral UX. Populated once at config
+// load, before serving; the RWMutex keeps ValidSource race-safe if a future
+// caller ever registers concurrently.
+var (
+	registeredMu    sync.RWMutex
+	registeredNames = map[Source]bool{}
+)
+
+// RegisterSource marks name as a valid source in addition to the built-in
+// enum. Idempotent. Intended for mapping-webhook names declared in trusted
+// config (never from untrusted request bodies).
+func RegisterSource(name Source) {
+	registeredMu.Lock()
+	registeredNames[name] = true
+	registeredMu.Unlock()
+}
+
+// BuiltinSource reports whether s is one of the compiled-in sources (not a
+// registered mapping-webhook name). Used to reject a webhook name that would
+// shadow a first-class ingest path.
+func BuiltinSource(s Source) bool { return validSources[s] }
+
+// ValidSource reports whether s is a known built-in or registered source.
+func ValidSource(s Source) bool {
+	if validSources[s] {
+		return true
+	}
+	registeredMu.RLock()
+	ok := registeredNames[s]
+	registeredMu.RUnlock()
+	return ok
+}
 
 // Kind classifies what a change event represents. See SPEC §1 for semantics.
 type Kind string

@@ -1,0 +1,15 @@
+# Jenkins Notification Plugin (tikal/jenkins-notification-plugin) JSON webhook.
+# Configure the job's "Job Notifications" with a JSON endpoint pointing at
+# /ingest/webhook/<name> and a static header carrying your token.
+# One row per build: STARTED -> started, COMPLETED/FINALIZED upsert to the
+# terminal status keyed on job name + build number.
+dedup_key: 'jenkins:{{ .name }}:{{ .build.number }}'
+mapping:
+  kind: build
+  status: '{{ if or (eq .build.phase "STARTED") (eq .build.phase "QUEUED") }}started{{ else if eq .build.status "SUCCESS" }}succeeded{{ else if eq .build.status "FAILURE" }}failed{{ else }}unknown{{ end }}'
+  title: 'Jenkins {{ .name }} #{{ .build.number }}'
+  url: '{{ .build.full_url }}'
+  ref: '{{ .build.scm.commit }}'
+facts:
+  branch: '{{ .build.scm.branch }}'
+  repo: '{{ .name }}'

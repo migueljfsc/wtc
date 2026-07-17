@@ -24,18 +24,42 @@ type PollState struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// WebhookChurn flags a likely-unstable mapping-webhook dedup_key (P14): rows
+// sharing (source, title, kind, status) that landed inside a tight window but
+// under DISTINCT dedup_keys — the signature of a sender retrying with a key
+// that varies per delivery (e.g. embeds a timestamp). Legitimate distinct
+// changes do not cluster this tightly. Heuristic, meant to be eyeballed.
+type WebhookChurn struct {
+	Source  string `json:"source"`
+	Title   string `json:"title"`
+	Rows    int    `json:"rows"`     // distinct dedup_keys in the cluster
+	WindowS int    `json:"window_s"` // seconds the cluster spans
+}
+
+// WebhookMappingError is a per-source count of recent mapping-template eval
+// failures (P14 guardrail). Populated by the server (in-memory), merged into
+// the doctor report — a mapping error must surface, never be guessed at.
+type WebhookMappingError struct {
+	Source    string    `json:"source"`
+	Count     int       `json:"count"`
+	LastError string    `json:"last_error"`
+	LastAt    time.Time `json:"last_at"`
+}
+
 // DoctorReport is the /api/doctor payload (SPEC §6). OldestEvent lets an
 // operator eyeball retention (how far back the ledger reaches vs. keep); a
 // dedup-drop counter is still not tracked.
 type DoctorReport struct {
-	TotalEvents     int64          `json:"total_events"`
-	DBSizeBytes     int64          `json:"db_size_bytes"`
-	OldestEvent     *time.Time     `json:"oldest_event,omitempty"` // nil on an empty ledger
-	Sources         []SourceHealth `json:"sources"`
-	Unmapped24h     int            `json:"unmapped_24h"`
-	UnmappedSamples []string       `json:"unmapped_samples,omitempty"`
-	ClockSkew24h    int            `json:"clock_skew_24h"`
-	Poll            []PollState    `json:"poll,omitempty"`
+	TotalEvents          int64                 `json:"total_events"`
+	DBSizeBytes          int64                 `json:"db_size_bytes"`
+	OldestEvent          *time.Time            `json:"oldest_event,omitempty"` // nil on an empty ledger
+	Sources              []SourceHealth        `json:"sources"`
+	Unmapped24h          int                   `json:"unmapped_24h"`
+	UnmappedSamples      []string              `json:"unmapped_samples,omitempty"`
+	ClockSkew24h         int                   `json:"clock_skew_24h"`
+	Poll                 []PollState           `json:"poll,omitempty"`
+	WebhookChurn         []WebhookChurn        `json:"webhook_churn,omitempty"`          // P14 unstable dedup_key heuristic
+	WebhookMappingErrors []WebhookMappingError `json:"webhook_mapping_errors,omitempty"` // P14 recent template eval failures
 }
 
 // Doctor gathers source health from the read pool (poll state from writeDB,
@@ -147,5 +171,51 @@ WHERE ts >= ? AND ABS(julianday(ts) - julianday(ingested_at)) > 10.0/1440.0`, da
 		return nil, fmt.Errorf("doctor: poll state: %w", err)
 	}
 
+	if err := s.webhookChurn(ctx, r, dayAgo); err != nil {
+		return nil, err
+	}
+
 	return r, nil
+}
+
+// churn heuristic thresholds: a cluster of >= churnMinRows rows sharing
+// (source,title,kind,status) but with distinct dedup_keys, spanning less than
+// churnWindow, is flagged as a probable unstable dedup_key.
+const (
+	churnMinRows = 5
+	churnWindow  = 5 * time.Minute
+)
+
+// webhookChurn detects likely-unstable mapping-webhook dedup keys. It groups
+// 24h events by (source,title,kind,status) and flags groups whose distinct
+// dedup_keys number >= churnMinRows within a churnWindow span — rows that
+// SHOULD have collapsed onto one row but did not. Runs over all sources (the
+// signal is meaningful for any parser), but the footgun it targets is the
+// operator-authored P14 dedup_key template.
+func (s *Store) webhookChurn(ctx context.Context, r *DoctorReport, dayAgo string) error {
+	windowDays := churnWindow.Minutes() / 1440.0
+	rows, err := s.readDB.QueryContext(ctx, `
+SELECT source, title, COUNT(DISTINCT dedup_key) AS keys,
+       CAST((julianday(MAX(ts)) - julianday(MIN(ts))) * 86400 AS INTEGER) AS span_s
+FROM events
+WHERE ts >= ?
+GROUP BY source, title, kind, status
+HAVING keys >= ? AND (julianday(MAX(ts)) - julianday(MIN(ts))) <= ?
+ORDER BY keys DESC
+LIMIT 10`, dayAgo, churnMinRows, windowDays)
+	if err != nil {
+		return fmt.Errorf("doctor: webhook churn: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var c WebhookChurn
+		if err := rows.Scan(&c.Source, &c.Title, &c.Rows, &c.WindowS); err != nil {
+			return fmt.Errorf("doctor: scan churn: %w", err)
+		}
+		r.WebhookChurn = append(r.WebhookChurn, c)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("doctor: webhook churn: %w", err)
+	}
+	return nil
 }

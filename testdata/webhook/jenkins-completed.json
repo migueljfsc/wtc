@@ -1,0 +1,24 @@
+{
+  "name": "api",
+  "display_name": "api",
+  "url": "job/api/",
+  "build": {
+    "full_url": "http://localhost:8080/job/api/3/",
+    "number": 3,
+    "queue_id": 3,
+    "timestamp": 1784279203000,
+    "duration": 1036,
+    "phase": "COMPLETED",
+    "url": "job/api/3/",
+    "scm": {
+      "url": "https://github.com/acme/api.git",
+      "branch": "origin/main",
+      "commit": "9f1c2ab3d4e5f60718293a4b5c6d7e8f90123456",
+      "changes": [],
+      "culprits": []
+    },
+    "log": "",
+    "artifacts": {},
+    "status": "SUCCESS"
+  }
+}

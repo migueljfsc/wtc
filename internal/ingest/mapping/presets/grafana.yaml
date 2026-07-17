@@ -1,0 +1,18 @@
+# Grafana unified-alerting webhook contact point.
+# Auth is supplied by the operator (Grafana sends a configurable Authorization
+# header, or an "Bearer"/basic credential you set on the contact point).
+# One Event per delivery, keyed to the alert episode like alertmanager:
+# firing -> started, resolved -> succeeded on the same row.
+dedup_key: 'grafana:{{ (index .alerts 0).fingerprint }}:{{ (index .alerts 0).startsAt }}'
+mapping:
+  kind: alert
+  status: '{{ if eq .status "resolved" }}succeeded{{ else }}started{{ end }}'
+  title: '{{ .title }}'
+  url: '{{ .externalURL }}'
+  actor: grafana
+  ts: '{{ if eq .status "resolved" }}{{ (index .alerts 0).endsAt }}{{ else }}{{ (index .alerts 0).startsAt }}{{ end }}'
+  env: '{{ .commonLabels.env }}'
+facts:
+  cluster: '{{ .commonLabels.cluster }}'
+  namespace: '{{ .commonLabels.namespace }}'
+  reason: '{{ .commonLabels.severity }}'

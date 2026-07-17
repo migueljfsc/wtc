@@ -418,7 +418,29 @@
           "unmapped_24h": { "type": "integer" },
           "unmapped_samples": { "type": "array", "items": { "type": "string" } },
           "clock_skew_24h": { "type": "integer" },
-          "poll": { "type": "array", "items": { "$ref": "#/components/schemas/PollState" } }
+          "poll": { "type": "array", "items": { "$ref": "#/components/schemas/PollState" } },
+          "webhook_churn": { "type": "array", "items": { "$ref": "#/components/schemas/WebhookChurn" }, "description": "Mapping-webhook sources with a probable unstable dedup_key (P14 heuristic)." },
+          "webhook_mapping_errors": { "type": "array", "items": { "$ref": "#/components/schemas/WebhookMappingError" }, "description": "Recent per-source mapping-template eval failures (P14)." }
+        }
+      },
+      "WebhookChurn": {
+        "type": "object",
+        "required": ["source", "title", "rows", "window_s"],
+        "properties": {
+          "source": { "type": "string" },
+          "title": { "type": "string" },
+          "rows": { "type": "integer" },
+          "window_s": { "type": "integer" }
+        }
+      },
+      "WebhookMappingError": {
+        "type": "object",
+        "required": ["source", "count", "last_error", "last_at"],
+        "properties": {
+          "source": { "type": "string" },
+          "count": { "type": "integer" },
+          "last_error": { "type": "string" },
+          "last_at": { "type": "string", "format": "date-time" }
         }
       },
       "ActivityBucket": {

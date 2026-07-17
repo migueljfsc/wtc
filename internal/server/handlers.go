@@ -169,6 +169,9 @@ func (s *Server) handleDoctor(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusInternalServerError, "doctor query error")
 		return
 	}
+	// Merge in-memory mapping-webhook eval errors (P14) — they live on the
+	// server, not the DB, since they concern deliveries that never became rows.
+	report.WebhookMappingErrors = s.mapErrs.snapshot()
 	s.writeJSON(w, http.StatusOK, report)
 }
 

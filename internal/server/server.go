@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/ingest/flux"
+	"github.com/migueljfsc/wtc/internal/ingest/mapping"
 	"github.com/migueljfsc/wtc/internal/normalize"
 	"github.com/migueljfsc/wtc/internal/store"
 	"github.com/migueljfsc/wtc/web"
@@ -57,6 +58,9 @@ type Options struct {
 	// config viewer). Display copies of what the engine/resolver were built from.
 	Rules       []normalize.Rule
 	TagPatterns []string
+	// Mappers are the compiled mapping webhooks (P14), keyed by source name;
+	// nil/empty means /ingest/webhook/<name> 404s for every name.
+	Mappers map[string]*mapping.Mapper
 }
 
 // Server routes ingest and query requests onto a Store.
@@ -71,6 +75,8 @@ type Server struct {
 	argocdSuppressor   *flux.Suppressor // same window mechanism; keys are argocd-shaped
 	engine             *normalize.EngineHolder
 	tags               *normalize.TagResolverHolder
+	mappers            map[string]*mapping.Mapper
+	mapErrs            *mappingErrorTracker
 	captureDir         string
 	corsOrigins        []string
 	log                *slog.Logger
@@ -114,6 +120,8 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 		argocdSuppressor:   flux.NewSuppressor(opts.ArgoCDSuppression),
 		engine:             engine,
 		tags:               tags,
+		mappers:            opts.Mappers,
+		mapErrs:            newMappingErrorTracker(),
 		captureDir:         opts.CaptureDir,
 		corsOrigins:        opts.CORSAllowedOrigins,
 		fileRules:          opts.Rules,
@@ -144,6 +152,8 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 	s.mux.HandleFunc("POST /ingest/flux", s.handleIngestFlux)     // HMAC-verified inside
 	s.mux.HandleFunc("POST /ingest/argocd", s.handleIngestArgoCD) // token-verified inside
 	s.mux.HandleFunc("POST /ingest/gitlab", s.handleIngestGitLab) // token-verified inside
+	// Mapping webhooks (P14): one handler, per-name lookup + per-source auth.
+	s.mux.HandleFunc("POST /ingest/webhook/{name}", s.handleIngestWebhook)
 
 	// Query API. Every route is registered under both the legacy /api prefix
 	// (CLI client + embedded web depend on it) and the versioned /api/v1

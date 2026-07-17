@@ -93,6 +93,46 @@ retention:
 	}
 }
 
+func TestWebhooksConfig(t *testing.T) {
+	t.Setenv("TEST_GRAFANA_TOKEN", "graf-sekrit")
+	path := writeFile(t, `
+server:
+  listen: ":8484"
+  db: ./wtc.db
+sources:
+  webhooks:
+    - name: grafana
+      preset: grafana
+      auth:
+        token: ${TEST_GRAFANA_TOKEN}
+        header: Authorization
+    - name: harbor
+      auth:
+        hmac: { secret: xyz, header: X-Sig, algo: sha256 }
+      dedup_key: 'harbor:{{ .id }}'
+      mapping: { kind: build, title: 'Harbor {{ .id }}' }
+      facts: { service: '{{ .repo }}' }
+`)
+	cfg, err := Load(path, false)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.Sources.Webhooks) != 2 {
+		t.Fatalf("webhooks = %d, want 2", len(cfg.Sources.Webhooks))
+	}
+	g := cfg.Sources.Webhooks[0]
+	if g.Name != "grafana" || g.Preset != "grafana" || g.Auth.Token != "graf-sekrit" || g.Auth.Header != "Authorization" {
+		t.Errorf("grafana webhook = %+v", g)
+	}
+	h := cfg.Sources.Webhooks[1]
+	if h.Auth.HMAC == nil || h.Auth.HMAC.Header != "X-Sig" || h.DedupKey != "harbor:{{ .id }}" {
+		t.Errorf("harbor webhook = %+v (hmac %+v)", h, h.Auth.HMAC)
+	}
+	if h.Facts["service"] != "{{ .repo }}" {
+		t.Errorf("harbor facts = %v", h.Facts)
+	}
+}
+
 func TestLoadFileAndVarExpansion(t *testing.T) {
 	t.Setenv("TEST_WTC_TOKEN", "sekrit")
 	t.Setenv("TEST_WTC_EMPTY_TOKEN", "") // set-but-empty is allowed and filtered

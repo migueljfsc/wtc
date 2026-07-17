@@ -15,6 +15,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/migueljfsc/wtc/internal/ingest/mapping"
 	"github.com/migueljfsc/wtc/internal/normalize"
 )
 
@@ -119,10 +120,11 @@ type ArgoCD struct {
 
 // Sources groups per-source ingest configuration.
 type Sources struct {
-	GitHub GitHub `yaml:"github"`
-	GitLab GitLab `yaml:"gitlab"`
-	Flux   Flux   `yaml:"flux"`
-	ArgoCD ArgoCD `yaml:"argocd"`
+	GitHub   GitHub            `yaml:"github"`
+	GitLab   GitLab            `yaml:"gitlab"`
+	Flux     Flux              `yaml:"flux"`
+	ArgoCD   ArgoCD            `yaml:"argocd"`
+	Webhooks []mapping.Webhook `yaml:"webhooks"` // config-declared mapping webhooks (P14)
 }
 
 // Digest configures the optional serve-side scheduled Slack digest. Enabled

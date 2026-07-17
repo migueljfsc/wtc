@@ -20,7 +20,7 @@ Lives at `docs/PLAN.md`. Each phase ≈ 1–3 Claude Code sessions. A phase is d
 | **P11 ArgoCD ingest** | ✅ 2026-07-16 | fixture-first vs live Argo v3.4.5 on kind; canonical template ships the contract (4 template gotchas found live); per-sync-operation dedup keys (failed→succeeded retry = two rows); new `degraded` status (rank 3, upserts terminal rows); env tiers label>ns>name-suffix live-verified; full join proven live: github push INTENT → argocd APPLIED, 23h lag |
 | **P12 GitLab ingest** | ✅ 2026-07-16 | SCM/CI-axis neutrality proof (GitHub↔GitLab, as Flux↔Argo was for GitOps); poller + `X-Gitlab-Token` webhook converge on shared dedup keys (`gl:pipeline`/`gl:mr`/`gl:push`); pipeline/MR/push normalizers + MR-diff enrichment; env inference via shared path rules. Verified live on a gitlab.com project: `wtc where` spans pipeline BUILD → MR merge INTENT → Argo CD APPLIED (private repo via Argo credential) |
 | **P13 GitHub webhook completion** | ✅ 2026-07-17 | `/ingest/github` normalizes workflow_run/push/pull_request into the poller's Events + dedup keys (nested objects reuse the REST structs) — webhook + poller now peer modes, idempotent together; fixtures captured via the hook-deliveries API (no tunnel); onboarding gains the ingest-posture guide |
-| **P14 Mapping webhook** | ⬜ planned | `/ingest/webhook/<name>`: config-declared auth + payload→Event template mapping + dedup_key template; shipped presets (Grafana, Jenkins, Harbor, TFC); doctor guards unstable keys |
+| **P14 Mapping webhook** | ✅ 2026-07-17 | `/ingest/webhook/<name>`: config-declared auth (static token XOR hex-HMAC) + payload→Event template mapping (same engine as `rules[].set`) + dedup_key template + rule facts; webhook names are first-class sources. Presets **Grafana + Jenkins** live-captured (Harbor/TFC deferred, capture-first doc covers them); doctor gains an unstable-dedup_key churn heuristic + mapping-error surfacing |
 
 Unplanned addition: `demo/` — three dummy services + fake three-cluster Flux
 wiring generating real events continuously (operator-requested test bed;
@@ -313,6 +313,21 @@ seconds where the poller alone would take a poll interval; both modes running
 together produce zero duplicates over a real day of activity.
 
 ## Phase 14 — Mapping webhook (long-tail ingest)
+
+**Shipped 2026-07-17.** `/ingest/webhook/<name>` with config-declared sources
+(`sources.webhooks[]`): auth (static token XOR hex-HMAC), a payload→Event field
+mapping compiled from Go templates over the parsed JSON body (reusing the
+rules-engine funcs + `default`), a required stable `dedup_key` template, and
+optional facts feeding the rules engine. Each webhook name is registered as a
+first-class `model.Source`, so it shows under its real name in log/facets/
+doctor. Presets `grafana` + `jenkins` are live-captured golden fixtures
+(Grafana 11.3 test contact point; Jenkins Notification Plugin serialized via its
+own `buildJobState` — its SSRF guard blocks a private-IP POST). doctor gains a
+per-source unstable-dedup_key **churn heuristic** (rows sharing title/kind/
+status seconds apart under distinct keys) and surfaces mapping-template eval
+failures (rejected `422`, never dropped). `/ingest/generic` stays separate.
+Harbor/TFC presets deferred; `docs/setup/mapping-webhook.md` wires a novel tool
+capture-first. See below for the original plan.
 
 `/ingest/webhook/<name>` — operator-declared sources in config: auth (static
 token header, or HMAC where the sender signs), a payload→Event field mapping

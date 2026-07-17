@@ -126,6 +126,19 @@ func newDoctorCmd(flags *clientFlags) *cobra.Command {
 				}
 				_ = pw.Flush()
 			}
+			if len(r.WebhookChurn) > 0 {
+				_, _ = fmt.Fprintln(out, "\nwebhook dedup_key churn (rows that should have collapsed — check the dedup_key template):")
+				for _, c := range r.WebhookChurn {
+					_, _ = fmt.Fprintf(out, "  %s: %d rows in %ds — %q\n", c.Source, c.Rows, c.WindowS, c.Title)
+				}
+			}
+			if len(r.WebhookMappingErrors) > 0 {
+				_, _ = fmt.Fprintln(out, "\nwebhook mapping errors (deliveries rejected — template never guessed):")
+				for _, e := range r.WebhookMappingErrors {
+					_, _ = fmt.Fprintf(out, "  %s: %d error(s), last %s — %s\n",
+						e.Source, e.Count, e.LastAt.Local().Format("2006-01-02 15:04"), e.LastError)
+				}
+			}
 
 			if len(silent) > 0 {
 				return fmt.Errorf("source(s) silent longer than %s: %v", maxSilence, silent)

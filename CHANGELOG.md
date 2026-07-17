@@ -4,6 +4,44 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 14 (Mapping webhook — long-tail ingest)
+
+- **`/ingest/webhook/<name>`: any tool that POSTs JSON becomes config, not
+  code.** Operators declare sources under `sources.webhooks[]` — auth, a
+  payload→Event field mapping, a stable `dedup_key`, and optional facts. Mapped
+  events enter the standard pipeline (rules → redaction → status-rank upsert),
+  so lifecycle transitions and env/service inference work as for any source.
+  Each webhook `name` is registered as a **first-class source**, so it appears
+  under its real name in `wtc log --source <name>`, facets and doctor.
+- **Templates reuse the rules engine.** Field/dedup/facts values are Go
+  `text/template` over the parsed JSON body, with the *same* funcs `rules[].set`
+  uses (`trimPrefix`, `trimSuffix`, `lower`, `regexReplace`) plus `default`.
+  Compiled at startup — a bad template or missing `dedup_key`/`kind`/`title`
+  fails the daemon, never a delivery.
+- **Auth: static token XOR HMAC.** A shared secret in a configurable header
+  (constant-time; default `X-WTC-Token`, like argocd/gitlab) or a sender-signed
+  hex HMAC (`sha256`/`sha512`/`sha1`, configurable header + stripped prefix,
+  like github/flux). Exactly one is required; neither fails closed.
+- **Shipped presets** `grafana` and `jenkins` — a preset supplies the template
+  surface; the operator supplies name + secret and may override any field.
+  Fixtures captured live: Grafana 11.3 via a test contact point; Jenkins
+  Notification Plugin serialized by the plugin's own classes (the plugin's
+  SSRF guard blocks a private-IP POST, so the body was produced through
+  `buildJobState`). Jenkins git-SCM sub-fields (`scm.branch`/`commit`) follow
+  the plugin's documented `ScmState` schema — the build-lifecycle fields are
+  live-captured. Grafana firing is live; the resolved variant is a minimal edit
+  of it.
+- **doctor guardrails for the `dedup_key` footgun.** A churn heuristic flags
+  rows that share title/kind/status and landed seconds apart under *distinct*
+  dedup keys (a key that should have collapsed but didn't); a per-source
+  counter surfaces mapping-template eval failures. Template errors reject the
+  delivery `422` (retryable) — never a silent drop.
+- **`/ingest/generic` stays separate** — the "you own the sender" path needs no
+  mapping. Harbor and Terraform Cloud presets are deferred; the doc shows the
+  capture-first authoring loop for wiring any novel tool.
+- **Docs:** `docs/setup/mapping-webhook.md` (preset wiring + capture-first
+  authoring + the dedup_key/doctor guardrails).
+
 ### Added — Phase 13 (GitHub webhook completion)
 
 - **`/ingest/github` graduates from capture-only to full ingest.** The

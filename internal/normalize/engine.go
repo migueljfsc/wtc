@@ -99,6 +99,18 @@ var tmplFuncs = template.FuncMap{
 	},
 }
 
+// TemplateFuncs returns the funcs available to rules `set:` templates
+// (trimPrefix, trimSuffix, lower, regexReplace). Exposed so the mapping-webhook
+// engine (P14) renders payload→Event templates with the identical func set —
+// one documented template vocabulary across the two config surfaces.
+func TemplateFuncs() template.FuncMap {
+	fm := template.FuncMap{}
+	for k, v := range tmplFuncs {
+		fm[k] = v
+	}
+	return fm
+}
+
 // NewEngine compiles globs and templates up front so config errors surface at
 // startup, not per event.
 func NewEngine(rules []Rule) (*Engine, error) {
