@@ -30,6 +30,24 @@ GitOps engine posts to wtc from wherever it runs: same cluster → wtc's
 in-cluster Service; other clusters → wtc's ingress URL. All ingest is outbound
 from the source's side — no webhooks required.
 
+## Ingest posture
+
+For the SCM/CI sources (GitHub, GitLab), pick per installation based on whether
+wtc has a public endpoint. Both sources support **both** modes, converging on
+the same rows, so the choice is about reachability and latency, not coverage:
+
+- **Private wtc (no public endpoint) → poller-primary.** Outbound HTTPS only;
+  the poller pulls builds/merges/pushes every interval. This is the default and
+  the operator's own posture. Webhooks are simply not wired.
+- **Public wtc → webhooks + poller sweeper.** Register the webhook for
+  low-latency ingest (a merge appears in seconds, not a poll interval) *and*
+  keep the poller running as the loss-recovery sweeper. Dedup keys derive from
+  run/PR/commit identity, so a change seen by both lands on one row — running
+  both together produces zero duplicates.
+
+GitOps notifications (Flux, Argo CD) are unaffected either way: that traffic is
+in-cluster/outbound from the engine regardless of wtc's exposure.
+
 ## Prerequisites
 
 - A cluster + `kubectl` and `helm`, and permission to create Secrets/Ingress.

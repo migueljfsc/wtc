@@ -4,6 +4,30 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 13 (GitHub webhook completion)
+
+- **`/ingest/github` graduates from capture-only to full ingest.** The
+  P1-deferred webhook-envelope parsing lands: `workflow_run`, `push`, and
+  `pull_request` deliveries normalize into the same Events and dedup keys the
+  poller produces, so webhook and poller are now **peer modes** — the webhook
+  for latency, the poller as the idempotent loss-recovery sweeper. Both can run
+  together with zero duplicates.
+- **Envelope reuse:** the nested `workflow_run`/`pull_request` objects are
+  field-identical to the poller's REST structs, so the envelopes reuse them and
+  call the *same* normalizers; only `push` needed a shared `pushEvent` builder
+  (its commit shape differs), extracted from `NormalizeCommit`. A push fans out
+  to one event per commit; only merged PRs land; non-merge PR actions and
+  `ping` are acknowledged and dropped (202).
+- **Fixtures** captured from real deliveries on `migueljfsc/wtc` via the
+  **hook-deliveries API** (bodies recorded even when the target 404s — no
+  tunnel): `workflow_run` completed success + failure, `push`, `pull_request`.
+  `X-Hub-Signature` is derived from the secret (safe to keep in a fixture),
+  unlike a raw token.
+- **Docs:** `github-webhook.md` becomes a full wiring guide; onboarding gains an
+  **ingest-posture** guide (private → poller-primary; public → webhook + poller
+  sweeper). The github poller now captures via `internal/capture` (no `server`
+  import), matching gitlab.
+
 ### Added — Phase 12 (GitLab ingest)
 
 - **GitLab as the SCM/CI-axis neutrality peer of GitHub** (mirroring Flux↔Argo

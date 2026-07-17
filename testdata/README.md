@@ -51,12 +51,19 @@ headers (`raw/` is gitignored). Fixtures here are curated copies:
   when delivery to an unreachable URL fails, so no tunnel is needed;
   `X-Gitlab-Token` comes back `[REDACTED]`, never a secret on disk).
   `push_root_only.json` touches only a root file → the `env=""` case.
+- `github/webhook/` — real deliveries from `migueljfsc/wtc` read back via the
+  **hook-deliveries API** (`GET /repos/:o/:r/hooks/:id/deliveries/:id` —
+  GitHub records the request body even when the target 404s, so no tunnel is
+  needed): `workflow_run_completed_success.json` (a `ci` run on a PR branch),
+  `workflow_run_completed_failure.json` (a real scheduled `demo-web` failure),
+  `push.json` (one commit, file paths present), and `pull_request_opened.json`
+  (the drop path — only merges are change intents). The nested
+  `workflow_run`/`pull_request` objects are field-identical to the poller's
+  REST structs, so the envelope parsers reuse them. `X-Hub-Signature` is
+  derived from the secret (safe to keep), never a raw token.
 
 ## Gaps (deliberate)
 
-- **GitHub webhook envelopes** — skipped by operator decision (no public
-  endpoint; poller is primary). `/ingest/github` authenticates + captures
-  only, until webhook fixtures exist.
 - **Flux ImageUpdateAutomation events** — need a cluster with image
   automation writing to a repo; capture when the real dev cluster exists.
 - **ArgoCD multi-source apps (`revisions[]`, 2.6+)** — all three test

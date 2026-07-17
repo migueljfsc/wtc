@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/migueljfsc/wtc/internal/capture"
 	"github.com/migueljfsc/wtc/internal/model"
 	"github.com/migueljfsc/wtc/internal/normalize"
-	"github.com/migueljfsc/wtc/internal/server"
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
@@ -129,7 +129,7 @@ func (p *Poller) pollResource(ctx context.Context, repo, resource string) error 
 	}
 
 	if p.captureDir != "" {
-		if err := server.CaptureBody(p.captureDir, "github-api", repo+"-"+resource, nil, raw); err != nil {
+		if err := capture.Body(p.captureDir, "github-api", repo+"-"+resource, nil, raw); err != nil {
 			p.log.Error("poller capture", "repo", repo, "resource", resource, "error", err)
 		}
 	}

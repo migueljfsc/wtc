@@ -19,7 +19,7 @@ Lives at `docs/PLAN.md`. Each phase ≈ 1–3 Claude Code sessions. A phase is d
 | **P10 live + config surfaces** | ✅ 2026-07-15 | SSE live updates (`/api/v1/stream`, no-poll timeline/dashboard); Settings = source health + DB-backed editable rules/tag_patterns with hot-reload (`edit → next event re-routed`, no restart). Token management + multi-user auth stay out (RBAC non-goal) |
 | **P11 ArgoCD ingest** | ✅ 2026-07-16 | fixture-first vs live Argo v3.4.5 on kind; canonical template ships the contract (4 template gotchas found live); per-sync-operation dedup keys (failed→succeeded retry = two rows); new `degraded` status (rank 3, upserts terminal rows); env tiers label>ns>name-suffix live-verified; full join proven live: github push INTENT → argocd APPLIED, 23h lag |
 | **P12 GitLab ingest** | ✅ 2026-07-16 | SCM/CI-axis neutrality proof (GitHub↔GitLab, as Flux↔Argo was for GitOps); poller + `X-Gitlab-Token` webhook converge on shared dedup keys (`gl:pipeline`/`gl:mr`/`gl:push`); pipeline/MR/push normalizers + MR-diff enrichment; env inference via shared path rules. Verified live on a gitlab.com project: `wtc where` spans pipeline BUILD → MR merge INTENT → Argo CD APPLIED (private repo via Argo credential) |
-| **P13 GitHub webhook completion** | ⬜ planned | reachability posture change (2026-07-16): webhook envelope parsing lands (fixtures via hook-deliveries API, no tunnel needed); poller and webhooks become peer modes |
+| **P13 GitHub webhook completion** | ✅ 2026-07-17 | `/ingest/github` normalizes workflow_run/push/pull_request into the poller's Events + dedup keys (nested objects reuse the REST structs) — webhook + poller now peer modes, idempotent together; fixtures captured via the hook-deliveries API (no tunnel); onboarding gains the ingest-posture guide |
 | **P14 Mapping webhook** | ⬜ planned | `/ingest/webhook/<name>`: config-declared auth + payload→Event template mapping + dedup_key template; shipped presets (Grafana, Jenkins, Harbor, TFC); doctor guards unstable keys |
 
 Unplanned addition: `demo/` — three dummy services + fake three-cluster Flux
@@ -283,6 +283,15 @@ with `wtc where` spanning it; `docs/setup/gitlab.md` wires a real project using
 only the docs.
 
 ## Phase 13 — GitHub webhook completion (reachability posture)
+
+**Shipped 2026-07-17.** `/ingest/github` normalizes workflow_run/push/
+pull_request into the poller's Events + dedup keys (nested resource objects
+reuse the REST structs; only `push` needed a shared `pushEvent` builder).
+Webhook + poller are now peer modes, idempotent together. Fixtures captured
+from real deliveries on `migueljfsc/wtc` via the hook-deliveries API (no
+tunnel). `github-webhook.md` is a full wiring guide; onboarding gains the
+ingest-posture section. The github poller now captures via `internal/capture`
+(no `server` import), matching gitlab.
 
 Per the 2026-07-16 decision update: exposure is per-installation, so the
 P1-deferred webhook envelope parsing lands and the poller/webhook pair becomes

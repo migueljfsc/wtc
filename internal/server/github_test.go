@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -17,7 +18,7 @@ import (
 
 const testWebhookSecret = "hook-secret"
 
-func newGitHubTestServer(t *testing.T, captureDir string) *httptest.Server {
+func newGitHubTestServer(t *testing.T, captureDir string) (*httptest.Server, *store.Store) {
 	t.Helper()
 	st, err := store.Open(filepath.Join(t.TempDir(), "wtc.db"))
 	if err != nil {
@@ -35,7 +36,7 @@ func newGitHubTestServer(t *testing.T, captureDir string) *httptest.Server {
 			t.Errorf("close store: %v", err)
 		}
 	})
-	return ts
+	return ts, st
 }
 
 func sign(secret string, body []byte) string {
@@ -61,9 +62,20 @@ func githubPost(t *testing.T, url string, body []byte, headers map[string]string
 	return resp
 }
 
+func githubWebhookFixture(t *testing.T, name string) []byte {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("../../testdata/github/webhook", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+// Auth is checked before the body is parsed, so a ping (no events) isolates the
+// signature logic: valid → 202 (nothing to ingest), everything else → 401.
 func TestGitHubHMAC(t *testing.T) {
-	ts := newGitHubTestServer(t, "")
-	body := []byte(`{"action":"completed"}`)
+	ts, _ := newGitHubTestServer(t, "")
+	body := []byte(`{"zen":"ok"}`)
 	url := ts.URL + "/ingest/github"
 
 	tests := []struct {
@@ -79,7 +91,7 @@ func TestGitHubHMAC(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			headers := map[string]string{"X-GitHub-Event": "workflow_run", "X-GitHub-Delivery": "d-1"}
+			headers := map[string]string{"X-GitHub-Event": "ping", "X-GitHub-Delivery": "d-1"}
 			if tt.sig != "" {
 				headers["X-Hub-Signature-256"] = tt.sig
 			}
@@ -92,6 +104,7 @@ func TestGitHubHMAC(t *testing.T) {
 
 	// Signature valid for a DIFFERENT body must fail (body binding).
 	resp := githubPost(t, url, []byte(`{"tampered":true}`), map[string]string{
+		"X-GitHub-Event":      "ping",
 		"X-Hub-Signature-256": sign(testWebhookSecret, body),
 	})
 	if resp.StatusCode != http.StatusUnauthorized {
@@ -100,7 +113,6 @@ func TestGitHubHMAC(t *testing.T) {
 }
 
 func TestGitHubWebhookNotConfiguredFailsClosed(t *testing.T) {
-	// Server without a webhook secret must reject even signed deliveries.
 	st, err := store.Open(filepath.Join(t.TempDir(), "wtc.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -111,6 +123,7 @@ func TestGitHubWebhookNotConfiguredFailsClosed(t *testing.T) {
 
 	body := []byte(`{}`)
 	resp := githubPost(t, srv.URL+"/ingest/github", body, map[string]string{
+		"X-GitHub-Event":      "ping",
 		"X-Hub-Signature-256": sign(testWebhookSecret, body),
 	})
 	if resp.StatusCode != http.StatusServiceUnavailable {
@@ -118,18 +131,20 @@ func TestGitHubWebhookNotConfiguredFailsClosed(t *testing.T) {
 	}
 }
 
+// Capture writes the raw body before parsing; a real workflow_run delivery both
+// captures and ingests.
 func TestGitHubCapture(t *testing.T) {
 	dir := t.TempDir()
-	ts := newGitHubTestServer(t, dir)
-	body := []byte(`{"action":"completed","workflow_run":{"id":1}}`)
+	ts, st := newGitHubTestServer(t, dir)
+	body := githubWebhookFixture(t, "workflow_run_completed_success.json")
 
 	resp := githubPost(t, ts.URL+"/ingest/github", body, map[string]string{
 		"X-Hub-Signature-256": sign(testWebhookSecret, body),
 		"X-GitHub-Event":      "workflow_run",
 		"X-GitHub-Delivery":   "abc-123",
 	})
-	if resp.StatusCode != http.StatusAccepted {
-		t.Fatalf("status = %d, want 202", resp.StatusCode)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("status = %d, want 201", resp.StatusCode)
 	}
 
 	matches, err := filepath.Glob(filepath.Join(dir, "github", "*workflow_run-abc-123.json"))
@@ -142,11 +157,42 @@ func TestGitHubCapture(t *testing.T) {
 		t.Fatal(err)
 	}
 	if string(captured) != string(body) {
-		t.Fatalf("captured body mismatch: %s", captured)
+		t.Fatalf("captured body mismatch")
 	}
-	// Headers sidecar exists.
-	headerFiles, _ := filepath.Glob(filepath.Join(dir, "github", "*.headers"))
-	if len(headerFiles) != 1 {
-		t.Fatalf("expected 1 headers sidecar, got %v", headerFiles)
+
+	// And it ingested as a build row.
+	events, _, err := st.ListEvents(context.Background(), store.Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 || events[0].DedupKey != "gh:run:migueljfsc/wtc:29534601016:1" {
+		t.Fatalf("events = %+v", events)
+	}
+}
+
+// A real workflow_run delivery ingests once; replaying it (GitHub redelivery,
+// or the poller sweeping the same run) leaves exactly one row.
+func TestGitHubWebhookReplayDedups(t *testing.T) {
+	ts, st := newGitHubTestServer(t, "")
+	body := githubWebhookFixture(t, "workflow_run_completed_success.json")
+	hdr := map[string]string{
+		"X-Hub-Signature-256": sign(testWebhookSecret, body),
+		"X-GitHub-Event":      "workflow_run",
+	}
+
+	r1 := githubPost(t, ts.URL+"/ingest/github", body, hdr)
+	if r1.StatusCode != http.StatusCreated {
+		t.Fatalf("first status = %d, want 201", r1.StatusCode)
+	}
+	r2 := githubPost(t, ts.URL+"/ingest/github", body, hdr)
+	if r2.StatusCode != http.StatusOK {
+		t.Fatalf("replay status = %d, want 200 (deduped)", r2.StatusCode)
+	}
+	events, _, err := st.ListEvents(context.Background(), store.Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("got %d rows after replay, want 1", len(events))
 	}
 }

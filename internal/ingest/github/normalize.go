@@ -207,7 +207,20 @@ func NormalizeCommit(c restCommit, repo string, now time.Time) (*model.Event, no
 	if ts.IsZero() {
 		ts = c.Commit.Author.Date
 	}
+	// Commit-list payloads carry no files[]; per-commit detail fetch is
+	// P3/P4 enrichment. Unknown ≠ no match (trap #3).
+	return pushEvent(repo, c.SHA, title, c.HTMLURL, actor, nil, true, ts, now)
+}
 
+// pushEvent builds the Event + facts for one commit, shared by the poller
+// (NormalizeCommit) and the webhook push parser so both converge on the same
+// gh:push:<repo>:<sha> row. paths (known from a webhook push's
+// added/modified/removed) drive path-based env inference; the poller's
+// commit-list carries none, so it passes truncated=true.
+func pushEvent(repo, sha, title, url, actor string, paths []string, truncated bool, ts, now time.Time) (*model.Event, normalize.Facts) {
+	if ts.IsZero() {
+		ts = now
+	}
 	ev := &model.Event{
 		ID:         model.NewID(),
 		TS:         ts.UTC(),
@@ -216,19 +229,18 @@ func NormalizeCommit(c restCommit, repo string, now time.Time) (*model.Event, no
 		Kind:       model.KindPush,
 		Status:     model.StatusSucceeded,
 		Actor:      actor,
-		Ref:        c.SHA,
+		Ref:        sha,
 		Title:      title,
-		URL:        c.HTMLURL,
-		DedupKey:   fmt.Sprintf("gh:push:%s:%s", repo, c.SHA),
+		URL:        url,
+		DedupKey:   fmt.Sprintf("gh:push:%s:%s", repo, sha),
 	}
 	facts := normalize.Facts{
-		Source: "github",
-		Repo:   repo,
-		Event:  "push",
-		Actor:  actor,
-		// Commit-list payloads carry no files[]; per-commit detail fetch is
-		// P3/P4 enrichment. Unknown ≠ no match (trap #3).
-		PathsTruncated: true,
+		Source:         "github",
+		Repo:           repo,
+		Event:          "push",
+		Actor:          actor,
+		Paths:          paths,
+		PathsTruncated: truncated,
 	}
 	return ev, facts
 }
