@@ -32,7 +32,7 @@ Consequence: the two highest-value ingest paths are the **GitHub API poller** an
 ## Hard decisions — do not relitigate without operator approval
 
 - **Language:** Go >= 1.22. Single static binary. **No CGO** — use `modernc.org/sqlite`.
-- **Storage:** SQLite, WAL mode, single writer (the serve process). Migrations are embedded sequential SQL files via `go:embed`, append-only, never edited after being applied.
+- **Storage:** SQLite, WAL mode, single writer (the serve process). Migrations are embedded sequential SQL files via `go:embed`, append-only, never edited after being applied. Amendment (operator-approved 2026-07-17, P15): an **opt-in Postgres backend** (`storage.backend: postgres`, `jackc/pgx/v5`) for stateless-pod deployments — SQLite remains the default and the single-binary story; per-dialect migration dirs, same append-only rule; still one replica. See docs/PLAN.md "Storage & operations track".
 - **Process model:** one binary, subcommands. `wtc serve` is the daemon (ingest HTTP + query API + retention job). Every other subcommand is a thin HTTP client of the serve API. **The CLI never opens the DB file directly.**
 - **CLI framework:** `spf13/cobra`. Config: single YAML file + `WTC_*` env overrides. No viper; use koanf or hand-rolled loading.
 - **IDs:** ULID. **Time:** stored UTC RFC3339; `ts` = source event time, `ingested_at` = ours; timelines sort by `ts`; CLI renders local time.
@@ -46,9 +46,9 @@ Consequence: the two highest-value ingest paths are the **GitHub API poller** an
 
 ## Non-goals for v1 — do not build
 
-Postgres backend, multi-tenancy/RBAC, feature-flag providers, in-cluster Kubernetes agent, Slack slash-commands, AI summaries.
+Multi-tenancy/RBAC, feature-flag providers, in-cluster Kubernetes agent, Slack slash-commands, AI summaries, ClickHouse (evaluated for metrics 2026-07-17 and rejected — change-event volumes never warrant it; see PLAN P16 note).
 
-Moved into scope for the post-v1 UI Platform track (docs/PLAN.md P7–P10, operator decision 2026-07-14): an SPA portal (React) and DORA-style dashboards/metrics. Still out of scope until then; the data plane (Go binary, SQLite) stays a single self-hosted binary regardless.
+Moved into scope for the post-v1 UI Platform track (docs/PLAN.md P7–P10, operator decision 2026-07-14): an SPA portal (React) and DORA-style dashboards/metrics. Moved into scope for the Storage & operations track (P15, operator decision 2026-07-17): the opt-in Postgres backend — previously a non-goal. The data plane stays a single Go binary; SQLite remains its default embedded store.
 
 ## Repository layout
 

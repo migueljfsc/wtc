@@ -21,6 +21,8 @@ Lives at `docs/PLAN.md`. Each phase ≈ 1–3 Claude Code sessions. A phase is d
 | **P12 GitLab ingest** | ✅ 2026-07-16 | SCM/CI-axis neutrality proof (GitHub↔GitLab, as Flux↔Argo was for GitOps); poller + `X-Gitlab-Token` webhook converge on shared dedup keys (`gl:pipeline`/`gl:mr`/`gl:push`); pipeline/MR/push normalizers + MR-diff enrichment; env inference via shared path rules. Verified live on a gitlab.com project: `wtc where` spans pipeline BUILD → MR merge INTENT → Argo CD APPLIED (private repo via Argo credential) |
 | **P13 GitHub webhook completion** | ✅ 2026-07-17 | `/ingest/github` normalizes workflow_run/push/pull_request into the poller's Events + dedup keys (nested objects reuse the REST structs) — webhook + poller now peer modes, idempotent together; fixtures captured via the hook-deliveries API (no tunnel); onboarding gains the ingest-posture guide |
 | **P14 Mapping webhook** | ✅ 2026-07-17 | `/ingest/webhook/<name>`: config-declared auth (static token XOR hex-HMAC) + payload→Event template mapping (same engine as `rules[].set`) + dedup_key template + rule facts; webhook names are first-class sources. Presets **Grafana + Jenkins** live-captured (Harbor/TFC deferred, capture-first doc covers them); doctor gains an unstable-dedup_key churn heuristic + mapping-error surfacing |
+| **P15 Postgres backend** | ⬜ planned | Opt-in `storage.backend: postgres` (pgx) → stateless wtc pod in k8s (no PVC, RollingUpdate); SQLite stays the default and the single-binary story; Helm bundles an optional postgres (`postgresql.enabled`) or takes an external DSN; one-shot sqlite→pg ledger migration; single replica stays |
+| **P16 Prometheus metrics** | ⬜ planned | `/metrics` (promhttp): per-source ingest/dedup/suppression counters, mapping errors, poller lag, DB size, HTTP latency histograms; optional ServiceMonitor in the chart. ClickHouse evaluated and rejected — change-event volumes never warrant it |
 
 Unplanned addition: `demo/` — three dummy services + fake three-cluster Flux
 wiring generating real events continuously (operator-requested test bed;
@@ -360,3 +362,106 @@ Independent of each other and of the UI track. P13 is the smallest and touches
 only existing github code — good gap-filler. P12 is the biggest neutrality win
 and next by default. P14 last: its presets benefit from the P13 posture docs,
 and doctor's churn heuristic is easier once two SCM sources exercise it.
+
+# Storage & operations track (P15–P16, operator decisions 2026-07-17)
+
+Theme: run wtc like a production service. Separate the data from the pod
+(opt-in Postgres → stateless wtc Deployment), then make the service observable
+(Prometheus metrics). Decisions recorded 2026-07-17:
+
+- **Postgres** is the second storage backend (`jackc/pgx/v5` approved —
+  pure Go, no CGO conflict). Selected via an **explicit `storage.backend` key**
+  (no DSN sniffing).
+- **SQLite stays the default.** The single-binary story is the product
+  differentiator; Postgres is opt-in for k8s/production posture. This amends
+  the CLAUDE.md storage hard decision and removes "Postgres backend" from the
+  non-goals list (operator approval 2026-07-17).
+- **Helm bundles an optional postgres** behind `postgresql.enabled`; the wtc
+  chart takes a DB URL input — auto-wired to the bundled pod's service FQDN
+  when enabled, a `localhost` placeholder for BYO-DB otherwise.
+- **Single replica stays** — this phase separates the data, nothing else.
+  Pollers, suppression windows, and the digest are per-pod; HA/leader-election
+  is out of scope. Idempotent ingest makes an accidental second replica
+  safe-but-wasteful, not supported.
+- **Metrics are their own phase (P16). ClickHouse is rejected**: change events
+  run 10³–10⁵/day worst case, ClickHouse earns its keep around 10⁹ rows; DORA
+  aggregates over years of ledger compute in milliseconds on either backend.
+  A ClickHouse pod would cost ~1 GB RAM baseline, a third SQL dialect, and an
+  ops surface that undercuts the lightweight-neutral positioning. Revisit only
+  if wtc ever ingests high-cardinality telemetry — a stated non-goal.
+
+## Phase 15 — Postgres backend (stateless wtc pod)
+
+The driver is **operational posture, not scale** — SQLite handles these
+volumes for a decade. What Postgres buys in k8s: the wtc pod becomes
+disposable (no RWO PVC → RollingUpdate instead of Recreate, instant reschedule
+on node loss), standard backup/restore, managed offerings (RDS, CloudNativePG).
+
+**Config.** New `storage:` section: `backend: sqlite` (default; keeps using
+`server.db` as the file path — existing configs unchanged) or
+`backend: postgres` + `storage.dsn` (required then; empty DSN is a startup
+error, fail fast). `WTC_STORAGE_BACKEND` / `WTC_STORAGE_DSN` env overrides.
+The DSN carries credentials → inject via the existing helm secretRef pattern,
+never a plain chart value.
+
+**Store.** One `Store` struct gains a dialect: per-dialect embedded migration
+dirs (`migrations/sqlite/` — the existing four, unchanged; `migrations/
+postgres/` — fresh port), a small `?`→`$n` rebind helper, and ports of the
+~26 dialect-specific sites (audited 2026-07-17): `julianday` → `EXTRACT(EPOCH)`,
+`GLOB` → regex/`LIKE`, `pragma` size queries → `pg_database_size`,
+`INSERT OR …` → `ON CONFLICT`. FTS5 (`wtc log -q`) → plain `ILIKE` on postgres
+initially — the events table is small; `pg_trgm` only if it ever hurts. The
+single-writer goroutine and write/read pool split stay on both backends
+(harmless on pg, keeps ordering semantics identical).
+
+**Ledger migration.** The operator has real history; poller backfill is
+bounded and would lose it. One-shot offline command (exact name at build time,
+e.g. `wtc migrate --to <dsn>`): copies events, poll watermarks, and DB-backed
+config overrides from the sqlite file into postgres; serve stopped; idempotent
+re-run safe (dedup keys make event copies upserts).
+
+**Helm.** `storage.backend=postgres` → wtc Deployment drops the PVC and
+switches to RollingUpdate. `postgresql.enabled=true` → minimal bundled
+postgres (StatefulSet + PVC + Secret + Service) with the wtc DSN auto-wired to
+its FQDN; `enabled=false` → `externalDatabase.url` (default `localhost`
+placeholder the operator overrides; docs point at CloudNativePG/RDS).
+`storage.backend=sqlite` keeps today's chart behavior exactly. docker-compose
+gains a postgres variant.
+
+**Tests.** Store suite parameterized over backends: sqlite always; postgres
+gated behind `WTC_TEST_PG_DSN` locally and a postgres service container in CI.
+E2E smoke (fixture replay → log/where/diff) runs on both.
+
+**Accept:** `go test ./...` green on both backends in CI; `helm install` with
+`postgresql.enabled=true` yields a wtc pod with **no PVC** that survives
+`kubectl delete pod` with zero data loss and upgrades via RollingUpdate;
+`wtc migrate` moves a real sqlite ledger and `log`/`where`/`diff` output is
+identical before/after; the sqlite default path is byte-for-byte unchanged for
+existing installs; `docs/setup/postgres.md` wires it using only the docs.
+
+## Phase 16 — Prometheus metrics
+
+`/metrics` via `prometheus/client_golang` (dep to approve at build time).
+Instruments: `wtc_ingested_total{source}`, `wtc_deduped_total{source}`,
+`wtc_suppressed_total{source}`, `wtc_mapping_errors_total{source}`, poller
+last-success/lag gauges per repo, DB size gauge (per-backend query), HTTP
+request duration histogram `{path,method,status}`, SSE connection gauge.
+
+Exposure: wtc may be public (P13 posture) — `/metrics` leaks source names and
+activity levels, so it is **bearer-authed with the existing `api_tokens`**
+(Prometheus scrape configs support authorization headers natively); decide at
+build time whether to also offer a separate unauthenticated listen addr for
+in-cluster-only setups.
+
+Helm: optional ServiceMonitor + scrape-annotation toggle. Docs:
+`docs/setup/metrics.md` with a scrape config and example alerts (source
+silent > N, mapping errors > 0, poller lag).
+
+**Accept:** a real Prometheus scrape ingests the endpoint; counters proven by
+fixture replay (N ingested → counter = N, replay again → deduped counter
+moves); ServiceMonitor verified on a kind cluster with kube-prometheus-stack.
+
+### Sequencing (P15–P16)
+
+P15 first — P16's DB-size gauge and CI wiring benefit from the backend split
+landing beforehand. Both independent of the ingest and UI tracks.
