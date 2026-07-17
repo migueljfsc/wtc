@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/ingest/flux"
+	"github.com/migueljfsc/wtc/internal/metrics"
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
@@ -59,6 +60,7 @@ func (s *Server) handleIngestFlux(w http.ResponseWriter, r *http.Request) {
 	// Trap #1: reconcile re-emits inside the window are shed before the
 	// write path; the strict-rank upsert guarantees one row regardless.
 	if s.fluxSuppressor.Suppress(ev.DedupKey, time.Now()) {
+		metrics.Suppressed.WithLabelValues("flux").Inc()
 		s.writeJSON(w, http.StatusAccepted, map[string]string{"status": flux.ResultSuppressed})
 		return
 	}

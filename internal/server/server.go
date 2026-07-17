@@ -10,6 +10,7 @@ import (
 
 	"github.com/migueljfsc/wtc/internal/ingest/flux"
 	"github.com/migueljfsc/wtc/internal/ingest/mapping"
+	"github.com/migueljfsc/wtc/internal/metrics"
 	"github.com/migueljfsc/wtc/internal/normalize"
 	"github.com/migueljfsc/wtc/internal/store"
 	"github.com/migueljfsc/wtc/web"
@@ -146,6 +147,12 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 	// OpenAPI document for the portal's typed client generator. Public, like
 	// healthz — it describes the (bearer-authed) API but leaks no data.
 	s.mux.HandleFunc("GET /api/openapi.json", s.handleOpenAPI)
+	// Prometheus exposition (P16). Bearer-authed: wtc may be public (P13
+	// posture) and /metrics leaks source names and activity levels. For
+	// in-cluster scrapes without an api_token, serve config offers a separate
+	// unauthenticated metrics listener instead.
+	s.mux.Handle("GET /metrics", s.requireBearer(metrics.Handler()))
+	metrics.SetDBSize(st.Backend(), st.SizeBytes)
 	s.mux.Handle("POST /ingest/generic", s.requireBearer(http.HandlerFunc(s.handleIngestGeneric)))
 	s.mux.Handle("POST /ingest/alertmanager", s.requireBearer(http.HandlerFunc(s.handleIngestAlertmanager)))
 	s.mux.HandleFunc("POST /ingest/github", s.handleIngestGitHub) // HMAC-verified inside

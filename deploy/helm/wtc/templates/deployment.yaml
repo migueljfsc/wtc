@@ -25,6 +25,11 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
       annotations:
         checksum/config: {{ toYaml .Values.config | sha256sum }}
+        {{- if and .Values.metrics.scrapeAnnotations .Values.metrics.port }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.metrics.port | quote }}
+        prometheus.io/path: /metrics
+        {{- end }}
     spec:
       {{- if .Values.postgresql.enabled }}
       # Hold wtc until the bundled postgres accepts connections, so first boot
@@ -45,6 +50,10 @@ spec:
           ports:
             - name: http
               containerPort: 8484
+            {{- with .Values.metrics.port }}
+            - name: metrics
+              containerPort: {{ . }}
+            {{- end }}
           {{- with .Values.existingSecret }}
           envFrom:
             - secretRef:

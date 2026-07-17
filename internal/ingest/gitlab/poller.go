@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/capture"
+	"github.com/migueljfsc/wtc/internal/metrics"
 	"github.com/migueljfsc/wtc/internal/normalize"
 	"github.com/migueljfsc/wtc/internal/store"
 )
@@ -119,6 +120,8 @@ func (p *Poller) pollResource(ctx context.Context, project, resource string) err
 	if err != nil {
 		return err
 	}
+	// P16: lag alerts derive from time() minus this gauge (repo = project path).
+	metrics.PollLastSuccess.WithLabelValues("gitlab", project, resource).SetToCurrentTime()
 	if stored > 0 {
 		p.log.Info("polled", "project", project, "resource", resource, "stored", stored)
 	}

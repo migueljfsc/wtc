@@ -136,6 +136,16 @@ type Sources struct {
 	Webhooks []mapping.Webhook `yaml:"webhooks"` // config-declared mapping webhooks (P14)
 }
 
+// Metrics configures the Prometheus exposition surface (P16). /metrics on the
+// main listener is always on and bearer-authed with api_tokens. Listen
+// optionally opens a SECOND, UNAUTHENTICATED listener serving only /metrics —
+// for in-cluster scrapes where handing Prometheus an api_token (which also
+// grants /api/* including config writes) would be over-privileged. Never
+// expose that listener publicly; it is meant to stay behind a NetworkPolicy.
+type Metrics struct {
+	Listen string `yaml:"listen"` // e.g. ":9091"; empty disables the extra listener
+}
+
 // Digest configures the optional serve-side scheduled Slack digest. Enabled
 // only when both interval and slack_webhook are set.
 type Digest struct {
@@ -166,6 +176,7 @@ type Config struct {
 	TagPatterns []string         `yaml:"tag_patterns"` // tag→sha extraction; empty = defaults (SPEC §2)
 	Digest      Digest           `yaml:"digest"`       // optional scheduled Slack digest
 	Retention   Retention        `yaml:"retention"`    // optional prune job (SPEC §8)
+	Metrics     Metrics          `yaml:"metrics"`      // Prometheus exposition (P16)
 }
 
 // Default returns the config used when no file or overrides are present.
@@ -335,6 +346,7 @@ func applyEnvOverrides(cfg *Config) {
 	set(&cfg.Sources.Flux.HMACKey, "WTC_FLUX_HMAC_KEY")
 	set(&cfg.Sources.ArgoCD.WebhookSecret, "WTC_ARGOCD_WEBHOOK_SECRET")
 	set(&cfg.Digest.SlackWebhook, "WTC_SLACK_WEBHOOK")
+	set(&cfg.Metrics.Listen, "WTC_METRICS_LISTEN")
 
 	if v, ok := os.LookupEnv("WTC_API_TOKEN"); ok && v != "" {
 		if !slices.Contains(cfg.Auth.APITokens, v) {

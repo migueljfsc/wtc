@@ -14,6 +14,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
+
+	"github.com/migueljfsc/wtc/internal/metrics"
 	"github.com/migueljfsc/wtc/internal/normalize"
 	"github.com/migueljfsc/wtc/internal/store"
 )
@@ -86,6 +89,7 @@ func postFlux(t *testing.T, url string, body []byte, sig string) (*http.Response
 func TestFluxIngestEndToEnd(t *testing.T) {
 	ts, st := newFluxTestServer(t, 10*time.Minute)
 	body := fluxFixture(t, "kustomization_reconcile_succeeded.json")
+	suppressedBefore := testutil.ToFloat64(metrics.Suppressed.WithLabelValues("flux"))
 
 	// Bad signature → 401, nothing stored.
 	resp, _ := postFlux(t, ts.URL, body, "sha256=deadbeef")
@@ -130,6 +134,11 @@ func TestFluxIngestEndToEnd(t *testing.T) {
 	events, _, _ = st.ListEvents(t.Context(), store.Filter{})
 	if len(events) != 1 {
 		t.Fatalf("after replay: %d rows, want 1", len(events))
+	}
+	// P16: the shed replay must move the suppression counter (delta — the
+	// counter is process-global).
+	if got := testutil.ToFloat64(metrics.Suppressed.WithLabelValues("flux")) - suppressedBefore; got != 1 {
+		t.Errorf("wtc_suppressed_total{source=\"flux\"} moved by %v, want 1", got)
 	}
 }
 

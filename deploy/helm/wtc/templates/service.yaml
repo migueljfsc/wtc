@@ -11,6 +11,11 @@ spec:
     - port: {{ .Values.service.port }}
       targetPort: http
       name: http
+    {{- with .Values.metrics.port }}
+    - port: {{ . }}
+      targetPort: metrics
+      name: metrics
+    {{- end }}
   selector:
     app.kubernetes.io/name: {{ .Chart.Name }}
     app.kubernetes.io/instance: {{ .Release.Name }}

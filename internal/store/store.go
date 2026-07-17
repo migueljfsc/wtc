@@ -15,6 +15,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" driver (pure Go)
 	_ "modernc.org/sqlite"             // registers the "sqlite" driver (pure Go, no CGO)
 
+	"github.com/migueljfsc/wtc/internal/metrics"
 	"github.com/migueljfsc/wtc/internal/model"
 )
 
@@ -240,6 +241,15 @@ func (s *Store) Ingest(ctx context.Context, ev *model.Event) (id string, deduped
 		// duplicates (poller sweeps, redeliveries) must not flood subscribers.
 		if r.err == nil && !r.deduped {
 			s.broadcast.publish(*ev)
+		}
+		// Every ingest path (webhooks, pollers, generic) funnels through here,
+		// so this is the one place the P16 counters stay complete.
+		if r.err == nil {
+			if r.deduped {
+				metrics.Deduped.WithLabelValues(string(ev.Source)).Inc()
+			} else {
+				metrics.Ingested.WithLabelValues(string(ev.Source)).Inc()
+			}
 		}
 		return r.id, r.deduped, r.err
 	case <-ctx.Done():

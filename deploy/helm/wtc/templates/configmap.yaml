@@ -19,6 +19,15 @@ Do not hand-write a storage: section under .Values.config — this wins.
   {{- if $dsn }}{{- $_ := set $storage "dsn" $dsn }}{{- end }}
   {{- $_ := set $config "storage" $storage }}
 {{- end }}
+{{- /*
+metrics.port opens the separate UNAUTHENTICATED metrics listener. The port is
+chart-owned (it must match the containerPort and Service port), so the chart —
+not the operator's .Values.config — sets metrics.listen. This wins over any
+hand-written metrics: section, same as storage above.
+*/ -}}
+{{- if .Values.metrics.port }}
+  {{- $_ := set $config "metrics" (dict "listen" (printf ":%v" .Values.metrics.port)) }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

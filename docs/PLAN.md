@@ -22,7 +22,7 @@ Lives at `docs/PLAN.md`. Each phase ≈ 1–3 Claude Code sessions. A phase is d
 | **P13 GitHub webhook completion** | ✅ 2026-07-17 | `/ingest/github` normalizes workflow_run/push/pull_request into the poller's Events + dedup keys (nested objects reuse the REST structs) — webhook + poller now peer modes, idempotent together; fixtures captured via the hook-deliveries API (no tunnel); onboarding gains the ingest-posture guide |
 | **P14 Mapping webhook** | ✅ 2026-07-17 | `/ingest/webhook/<name>`: config-declared auth (static token XOR hex-HMAC) + payload→Event template mapping (same engine as `rules[].set`) + dedup_key template + rule facts; webhook names are first-class sources. Presets **Grafana + Jenkins** live-captured (Harbor/TFC deferred, capture-first doc covers them); doctor gains an unstable-dedup_key churn heuristic + mapping-error surfacing |
 | **P15 Postgres backend** | ✅ 2026-07-17 | Opt-in `storage.backend: postgres` (pgx) → stateless wtc pod; one query surface via `?`→`$n` rebind + 5 explicit dialect branches (FTS→ILIKE, julianday→EXTRACT, GLOB→regex, pragma→pg_database_size; stats unified on substr); per-dialect migrations; `wtc migrate` (log output byte-identical across the copy); Helm bundled-postgres/external-DSN modes verified live on kind (no PVC, pod delete → zero loss, RollingUpdate); TestPG* parity suite + CI postgres service |
-| **P16 Prometheus metrics** | ⬜ planned | `/metrics` (promhttp): per-source ingest/dedup/suppression counters, mapping errors, poller lag, DB size, HTTP latency histograms; optional ServiceMonitor in the chart. ClickHouse evaluated and rejected — change-event volumes never warrant it |
+| **P16 Prometheus metrics** | ✅ 2026-07-17 | `/metrics` (promhttp) bearer-authed with `api_tokens`; ingest/dedup counters live in the single-writer path (complete across every source, zero per-handler wiring); suppression/mapping-error counters, poller last-success gauge, per-backend DB-size gauge, HTTP latency histogram (label = route **pattern**, not raw URL → no sha cardinality), SSE gauge. Optional separate **unauthenticated** listener (`metrics.listen`) for in-cluster scrapes. Helm ServiceMonitor (main-port-bearer XOR unauth-port models) + scrape-annotation toggle; `docs/setup/metrics.md`. ClickHouse rejected — change-event volumes never warrant it |
 
 Unplanned addition: `demo/` — three dummy services + fake three-cluster Flux
 wiring generating real events continuously (operator-requested test bed;
@@ -454,6 +454,24 @@ identical before/after; the sqlite default path is byte-for-byte unchanged for
 existing installs; `docs/setup/postgres.md` wires it using only the docs.
 
 ## Phase 16 — Prometheus metrics
+
+**Shipped 2026-07-17.** As planned below, with the two build-time decisions
+resolved: `prometheus/client_golang` approved (own registry, never the global
+default), and the optional unauthenticated listener **built** (`metrics.listen`
+/ `WTC_METRICS_LISTEN`; off by default) — an api_token also grants `/api/*`
+config writes, so an in-cluster least-privilege scrape path was worth the ~25
+lines. Two implementation notes worth recording: the ingest/dedup counters live
+in `Store.Ingest`'s single-writer reply path, not the HTTP handlers, so every
+source (webhooks, both pollers, generic, mapping) counts with no per-handler
+wiring and the two can never drift; and the HTTP histogram's `path` label is the
+Go 1.22 mux **route pattern** (`r.Pattern`, method prefix stripped), never the
+raw URL — raw `/api/v1/where/<sha>` paths would explode cardinality. The
+`wtc_db_size_bytes` gauge is a scrape-time collector reusing the doctor size
+query (`Store.SizeBytes`), emitting nothing on error rather than a lying zero.
+Helm ServiceMonitor guards the main-port model behind a `required`
+`existingSecret` (the scrape needs `WTC_API_TOKEN`); the unauth model keys off
+`metrics.port`, which the chart injects as `metrics.listen` into the ConfigMap
+so the container port and process listener can't drift.
 
 `/metrics` via `prometheus/client_golang` (dep to approve at build time).
 Instruments: `wtc_ingested_total{source}`, `wtc_deduped_total{source}`,

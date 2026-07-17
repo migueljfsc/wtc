@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/ingest/mapping"
+	"github.com/migueljfsc/wtc/internal/metrics"
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
@@ -36,6 +37,7 @@ func newMappingErrorTracker() *mappingErrorTracker {
 }
 
 func (t *mappingErrorTracker) record(source string, err error) {
+	metrics.MappingErrors.WithLabelValues(source).Inc()
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	e := t.by[source]

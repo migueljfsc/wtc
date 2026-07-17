@@ -99,6 +99,31 @@ resources:
   limits:
     memory: 256Mi
 
+# Prometheus metrics (P16). /metrics is always served on the main port,
+# bearer-authed with api_tokens. Two scrape models:
+#   1. port: 0 — scrape the MAIN port with bearer auth. The ServiceMonitor
+#      pulls credentials from existingSecret key WTC_API_TOKEN (required for
+#      serviceMonitor.enabled in this model). Note an api_token also grants
+#      /api/* including config writes — fine when you trust Prometheus,
+#      otherwise use model 2.
+#   2. port: <n> (shipped default 9091) — wtc opens a second UNAUTHENTICATED
+#      listener serving only /metrics; the chart exposes it as the "metrics"
+#      port (ClusterIP → in-cluster only) and the ServiceMonitor scrapes it
+#      without credentials. Keep it in-cluster (NetworkPolicy) — never route it
+#      through the ingress. Set to 0 to serve metrics on the main port only.
+metrics:
+  port: 9091
+  # ServiceMonitor for the Prometheus Operator / kube-prometheus-stack.
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    # Extra labels for Prometheus discovery, e.g. {release: kube-prometheus-stack}.
+    labels: {}
+  # prometheus.io/* pod annotations for annotation-based discovery instead of
+  # a ServiceMonitor. Only rendered when metrics.port is set — annotation
+  # scrapes cannot carry bearer auth.
+  scrapeAnnotations: false
+
 # Rendered verbatim to /etc/wtc/wtc.yaml — see docs/SPEC.md §2.
 # NOTE: ${VAR} references resolve from the pod environment at startup and an
 # UNSET variable is a fatal config error (by design — a silently empty db

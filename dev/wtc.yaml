@@ -55,6 +55,12 @@ rules:
 #  ephemeral_keep: 30d            # pr-* churn; defaults to keep
 #  interval: 24h                  # run cadence; default 24h once keep is set
 
+# Prometheus metrics — /metrics is always on the main port, bearer-authed with
+# auth.api_tokens. Uncomment to ALSO open a separate unauthenticated listener
+# serving only /metrics (in-cluster scrapes; keep it off the public net).
+#metrics:
+#  listen: ":9091"
+
 # Try it without wiring anything real:
 #   wtc demo            # seeds a synthetic week via /ingest/generic
 #   wtc log --since 7d ; wtc diff staging prod

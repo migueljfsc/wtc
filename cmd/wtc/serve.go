@@ -17,6 +17,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/ingest/github"
 	"github.com/migueljfsc/wtc/internal/ingest/gitlab"
 	"github.com/migueljfsc/wtc/internal/ingest/mapping"
+	"github.com/migueljfsc/wtc/internal/metrics"
 	"github.com/migueljfsc/wtc/internal/model"
 	"github.com/migueljfsc/wtc/internal/normalize"
 	"github.com/migueljfsc/wtc/internal/server"
@@ -182,11 +183,30 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 		go rs.Run(ctx)
 	}
 
-	errCh := make(chan error, 1)
+	errCh := make(chan error, 2)
 	go func() {
 		log.Info("wtc serve listening", "addr", cfg.Server.Listen, "db", cfg.Server.DB, "version", version)
 		errCh <- httpSrv.ListenAndServe()
 	}()
+
+	// Optional separate UNAUTHENTICATED metrics listener (P16) — for
+	// in-cluster scrapes where an api_token would be over-privileged. A
+	// configured listener that cannot bind is fatal, same as the main one:
+	// silently running without metrics defeats the point of configuring them.
+	var metricsSrv *http.Server
+	if cfg.Metrics.Listen != "" {
+		mmux := http.NewServeMux()
+		mmux.Handle("GET /metrics", metrics.Handler())
+		metricsSrv = &http.Server{
+			Addr:              cfg.Metrics.Listen,
+			Handler:           mmux,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		go func() {
+			log.Info("metrics listener (unauthenticated — keep in-cluster)", "addr", cfg.Metrics.Listen)
+			errCh <- metricsSrv.ListenAndServe()
+		}()
+	}
 
 	select {
 	case err := <-errCh:
@@ -203,6 +223,11 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 	// anyway — stragglers get ErrStoreClosed instead of racing the writer.
 	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 		log.Error("http shutdown", "error", err)
+	}
+	if metricsSrv != nil {
+		if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
+			log.Error("metrics shutdown", "error", err)
+		}
 	}
 	if err := st.Close(); err != nil {
 		return fmt.Errorf("close store: %w", err)

@@ -3,8 +3,11 @@ package server
 import (
 	"crypto/subtle"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/migueljfsc/wtc/internal/metrics"
 )
 
 // requireBearer enforces static bearer-token auth. Comparison is
@@ -85,11 +88,26 @@ func (s *Server) logRequests(next http.Handler) http.Handler {
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		start := time.Now()
 		next.ServeHTTP(rec, r)
+		elapsed := time.Since(start)
+		// The metric's path label is the matched ROUTE PATTERN (the mux sets
+		// r.Pattern during ServeHTTP), never the raw URL — raw paths carry
+		// shas/ULIDs and would explode cardinality. Unrouted requests (404s,
+		// CORS preflights answered before the mux) share one bucket.
+		pattern := r.Pattern
+		if _, p, ok := strings.Cut(pattern, " "); ok {
+			pattern = p // strip the method prefix; it is its own label
+		}
+		if pattern == "" {
+			pattern = "unmatched"
+		}
+		metrics.HTTPDuration.
+			WithLabelValues(pattern, r.Method, strconv.Itoa(rec.status)).
+			Observe(elapsed.Seconds())
 		s.log.Info("http",
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", rec.status,
-			"duration_ms", time.Since(start).Milliseconds(),
+			"duration_ms", elapsed.Milliseconds(),
 		)
 	})
 }

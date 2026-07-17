@@ -62,6 +62,29 @@ type DoctorReport struct {
 	WebhookMappingErrors []WebhookMappingError `json:"webhook_mapping_errors,omitempty"` // P14 recent template eval failures
 }
 
+// SizeBytes returns the database size in bytes (per-dialect query). Shared by
+// the doctor report and the wtc_db_size_bytes metric collector (P16).
+func (s *Store) SizeBytes(ctx context.Context) (int64, error) {
+	sizeSQL := `SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()`
+	if s.dialect == dialectPostgres {
+		sizeSQL = `SELECT pg_database_size(current_database())`
+	}
+	var n int64
+	if err := s.readDB.QueryRowContext(ctx, sizeSQL).Scan(&n); err != nil {
+		return 0, fmt.Errorf("db size: %w", err)
+	}
+	return n, nil
+}
+
+// Backend returns the storage backend name ("sqlite" or "postgres") — metric
+// label and diagnostics only.
+func (s *Store) Backend() string {
+	if s.dialect == dialectPostgres {
+		return "postgres"
+	}
+	return "sqlite"
+}
+
 // Doctor gathers source health from the read pool (poll state from writeDB,
 // where that table lives — a single cheap row scan).
 func (s *Store) Doctor(ctx context.Context, now time.Time) (*DoctorReport, error) {
@@ -71,13 +94,11 @@ func (s *Store) Doctor(ctx context.Context, now time.Time) (*DoctorReport, error
 	if err := s.readDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM events`).Scan(&r.TotalEvents); err != nil {
 		return nil, fmt.Errorf("doctor: total: %w", err)
 	}
-	sizeSQL := `SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()`
-	if s.dialect == dialectPostgres {
-		sizeSQL = `SELECT pg_database_size(current_database())`
+	size, err := s.SizeBytes(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("doctor: %w", err)
 	}
-	if err := s.readDB.QueryRowContext(ctx, sizeSQL).Scan(&r.DBSizeBytes); err != nil {
-		return nil, fmt.Errorf("doctor: db size: %w", err)
-	}
+	r.DBSizeBytes = size
 
 	// Oldest retained event (NULL on an empty ledger) — a quick retention gauge.
 	var oldest sql.NullString

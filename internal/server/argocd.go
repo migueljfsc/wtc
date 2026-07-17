@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/ingest/argocd"
+	"github.com/migueljfsc/wtc/internal/metrics"
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
@@ -56,6 +57,7 @@ func (s *Server) handleIngestArgoCD(w http.ResponseWriter, r *http.Request) {
 	// resyncs re-fire Running+Succeeded every time); the strict-rank upsert
 	// guarantees one row regardless.
 	if s.argocdSuppressor.Suppress(suppressKey, time.Now()) {
+		metrics.Suppressed.WithLabelValues("argocd").Inc()
 		s.writeJSON(w, http.StatusAccepted, map[string]string{"status": argocd.ResultSuppressed})
 		return
 	}

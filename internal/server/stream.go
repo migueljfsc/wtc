@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/migueljfsc/wtc/internal/metrics"
 )
 
 // handleStream is the SSE live feed: every newly-stored event is pushed as an
@@ -25,6 +27,9 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 
 	sub := s.store.Subscribe()
 	defer s.store.Unsubscribe(sub)
+
+	metrics.SSEConnections.Inc()
+	defer metrics.SSEConnections.Dec()
 
 	// Open the stream immediately so the client's fetch resolves.
 	_, _ = io.WriteString(w, ": connected\n\n")

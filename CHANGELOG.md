@@ -4,6 +4,34 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 16 (Prometheus metrics)
+
+- **`/metrics` endpoint** (`prometheus/client_golang`) on the serve process,
+  **bearer-authed with `auth.api_tokens`** — wtc may be public (P13 posture) and
+  the endpoint leaks source names and activity levels. Instruments:
+  `wtc_ingested_total` / `wtc_deduped_total` / `wtc_suppressed_total` /
+  `wtc_mapping_errors_total` (all by `source`), `wtc_poll_last_success_timestamp_seconds`
+  (by `source`/`repo`/`resource`), `wtc_db_size_bytes` (per-backend, sampled at
+  scrape), `wtc_http_request_duration_seconds` histogram (by route `path`,
+  `method`, `status`), and `wtc_sse_connections`. Standard `go_*`/`process_*`
+  collectors included.
+- **Ingest counters live in the single-writer path**, so `ingested`/`deduped`
+  stay complete across every source (webhooks, pollers, generic) with no
+  per-handler wiring. The HTTP histogram's `path` label is the matched **route
+  pattern** (`/api/v1/where/{ref}`), never the raw URL — raw paths carry
+  shas/ULIDs and would explode cardinality.
+- **Optional separate unauthenticated listener** (`metrics.listen: ":9091"` /
+  `WTC_METRICS_LISTEN`) serving only `/metrics`, for in-cluster scrapes where an
+  api_token (which also grants `/api/*`) would be over-privileged. Off by
+  default; a configured listener that cannot bind is fatal.
+- **Helm: ServiceMonitor + scrape-annotation toggle** (`metrics.*`). Two scrape
+  models — main port with bearer auth (ServiceMonitor pulls `WTC_API_TOKEN` from
+  `existingSecret`; required in this model) or the unauthenticated
+  `metrics.port` listener (chart adds a `metrics` container/Service port). The
+  ServiceMonitor selector matches only the API Service, never the portal.
+- **Docs:** `docs/setup/metrics.md` — scrape configs for both models and example
+  alerts (source silent, mapping errors, no-ingest).
+
 ### Added — Phase 15 (Postgres backend — stateless wtc pod)
 
 - **Opt-in Postgres storage backend** (`storage.backend: postgres` +
