@@ -513,7 +513,10 @@ succeeded); string lists normalize nil→`[]` so clients index without null
 checks (caught live: `projects: null` would have crashed the tab); retention/
 digest sections report the SCHEDULERS' effective defaults rather than raw
 zeros, and whole-day durations render as `"180d"` matching the config's own
-d-suffix syntax.
+d-suffix syntax. Follow-up in the same phase (operator-requested): a real
+**Settings tab** — API version via bearer-authed `GET /api/v1/version`
+(version strings fingerprint deployments, so not public), build-time UI
+version, connection status, theme, and session/local-data controls.
 
 **Problem.** The portal shows only rules + tag_patterns (`/api/v1/config`,
 P10). Everything else the daemon runs with — which ingest paths are wired
