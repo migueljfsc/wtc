@@ -3,5 +3,5 @@ name: wtc
 description: Vendor-neutral change ledger — "git log for production"
 type: application
 version: 0.1.0
-appVersion: "0.13.0"
+appVersion: "0.14.0"
 home: https://github.com/migueljfsc/wtc
