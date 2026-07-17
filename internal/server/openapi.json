@@ -558,10 +558,155 @@
           "set": { "$ref": "#/components/schemas/RuleSet" }
         }
       },
+      "MaskedSecret": {
+        "type": "string",
+        "description": "Constant \"********\" when the secret is configured, \"\" when not. Never the value, never a partial, length-independent (P17)."
+      },
+      "ConfigServer": {
+        "type": "object",
+        "description": "Serve daemon surface (redacted).",
+        "required": ["listen", "cors_origins", "capture_enabled"],
+        "properties": {
+          "listen": { "type": "string" },
+          "cors_origins": { "type": "array", "items": { "type": "string" } },
+          "capture_enabled": { "type": "boolean", "description": "Raw ingest bodies are being written to disk (dev capture mode) — surface as a warning." }
+        }
+      },
+      "ConfigStorage": {
+        "type": "object",
+        "description": "Storage backend; for postgres the DSN's location parts with credentials stripped (absent when the DSN does not parse).",
+        "required": ["backend", "dsn"],
+        "properties": {
+          "backend": { "type": "string", "enum": ["sqlite", "postgres"] },
+          "dsn": { "$ref": "#/components/schemas/MaskedSecret" },
+          "host": { "type": "string" },
+          "port": { "type": "integer" },
+          "database": { "type": "string" }
+        }
+      },
+      "ConfigAuth": {
+        "type": "object",
+        "required": ["api_tokens"],
+        "properties": {
+          "api_tokens": { "type": "array", "items": { "$ref": "#/components/schemas/MaskedSecret" }, "description": "One mask per configured token — count visible, values never." }
+        }
+      },
+      "ConfigGitHub": {
+        "type": "object",
+        "required": ["webhook_secret", "api_token", "poll_interval", "poller_enabled", "repos", "infra_path"],
+        "properties": {
+          "webhook_secret": { "$ref": "#/components/schemas/MaskedSecret" },
+          "api_token": { "$ref": "#/components/schemas/MaskedSecret" },
+          "poll_interval": { "type": "string" },
+          "poller_enabled": { "type": "boolean" },
+          "repos": { "type": "array", "items": { "type": "string" }, "description": "Poller scope; empty with poller_enabled means auto-discovery." },
+          "infra_path": { "type": "string" }
+        }
+      },
+      "ConfigGitLab": {
+        "type": "object",
+        "required": ["base_url", "webhook_secret", "api_token", "poll_interval", "poller_enabled", "projects", "infra_path"],
+        "properties": {
+          "base_url": { "type": "string" },
+          "webhook_secret": { "$ref": "#/components/schemas/MaskedSecret" },
+          "api_token": { "$ref": "#/components/schemas/MaskedSecret" },
+          "poll_interval": { "type": "string" },
+          "poller_enabled": { "type": "boolean" },
+          "projects": { "type": "array", "items": { "type": "string" } },
+          "infra_path": { "type": "string" }
+        }
+      },
+      "ConfigFlux": {
+        "type": "object",
+        "required": ["hmac_key", "suppression_window"],
+        "properties": {
+          "hmac_key": { "$ref": "#/components/schemas/MaskedSecret" },
+          "suppression_window": { "type": "string" }
+        }
+      },
+      "ConfigArgoCD": {
+        "type": "object",
+        "required": ["webhook_secret", "suppression_window"],
+        "properties": {
+          "webhook_secret": { "$ref": "#/components/schemas/MaskedSecret" },
+          "suppression_window": { "type": "string" }
+        }
+      },
+      "ConfigWebhookAuth": {
+        "type": "object",
+        "required": ["mode", "secret"],
+        "properties": {
+          "mode": { "type": "string", "enum": ["token", "hmac"] },
+          "header": { "type": "string" },
+          "algo": { "type": "string" },
+          "prefix": { "type": "string" },
+          "secret": { "$ref": "#/components/schemas/MaskedSecret" }
+        }
+      },
+      "ConfigWebhook": {
+        "type": "object",
+        "description": "One mapping webhook (P14): auth shape with the secret masked, templates in full.",
+        "required": ["name", "auth", "dedup_key", "mapping"],
+        "properties": {
+          "name": { "type": "string" },
+          "preset": { "type": "string" },
+          "auth": { "$ref": "#/components/schemas/ConfigWebhookAuth" },
+          "dedup_key": { "type": "string" },
+          "mapping": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Effective (preset-resolved) field templates, shown in full." },
+          "facts": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      },
+      "ConfigSources": {
+        "type": "object",
+        "required": ["github", "gitlab", "flux", "argocd", "webhooks"],
+        "properties": {
+          "github": { "$ref": "#/components/schemas/ConfigGitHub" },
+          "gitlab": { "$ref": "#/components/schemas/ConfigGitLab" },
+          "flux": { "$ref": "#/components/schemas/ConfigFlux" },
+          "argocd": { "$ref": "#/components/schemas/ConfigArgoCD" },
+          "webhooks": { "type": "array", "items": { "$ref": "#/components/schemas/ConfigWebhook" } }
+        }
+      },
+      "ConfigDigest": {
+        "type": "object",
+        "required": ["enabled", "interval", "window", "slack_webhook"],
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "interval": { "type": "string" },
+          "window": { "type": "string" },
+          "slack_webhook": { "$ref": "#/components/schemas/MaskedSecret" }
+        }
+      },
+      "ConfigRetention": {
+        "type": "object",
+        "required": ["enabled", "keep"],
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "keep": { "type": "string" },
+          "ephemeral_env_pattern": { "type": "string" },
+          "ephemeral_keep": { "type": "string" },
+          "interval": { "type": "string" }
+        }
+      },
+      "ConfigMetrics": {
+        "type": "object",
+        "required": ["listen"],
+        "properties": {
+          "listen": { "type": "string", "description": "Separate unauthenticated /metrics listener address; \"\" = not open." }
+        }
+      },
       "ConfigResponse": {
         "type": "object",
-        "required": ["rules", "tag_patterns", "rules_overridden", "tag_patterns_overridden"],
+        "description": "Effective config: live-editable normalization (rules/tag_patterns) plus the redacted static snapshot of server/storage/auth/sources/jobs (P17). Secrets are constant \"********\" masks — values never leave the server.",
+        "required": ["server", "storage", "auth", "sources", "digest", "retention", "metrics", "rules", "tag_patterns", "rules_overridden", "tag_patterns_overridden"],
         "properties": {
+          "server": { "$ref": "#/components/schemas/ConfigServer" },
+          "storage": { "$ref": "#/components/schemas/ConfigStorage" },
+          "auth": { "$ref": "#/components/schemas/ConfigAuth" },
+          "sources": { "$ref": "#/components/schemas/ConfigSources" },
+          "digest": { "$ref": "#/components/schemas/ConfigDigest" },
+          "retention": { "$ref": "#/components/schemas/ConfigRetention" },
+          "metrics": { "$ref": "#/components/schemas/ConfigMetrics" },
           "rules": { "type": "array", "items": { "$ref": "#/components/schemas/Rule" } },
           "tag_patterns": { "type": "array", "items": { "type": "string" } },
           "rules_overridden": { "type": "boolean", "description": "true when rules come from a DB override rather than the YAML baseline." },

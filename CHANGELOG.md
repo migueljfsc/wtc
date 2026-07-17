@@ -4,6 +4,30 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 17 (Configuration visibility)
+
+- **`/api/v1/config` now carries the full effective config** (post `${VAR}`
+  expansion + `WTC_*` overrides): server/storage/auth/sources (github, gitlab,
+  flux, argocd, mapping webhooks)/digest/retention/metrics, alongside the
+  live-editable rules/tag_patterns. **Secrets never leave the server**: every
+  configured secret renders as the constant `"********"` (length-independent,
+  no partials), `api_tokens` as a list of masks, and the postgres DSN as
+  host/port/database with credentials stripped by the real pgx parser. The
+  view is an allowlist DTO built field-by-field — a forgotten config field
+  fails safe (not exposed) — and a sentinel guard test proves no secret value
+  survives into the JSON. Mapping-webhook templates are shown in full,
+  preset-resolved (config-as-code, same exposure class as rules).
+- **Portal: Settings → Configuration tab.** Per-source cards (ingest-mode
+  badge, parameters, masked secrets, last-event health chip joined from
+  doctor), storage & server (with a capture-mode warning), retention & digest
+  jobs, and the existing normalization editors unchanged. `/settings`
+  redirects to `/configuration`.
+- **`wtc config` CLI** — the same endpoint rendered for the terminal
+  (`--json` supported): source table with ingest modes, storage/auth/metrics
+  summary, jobs. Retention/digest show the scheduler's *effective* defaults
+  (interval 24h, pattern `pr-*`, ephemeral keep = keep) and whole-day
+  durations render as `180d`, matching the config syntax.
+
 ### Added — Phase 16 (Prometheus metrics)
 
 - **`/metrics` endpoint** (`prometheus/client_golang`) on the serve process,

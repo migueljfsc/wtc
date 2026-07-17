@@ -11,7 +11,7 @@ const Timeline = lazy(() => import("@/pages/Timeline").then((m) => ({ default: m
 const Where = lazy(() => import("@/pages/Where").then((m) => ({ default: m.Where })));
 const Diff = lazy(() => import("@/pages/Diff").then((m) => ({ default: m.Diff })));
 const Services = lazy(() => import("@/pages/Services").then((m) => ({ default: m.Services })));
-const Settings = lazy(() => import("@/pages/Settings").then((m) => ({ default: m.Settings })));
+const Configuration = lazy(() => import("@/pages/Configuration").then((m) => ({ default: m.Configuration })));
 
 function PageFallback() {
   return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
@@ -40,7 +40,9 @@ export function App() {
           <Route path="where" element={<Suspense fallback={<PageFallback />}><Where /></Suspense>} />
           <Route path="diff" element={<Suspense fallback={<PageFallback />}><Diff /></Suspense>} />
           <Route path="services" element={<Suspense fallback={<PageFallback />}><Services /></Suspense>} />
-          <Route path="settings" element={<Suspense fallback={<PageFallback />}><Settings /></Suspense>} />
+          <Route path="configuration" element={<Suspense fallback={<PageFallback />}><Configuration /></Suspense>} />
+          {/* Old bookmark-friendly alias for the renamed page (P17). */}
+          <Route path="settings" element={<Navigate to="/configuration" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

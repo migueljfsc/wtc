@@ -68,6 +68,23 @@ func PresetNames() []string {
 	return names
 }
 
+// Resolved returns the webhooks with presets applied — the effective
+// declarations that Compile validates and serves. An unknown preset passes
+// through unchanged: Compile is where that errors, and every caller of
+// Resolved (the P17 config view) runs after Compile has already succeeded.
+func Resolved(webhooks []Webhook) []Webhook {
+	out := make([]Webhook, len(webhooks))
+	for i, w := range webhooks {
+		if w.Preset != "" {
+			if base, ok := Preset(w.Preset); ok {
+				w = merge(base, w)
+			}
+		}
+		out[i] = w
+	}
+	return out
+}
+
 // merge overlays an operator's Webhook onto a preset base: any non-empty field
 // in over wins; Facts maps merge key-by-key (override keys win). Name and Auth
 // come from the operator (a preset carries neither). The preset supplies the

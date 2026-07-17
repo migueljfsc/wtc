@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/migueljfsc/wtc/internal/config"
 	"github.com/migueljfsc/wtc/internal/ingest/flux"
 	"github.com/migueljfsc/wtc/internal/ingest/mapping"
 	"github.com/migueljfsc/wtc/internal/metrics"
@@ -62,6 +63,12 @@ type Options struct {
 	// Mappers are the compiled mapping webhooks (P14), keyed by source name;
 	// nil/empty means /ingest/webhook/<name> 404s for every name.
 	Mappers map[string]*mapping.Mapper
+	// ConfigView is the redacted effective-config snapshot served at
+	// /api/v1/config (P17). Built by the caller (serve.go — the only holder
+	// of the full config) via config.NewView, so the server never receives
+	// raw secrets it doesn't already need. Static: sources config cannot
+	// change without a restart.
+	ConfigView config.View
 }
 
 // Server routes ingest and query requests onto a Store.
@@ -93,6 +100,10 @@ type Server struct {
 	curTags     []string
 	rulesFromDB bool
 	tagsFromDB  bool
+
+	// configView is the pre-redacted effective-config snapshot (P17);
+	// immutable after New.
+	configView config.View
 }
 
 // New builds the HTTP surface.
@@ -129,6 +140,7 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 		fileTags:           opts.TagPatterns,
 		curRules:           opts.Rules,
 		curTags:            opts.TagPatterns,
+		configView:         opts.ConfigView,
 		log:                log,
 		mux:                http.NewServeMux(),
 	}

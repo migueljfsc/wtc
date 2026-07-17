@@ -23,6 +23,7 @@ Lives at `docs/PLAN.md`. Each phase ≈ 1–3 Claude Code sessions. A phase is d
 | **P14 Mapping webhook** | ✅ 2026-07-17 | `/ingest/webhook/<name>`: config-declared auth (static token XOR hex-HMAC) + payload→Event template mapping (same engine as `rules[].set`) + dedup_key template + rule facts; webhook names are first-class sources. Presets **Grafana + Jenkins** live-captured (Harbor/TFC deferred, capture-first doc covers them); doctor gains an unstable-dedup_key churn heuristic + mapping-error surfacing |
 | **P15 Postgres backend** | ✅ 2026-07-17 | Opt-in `storage.backend: postgres` (pgx) → stateless wtc pod; one query surface via `?`→`$n` rebind + 5 explicit dialect branches (FTS→ILIKE, julianday→EXTRACT, GLOB→regex, pragma→pg_database_size; stats unified on substr); per-dialect migrations; `wtc migrate` (log output byte-identical across the copy); Helm bundled-postgres/external-DSN modes verified live on kind (no PVC, pod delete → zero loss, RollingUpdate); TestPG* parity suite + CI postgres service |
 | **P16 Prometheus metrics** | ✅ 2026-07-17 | `/metrics` (promhttp) bearer-authed with `api_tokens`; ingest/dedup counters live in the single-writer path (complete across every source, zero per-handler wiring); suppression/mapping-error counters, poller last-success gauge, per-backend DB-size gauge, HTTP latency histogram (label = route **pattern**, not raw URL → no sha cardinality), SSE gauge. Optional separate **unauthenticated** listener (`metrics.listen`) for in-cluster scrapes. Helm ServiceMonitor (main-port-bearer XOR unauth-port models) + scrape-annotation toggle; `docs/setup/metrics.md`. ClickHouse rejected — change-event volumes never warrant it |
+| **P17 Configuration tab** | ✅ 2026-07-18 | `/api/v1/config` extended with the redacted effective config (allowlist DTO built in serve.go — the server gains no new raw secrets; constant `"********"` masks; DSN → pgx-parsed host/port/db, creds stripped; sentinel guard test). Portal Settings → Configuration (source cards + doctor health chips, capture-mode warning, `/settings` redirect); mapping templates shown preset-resolved; `wtc config` CLI renders the same endpoint with the schedulers' effective defaults |
 
 Unplanned addition: `demo/` — three dummy services + fake three-cluster Flux
 wiring generating real events continuously (operator-requested test bed;
@@ -497,3 +498,81 @@ moves); ServiceMonitor verified on a kind cluster with kube-prometheus-stack.
 
 P15 first — P16's DB-size gauge and CI wiring benefit from the backend split
 landing beforehand. Both independent of the ingest and UI tracks.
+
+# Operator visibility (P17, operator-requested 2026-07-18)
+
+## Phase 17 — Configuration tab (effective-config visibility)
+
+**Shipped 2026-07-18.** As planned below with the four operator decisions
+(Settings renamed, templates in full, both CLI + portal, masked secrets)
+applied. Implementation notes: the view lives in `internal/config` (`View` +
+`NewView`) so the sentinel test sits next to the struct it guards; preset
+resolution got an exported `mapping.Resolved` (pass-through on unknown presets
+— Compile stays the place that errors, and the view always runs after Compile
+succeeded); string lists normalize nil→`[]` so clients index without null
+checks (caught live: `projects: null` would have crashed the tab); retention/
+digest sections report the SCHEDULERS' effective defaults rather than raw
+zeros, and whole-day durations render as `"180d"` matching the config's own
+d-suffix syntax.
+
+**Problem.** The portal shows only rules + tag_patterns (`/api/v1/config`,
+P10). Everything else the daemon runs with — which ingest paths are wired
+(github poller/webhook, gitlab, flux, argocd, mapping webhooks), storage
+backend, retention, digest, metrics posture — is invisible without reading the
+ConfigMap or pod env. Operator wants a **Configuration tab**: one place that
+answers "what does this wtc have configured?".
+
+**The hard requirement: secrets never leave the server.** The config carries
+webhook secrets, HMAC keys, PATs, the DSN. Exposure rules (operator decisions
+2026-07-18):
+
+- **Fixed-mask strings** for every secret: a configured secret renders as the
+  constant `"********"`, an unconfigured one as `""` — never values, never
+  partials (last-4 leaks entropy), and the mask is **constant-length
+  regardless of the real value's length** (length is information too).
+  `api_tokens` → a list of masks (count is visible, values are not).
+- **Allowlist DTO, never struct marshal.** The view is an explicit
+  hand-written struct built field-by-field from `config.Config`; forgetting a
+  new config field fails SAFE (not exposed) instead of leaking it. Marshalling
+  `config.Config` with omissions is forbidden.
+- **Sentinel guard test** (the phase's must-have): build a fully-populated
+  `config.Config` where every secret field holds a sentinel string, marshal
+  the view, assert the sentinel never appears anywhere in the JSON (masks
+  appear instead).
+- Postgres DSN → parsed **host/port/database only** (creds stripped via
+  `pgx.ParseConfig`), password position masked; omit entirely if the parse
+  fails. Capture-dir set → surfaced with a warning badge (it is a
+  data-exposure flag).
+
+**API.** Extend the existing `GET /api/v1/config` response (additive, one
+"effective config" endpoint, portal already has the query hook) with the
+redacted sections: `server` (listen, cors, capture flag), `storage`, `auth`
+(token count), `sources` (github/gitlab/flux/argocd params + per-webhook
+name/preset/auth-mode/templates), `digest`, `retention`, `metrics`. Values are
+**effective** (post `${VAR}` expansion + `WTC_*` overrides) — built once in
+`serve.go` (the only holder of the full config) and passed into
+`server.Options` as a prebuilt view, so the Server gains no new raw secrets.
+Static snapshot: sources config cannot change without a restart (rules/tags
+keep their live-edit path unchanged). Mapping-webhook templates are shown in
+full — operator-authored config-as-code, same exposure class as rules.
+`openapi.json` updated + `npm run gen:api` regenerated in the same commit (the
+P14 drift lesson).
+
+**UI.** Restructure the existing Settings page into a **Configuration** tab
+(nav rename — operator-approved): sections *Sources* (per-source cards: on/off
+badge, parameters, webhook-vs-poller mode, secrets as `********`, a small
+health chip client-joined from the existing doctor query — no new API),
+*Storage & server*, *Normalization* (the existing rules/tag_patterns editors,
+unchanged), *Retention & jobs*. Mapping-webhook templates shown in full
+(operator-approved — config-as-code, same exposure class as rules). Portal
+only; the embedded lite UI (`web/`) stays as-is.
+
+**CLI.** `wtc config` subcommand rendering the same endpoint (`--json`
+supported) — thin client, CLI-first parity (operator-approved: both surfaces
+in scope).
+
+**Accept:** the portal tab shows the wtc-dev rig's real config (flux HMAC on,
+github/gitlab pollers off, storage postgres, ...) with zero secret values in
+any `/api/v1/config` response body (sentinel guard test + a live
+`curl | grep -c <known-secret>` = 0); an operator can tell at a glance which
+ingest paths are live; CI green including the regenerated UI client.

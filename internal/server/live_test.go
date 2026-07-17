@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/migueljfsc/wtc/internal/config"
 	"github.com/migueljfsc/wtc/internal/normalize"
 )
 
@@ -39,6 +40,49 @@ func TestConfigEndpoint(t *testing.T) {
 	}
 	if len(cfg.Rules) != 1 || cfg.Rules[0].Set.Env != "prod" || len(cfg.TagPatterns) != 1 {
 		t.Fatalf("config body = %+v", cfg)
+	}
+}
+
+// TestConfigEndpointView: the P17 sections ride the same endpoint, secrets
+// arrive masked, and the raw values never cross the wire.
+func TestConfigEndpointView(t *testing.T) {
+	const secret = "wire-leak-sentinel-77"
+	full := config.Config{
+		Server:  config.Server{Listen: ":8484", DB: "x", CaptureDir: "/cap"},
+		Storage: config.Storage{Backend: "sqlite"},
+		Auth:    config.Auth{APITokens: []string{secret}},
+	}
+	full.Sources.Flux.HMACKey = secret
+	full.Sources.GitHub.WebhookSecret = secret
+
+	st := newTestStore(t)
+	srv := New(st, Options{
+		Tokens:     []string{testToken},
+		ConfigView: config.NewView(&full),
+	}, slog.New(slog.DiscardHandler))
+	url := newHTTPTest(t, srv)
+
+	resp, body := doRequest(t, http.MethodGet, url+"/api/v1/config", testToken, nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("config = %d %s", resp.StatusCode, body)
+	}
+	if strings.Contains(string(body), secret) {
+		t.Fatalf("secret value crossed the wire:\n%s", body)
+	}
+
+	var cfg ConfigResponse
+	if err := json.Unmarshal(body, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Sources.Flux.HMACKey != config.Mask || cfg.Sources.GitHub.WebhookSecret != config.Mask {
+		t.Errorf("secrets not masked: flux=%q github=%q",
+			cfg.Sources.Flux.HMACKey, cfg.Sources.GitHub.WebhookSecret)
+	}
+	if len(cfg.Auth.APITokens) != 1 || cfg.Auth.APITokens[0] != config.Mask {
+		t.Errorf("api_tokens = %v, want one mask", cfg.Auth.APITokens)
+	}
+	if !cfg.Server.CaptureEnabled || cfg.Server.Listen != ":8484" {
+		t.Errorf("server section = %+v", cfg.Server)
 	}
 }
 

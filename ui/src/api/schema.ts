@@ -540,7 +540,109 @@ export interface components {
             match: components["schemas"]["RuleMatch"];
             set: components["schemas"]["RuleSet"];
         };
+        /** @description Constant "********" when the secret is configured, "" when not. Never the value, never a partial, length-independent (P17). */
+        MaskedSecret: string;
+        /** @description Serve daemon surface (redacted). */
+        ConfigServer: {
+            listen: string;
+            cors_origins: string[];
+            /** @description Raw ingest bodies are being written to disk (dev capture mode) — surface as a warning. */
+            capture_enabled: boolean;
+        };
+        /** @description Storage backend; for postgres the DSN's location parts with credentials stripped (absent when the DSN does not parse). */
+        ConfigStorage: {
+            /** @enum {string} */
+            backend: "sqlite" | "postgres";
+            dsn: components["schemas"]["MaskedSecret"];
+            host?: string;
+            port?: number;
+            database?: string;
+        };
+        ConfigAuth: {
+            /** @description One mask per configured token — count visible, values never. */
+            api_tokens: components["schemas"]["MaskedSecret"][];
+        };
+        ConfigGitHub: {
+            webhook_secret: components["schemas"]["MaskedSecret"];
+            api_token: components["schemas"]["MaskedSecret"];
+            poll_interval: string;
+            poller_enabled: boolean;
+            /** @description Poller scope; empty with poller_enabled means auto-discovery. */
+            repos: string[];
+            infra_path: string;
+        };
+        ConfigGitLab: {
+            base_url: string;
+            webhook_secret: components["schemas"]["MaskedSecret"];
+            api_token: components["schemas"]["MaskedSecret"];
+            poll_interval: string;
+            poller_enabled: boolean;
+            projects: string[];
+            infra_path: string;
+        };
+        ConfigFlux: {
+            hmac_key: components["schemas"]["MaskedSecret"];
+            suppression_window: string;
+        };
+        ConfigArgoCD: {
+            webhook_secret: components["schemas"]["MaskedSecret"];
+            suppression_window: string;
+        };
+        ConfigWebhookAuth: {
+            /** @enum {string} */
+            mode: "token" | "hmac";
+            header?: string;
+            algo?: string;
+            prefix?: string;
+            secret: components["schemas"]["MaskedSecret"];
+        };
+        /** @description One mapping webhook (P14): auth shape with the secret masked, templates in full. */
+        ConfigWebhook: {
+            name: string;
+            preset?: string;
+            auth: components["schemas"]["ConfigWebhookAuth"];
+            dedup_key: string;
+            /** @description Effective (preset-resolved) field templates, shown in full. */
+            mapping: {
+                [key: string]: string;
+            };
+            facts?: {
+                [key: string]: string;
+            };
+        };
+        ConfigSources: {
+            github: components["schemas"]["ConfigGitHub"];
+            gitlab: components["schemas"]["ConfigGitLab"];
+            flux: components["schemas"]["ConfigFlux"];
+            argocd: components["schemas"]["ConfigArgoCD"];
+            webhooks: components["schemas"]["ConfigWebhook"][];
+        };
+        ConfigDigest: {
+            enabled: boolean;
+            interval: string;
+            window: string;
+            slack_webhook: components["schemas"]["MaskedSecret"];
+        };
+        ConfigRetention: {
+            enabled: boolean;
+            keep: string;
+            ephemeral_env_pattern?: string;
+            ephemeral_keep?: string;
+            interval?: string;
+        };
+        ConfigMetrics: {
+            /** @description Separate unauthenticated /metrics listener address; "" = not open. */
+            listen: string;
+        };
+        /** @description Effective config: live-editable normalization (rules/tag_patterns) plus the redacted static snapshot of server/storage/auth/sources/jobs (P17). Secrets are constant "********" masks — values never leave the server. */
         ConfigResponse: {
+            server: components["schemas"]["ConfigServer"];
+            storage: components["schemas"]["ConfigStorage"];
+            auth: components["schemas"]["ConfigAuth"];
+            sources: components["schemas"]["ConfigSources"];
+            digest: components["schemas"]["ConfigDigest"];
+            retention: components["schemas"]["ConfigRetention"];
+            metrics: components["schemas"]["ConfigMetrics"];
             rules: components["schemas"]["Rule"][];
             tag_patterns: string[];
             /** @description true when rules come from a DB override rather than the YAML baseline. */

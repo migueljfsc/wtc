@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/migueljfsc/wtc/internal/config"
 	"github.com/migueljfsc/wtc/internal/normalize"
 )
 
@@ -13,10 +14,13 @@ const (
 	cfgKeyTags  = "tag_patterns"
 )
 
-// ConfigResponse is the effective normalization config plus whether each part
-// is a DB override (vs the YAML baseline). Secrets never appear here — rules
-// and tag_patterns hold only globs/regexes and field templates.
+// ConfigResponse is the effective config surface: the live-editable
+// normalization parts (rules/tag_patterns + override flags, P10) plus the
+// redacted static snapshot of everything else (config.View, P17). Secrets
+// never appear here — the view masks them as a constant "********" and the
+// sentinel guard test in internal/config proves it.
 type ConfigResponse struct {
+	config.View
 	Rules                 []normalize.Rule `json:"rules"`
 	TagPatterns           []string         `json:"tag_patterns"`
 	RulesOverridden       bool             `json:"rules_overridden"`
@@ -72,6 +76,7 @@ func (s *Server) snapshotConfig() ConfigResponse {
 		tags = []string{}
 	}
 	return ConfigResponse{
+		View:                  s.configView,
 		Rules:                 rules,
 		TagPatterns:           tags,
 		RulesOverridden:       s.rulesFromDB,

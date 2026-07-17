@@ -104,6 +104,15 @@ func (c *Client) Doctor(ctx context.Context) (store.DoctorReport, error) {
 	return out, err
 }
 
+// Config fetches the effective config: redacted static snapshot (P17) plus
+// the live normalization parts. Secrets arrive masked — the server never
+// sends values.
+func (c *Client) Config(ctx context.Context) (server.ConfigResponse, error) {
+	var out server.ConfigResponse
+	err := c.do(ctx, http.MethodGet, "/api/config", nil, &out)
+	return out, err
+}
+
 // Where fetches a change's BUILD → INTENT → APPLIED journey.
 func (c *Client) Where(ctx context.Context, ref string) (query.WhereReport, error) {
 	var out query.WhereReport

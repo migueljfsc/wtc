@@ -23,7 +23,7 @@ const NAV = [
   { to: "/where", label: "Where", icon: Route },
   { to: "/diff", label: "Diff", icon: GitCompareArrows },
   { to: "/services", label: "Services", icon: Server },
-  { to: "/settings", label: "Settings", icon: Settings },
+  { to: "/configuration", label: "Configuration", icon: Settings },
 ];
 
 function ThemeToggle() {
