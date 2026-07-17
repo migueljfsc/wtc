@@ -1,7 +1,6 @@
 package store
 
 import (
-	"database/sql"
 	"embed"
 	"fmt"
 	"strconv"
@@ -9,13 +8,23 @@ import (
 	"time"
 )
 
-//go:embed migrations/*.sql
+//go:embed migrations/sqlite/*.sql migrations/postgres/*.sql
 var migrationsFS embed.FS
+
+// migrationsDir returns the embedded per-dialect migration directory. The two
+// dialects have independent sequences (postgres has no FTS migration); both
+// follow the same append-only rule.
+func migrationsDir(d dialect) string {
+	if d == dialectPostgres {
+		return "migrations/postgres"
+	}
+	return "migrations/sqlite"
+}
 
 // migrate applies embedded sequential migrations that have not run yet.
 // Files are named NNNN_description.sql and applied in numeric order, each in
 // its own transaction, recorded in schema_migrations.
-func migrate(db *sql.DB) error {
+func migrate(db *dbConn, d dialect) error {
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
 		version    INTEGER PRIMARY KEY,
 		name       TEXT NOT NULL,
@@ -29,9 +38,10 @@ func migrate(db *sql.DB) error {
 		return fmt.Errorf("read schema version: %w", err)
 	}
 
+	dir := migrationsDir(d)
 	// fs.ReadDir guarantees entries sorted by filename, so NNNN_ prefixes
 	// already give numeric application order.
-	entries, err := migrationsFS.ReadDir("migrations")
+	entries, err := migrationsFS.ReadDir(dir)
 	if err != nil {
 		return fmt.Errorf("read embedded migrations: %w", err)
 	}
@@ -45,7 +55,7 @@ func migrate(db *sql.DB) error {
 		if version <= current {
 			continue
 		}
-		body, err := migrationsFS.ReadFile("migrations/" + name)
+		body, err := migrationsFS.ReadFile(dir + "/" + name)
 		if err != nil {
 			return fmt.Errorf("read migration %s: %w", name, err)
 		}
@@ -68,7 +78,7 @@ func migrationVersion(name string) (int, error) {
 	return version, nil
 }
 
-func applyMigration(db *sql.DB, version int, name, body string) error {
+func applyMigration(db *dbConn, version int, name, body string) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -78,8 +88,9 @@ func applyMigration(db *sql.DB, version int, name, body string) error {
 	if _, err := tx.Exec(body); err != nil {
 		return err
 	}
+	// tx is a raw *sql.Tx — rebind the recording insert explicitly.
 	if _, err := tx.Exec(
-		`INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)`,
+		db.rebind(`INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)`),
 		version, name, time.Now().UTC().Format(time.RFC3339),
 	); err != nil {
 		return err

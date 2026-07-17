@@ -57,13 +57,20 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 		log.Warn("no api_tokens configured — /api/* and /ingest/generic will reject all requests")
 	}
 
-	if dir := filepath.Dir(cfg.Server.DB); dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0o750); err != nil {
-			return fmt.Errorf("create db directory: %w", err)
+	var st *store.Store
+	switch cfg.Storage.Backend {
+	case "postgres":
+		// P15: external database — the serve pod is stateless.
+		st, err = store.OpenPostgres(cfg.Storage.DSN)
+		log.Info("storage backend", "backend", "postgres")
+	default: // "sqlite" (validated by config.Load)
+		if dir := filepath.Dir(cfg.Server.DB); dir != "." && dir != "" {
+			if err := os.MkdirAll(dir, 0o750); err != nil {
+				return fmt.Errorf("create db directory: %w", err)
+			}
 		}
+		st, err = store.Open(cfg.Server.DB)
 	}
-
-	st, err := store.Open(cfg.Server.DB)
 	if err != nil {
 		return err
 	}

@@ -6,12 +6,14 @@ Full guide: [../docs/setup/deploy.md](../docs/setup/deploy.md). Image:
 | Path | What |
 |---|---|
 | `helm/wtc/` | Helm chart — the primary packaging (in-cluster) |
-| `docker-compose.yaml` | VMs / local |
-| `wtc.example.yaml` | starter config for compose (`cp` to `wtc.yaml`, edit) |
+| `compose/docker-compose.yaml` | VMs / local |
+| `compose/docker-compose.postgres.yaml` | overlay: postgres-backed, stateless wtc (P15) |
+| `compose/wtc.example.yaml` | starter config for compose (`cp` to `wtc.yaml`, edit) |
 
 Two properties are contracts, not defaults to tune:
 
-- **`replicas: 1` + `Recreate` + RWO PVC** — SQLite has a single writer.
+- **`replicas: 1` + `Recreate` + RWO PVC** — SQLite has a single writer
+  (with the P15 postgres backend the pod is stateless and rolls instead).
   Scaling horizontally corrupts nothing but gains nothing; the second pod
   fails to start (by design).
 - **`${VAR}` in config resolves at startup and an unset var is fatal** —

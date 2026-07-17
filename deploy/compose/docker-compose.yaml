@@ -2,7 +2,7 @@
 services:
   wtc:
     build:
-      context: ..
+      context: ../..
     image: ghcr.io/migueljfsc/wtc:latest
     ports:
       - "8484:8484"
@@ -22,7 +22,7 @@ services:
   # directly (cross-origin, hence the CORS setting above).
   ui:
     build:
-      context: ../ui
+      context: ../../ui
     image: ghcr.io/migueljfsc/wtc-ui:latest
     ports:
       - "8080:80"

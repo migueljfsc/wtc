@@ -56,6 +56,7 @@ func newRootCmd() *cobra.Command {
 		newInitCmd(),
 		newDoctorCmd(flags),
 		newDemoCmd(flags),
+		newMigrateCmd(),
 	)
 	return root
 }

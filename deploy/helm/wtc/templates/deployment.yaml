@@ -5,10 +5,15 @@ metadata:
   labels:
     app.kubernetes.io/name: {{ .Chart.Name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
+{{- $pg := eq .Values.storage.backend "postgres" }}
 spec:
-  replicas: 1                # SQLite single writer — never scale this
+  replicas: 1                # single writer + per-pod pollers — never scale this
   strategy:
+    {{- if $pg }}
+    type: RollingUpdate      # stateless pod (P15): no volume pins the rollout
+    {{- else }}
     type: Recreate           # RWO volume + single writer: no rolling overlap
+    {{- end }}
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ .Chart.Name }}
@@ -21,6 +26,17 @@ spec:
       annotations:
         checksum/config: {{ toYaml .Values.config | sha256sum }}
     spec:
+      {{- if .Values.postgresql.enabled }}
+      # Hold wtc until the bundled postgres accepts connections, so first boot
+      # doesn't burn restart backoffs racing the database.
+      initContainers:
+        - name: wait-for-postgresql
+          image: {{ .Values.postgresql.image }}
+          command:
+            - sh
+            - -c
+            - until pg_isready -h {{ .Release.Name }}-postgresql -U {{ .Values.postgresql.auth.username }}; do echo waiting for postgresql; sleep 2; done
+      {{- end }}
       containers:
         - name: wtc
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -34,9 +50,24 @@ spec:
             - secretRef:
                 name: {{ . }}
           {{- end }}
-          {{- with .Values.env }}
+          {{- $pgChartManaged := and .Values.postgresql.enabled (ne .Values.postgresql.auth.password "") }}
+          {{- if or $pgChartManaged .Values.env }}
           env:
+            {{- if $pgChartManaged }}
+            # Chart-managed bundled-postgres password. The ConfigMap DSN
+            # references ${WTC_PG_PASSWORD}; wtc's loader expands it at
+            # startup. With existingSecret instead, the same variable arrives
+            # via envFrom (opinionated key WTC_PG_PASSWORD) and this entry is
+            # not rendered.
+            - name: WTC_PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-postgresql
+                  key: password
+            {{- end }}
+            {{- with .Values.env }}
 {{ toYaml . | indent 12 }}
+            {{- end }}
           {{- end }}
           livenessProbe:
             httpGet: {path: /healthz, port: http}
@@ -47,12 +78,15 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/wtc
+            {{- if not $pg }}
             - name: data
               mountPath: /data
+            {{- end }}
       volumes:
         - name: config
           configMap:
             name: {{ .Release.Name }}-config
+        {{- if not $pg }}
         - name: data
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
@@ -60,3 +94,4 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- end }}

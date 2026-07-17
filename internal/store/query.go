@@ -80,7 +80,19 @@ func (s *Store) ListEvents(ctx context.Context, f Filter) (events []model.Event,
 		add("ts <= ?", model.FormatTS(f.Until))
 	}
 	if f.Query != "" {
-		add("rowid IN (SELECT rowid FROM events_fts WHERE events_fts MATCH ?)", ftsQuery(f.Query))
+		if s.dialect == dialectPostgres {
+			// No FTS index on postgres (deliberate — the events table is
+			// small): each term must substring-match one of the searchable
+			// columns, terms ANDed. ILIKE mirrors FTS5's case-insensitivity;
+			// substring vs word-prefix is close enough for a change ledger.
+			for _, term := range strings.Fields(f.Query) {
+				p := "%" + escapeLike(term) + "%"
+				add(`(title ILIKE ? ESCAPE '\' OR service ILIKE ? ESCAPE '\' OR actor ILIKE ? ESCAPE '\' OR artifact ILIKE ? ESCAPE '\')`,
+					p, p, p, p)
+			}
+		} else {
+			add("rowid IN (SELECT rowid FROM events_fts WHERE events_fts MATCH ?)", ftsQuery(f.Query))
+		}
 	}
 	if f.Cursor != "" {
 		ts, id, err := decodeCursor(f.Cursor)

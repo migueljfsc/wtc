@@ -1,0 +1,114 @@
+{{- if .Values.postgresql.enabled }}
+{{- $user := .Values.postgresql.auth.username }}
+{{- $db := .Values.postgresql.auth.database }}
+{{- $host := printf "%s-postgresql" .Release.Name }}
+{{- /*
+Password source, one of:
+  1. postgresql.auth.password — quick path; the chart manages a Secret.
+  2. existingSecret            — operator-managed Secret, opinionated key
+                                 WTC_PG_PASSWORD (same secret that carries the
+                                 API tokens; see values.yaml).
+wtc itself receives the password via the ${WTC_PG_PASSWORD} reference in the
+ConfigMap DSN, expanded by its config loader at startup.
+*/ -}}
+{{- $chartManaged := ne .Values.postgresql.auth.password "" }}
+{{- if not (or $chartManaged .Values.existingSecret) }}
+{{- fail "bundled postgresql needs a password: set postgresql.auth.password OR provide existingSecret with key WTC_PG_PASSWORD" }}
+{{- end }}
+{{- $secretName := ternary (printf "%s-postgresql" .Release.Name) .Values.existingSecret $chartManaged }}
+{{- $secretKey := ternary "password" "WTC_PG_PASSWORD" $chartManaged }}
+{{- if $chartManaged }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $host }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}-postgresql
+    app.kubernetes.io/instance: {{ .Release.Name }}
+type: Opaque
+stringData:
+  password: {{ .Values.postgresql.auth.password | quote }}
+---
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $host }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}-postgresql
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+  selector:
+    app.kubernetes.io/name: {{ .Chart.Name }}-postgresql
+    app.kubernetes.io/instance: {{ .Release.Name }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $host }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}-postgresql
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  serviceName: {{ $host }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Chart.Name }}-postgresql
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Chart.Name }}-postgresql
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: postgresql
+          image: {{ .Values.postgresql.image }}
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: {{ $user | quote }}
+            - name: POSTGRES_DB
+              value: {{ $db | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ $secretKey }}
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ $user | quote }}, "-d", {{ $db | quote }}]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ $user | quote }}, "-d", {{ $db | quote }}]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+{{ toYaml .Values.postgresql.resources | indent 12 }}
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ .Values.postgresql.persistence.size }}
+        {{- with .Values.postgresql.persistence.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+{{- end }}

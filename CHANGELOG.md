@@ -4,6 +4,53 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 15 (Postgres backend — stateless wtc pod)
+
+- **Opt-in Postgres storage backend** (`storage.backend: postgres` +
+  `storage.dsn`; `WTC_STORAGE_*` env overrides). SQLite stays the default and
+  the single-binary story — the driver is operational posture, not scale: on
+  k8s the wtc pod goes **stateless** (no PVC, RollingUpdate, instant
+  reschedule), and backup/HA becomes your standard database story.
+- **One query surface, two dialects.** All SQL stays in sqlite form; a
+  transparent `?`→`$n` rebind wrapper covers postgres, and only the genuinely
+  divergent sites branch: DB size (`pg_database_size`), clock-skew/churn
+  (`EXTRACT(EPOCH)` instead of `julianday`), search (per-term `ILIKE` — no FTS
+  index on postgres, deliberately), retention glob (`~` regex translation,
+  autovacuum instead of `incremental_vacuum`). Stats bucketing was unified on
+  `substr` over the fixed-width ts text — one portable query, no branch. The
+  upsert's stored-row columns are now qualified (`events.<col>`): postgres
+  rejects unqualified `DO UPDATE` references as ambiguous; sqlite accepts the
+  qualified form, so one statement serves both.
+- **Per-dialect embedded migrations** (`migrations/sqlite/` unchanged;
+  `migrations/postgres/` fresh — no FTS, `duration_ms BIGINT`), same
+  append-only rule.
+- **`wtc migrate`** — one-shot offline sqlite→postgres ledger copy (events,
+  poller watermarks, config overrides; `ON CONFLICT DO NOTHING`, idempotent
+  re-run). The deliberate exception to "the CLI never opens the DB file".
+  Verified: `wtc log` output byte-identical across the migration.
+- **Helm:** `storage.backend=postgres` drops the wtc PVC and switches to
+  RollingUpdate; `postgresql.enabled=true` bundles a single-node postgres
+  StatefulSet (with an init wait so first boot doesn't race the DB);
+  otherwise `storage.externalDatabase.url` points at your own
+  (CloudNativePG/RDS). **Secrets follow one contract:** the chart-wide
+  `existingSecret` is a single operator-managed Secret with opinionated keys
+  covering API tokens, source credentials, AND db auth (`WTC_PG_PASSWORD`
+  bundled / `WTC_STORAGE_DSN` external); the DSN is rendered into the
+  ConfigMap referencing `${WTC_PG_PASSWORD}` and expanded by wtc's own config
+  loader at startup — credentials never appear in the Deployment spec. A
+  quick chart-managed path (`postgresql.auth.password`) remains. Verified
+  live on kind in both modes: no PVC, pod deleted → ledger intact, rolling
+  upgrade, one out-of-band Secret driving both DB auth and API auth.
+- **docker-compose:** `docker-compose.postgres.yaml` overlay (postgres service
+  + `WTC_STORAGE_*` env; wtc.yaml needs no storage section).
+- **Parity suite:** `TestPG*` (gated on `WTC_TEST_PG_DSN`) re-exercises
+  upsert lifecycle, search, doctor, retention, watermarks, overrides, stats,
+  matrix, and the ledger migration against a real postgres 16; CI gains a
+  postgres service container. Still **one replica** — HA/leader-election out
+  of scope. New dependency: `jackc/pgx/v5` (pure Go; operator-approved).
+- **Docs:** `docs/setup/postgres.md` (config, both Helm modes, compose
+  overlay, ledger migration, behavioral differences).
+
 ### Added — Phase 14 (Mapping webhook — long-tail ingest)
 
 - **`/ingest/webhook/<name>`: any tool that POSTs JSON becomes config, not

@@ -10,9 +10,10 @@ import (
 )
 
 // Dashboard aggregations (SPEC: DORA-ish portal metrics, P8). All grouping is
-// done in SQL over the events table; ts is stored as sortable UTC ISO-8601
-// text, so strftime buckets it directly. Buckets are UTC — the client formats
-// to local for display.
+// done in SQL over the events table; ts is stored as sortable fixed-width UTC
+// ISO-8601 text, so substr slices the bucket label directly (portable across
+// sqlite and postgres). Buckets are UTC — the client formats to local for
+// display.
 
 // maxBuckets caps a single activity request so an hour-bucketed multi-year
 // window can't allocate an unbounded slice.
@@ -35,17 +36,21 @@ type ActivityStats struct {
 }
 
 type bucketSpec struct {
-	sqlFmt string // strftime format
-	goFmt  string // matching Go layout
-	step   time.Duration
+	sqlExpr string // SQL expression producing the bucket label from ts
+	goFmt   string // matching Go layout
+	step    time.Duration
 }
 
+// bucketSpecFor builds the bucket label straight from the stored text: ts is
+// canonical fixed-width UTC ("2006-01-02T15:04:05.000Z"), so substr slices the
+// day/hour prefix without any datetime function — portable across sqlite and
+// postgres, replacing the sqlite-only strftime.
 func bucketSpecFor(bucket string) (bucketSpec, error) {
 	switch bucket {
 	case "day":
-		return bucketSpec{sqlFmt: "%Y-%m-%d", goFmt: "2006-01-02", step: 24 * time.Hour}, nil
+		return bucketSpec{sqlExpr: "substr(ts, 1, 10)", goFmt: "2006-01-02", step: 24 * time.Hour}, nil
 	case "hour":
-		return bucketSpec{sqlFmt: "%Y-%m-%dT%H:00", goFmt: "2006-01-02T15:00", step: time.Hour}, nil
+		return bucketSpec{sqlExpr: "substr(ts, 1, 13) || ':00'", goFmt: "2006-01-02T15:00", step: time.Hour}, nil
 	default:
 		return bucketSpec{}, fmt.Errorf("invalid bucket %q: want day or hour", bucket)
 	}
@@ -69,7 +74,7 @@ func (s *Store) ActivityStats(ctx context.Context, since, until time.Time, bucke
 	}
 
 	rows, err := s.readDB.QueryContext(ctx, `
-SELECT strftime('`+spec.sqlFmt+`', ts) AS bucket,
+SELECT `+spec.sqlExpr+` AS bucket,
        COUNT(*),
        SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END),
        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END)

@@ -56,7 +56,7 @@ Moved into scope for the post-v1 UI Platform track (docs/PLAN.md P7–P10, opera
 cmd/wtc/              main.go + cobra command definitions
 internal/model/       Event struct, kind/status enums, validation
 internal/config/      wtc.yaml loader, ${VAR} expansion (unset = fatal), WTC_* overrides
-internal/store/       sqlite open/pragmas, migrations/, write queue, queries, watermarks
+internal/store/       db open (sqlite default / postgres opt-in), per-dialect migrations/, write queue, queries, watermarks
 internal/server/      http server, routing, middleware (hmac, bearer), capture mode
 internal/ingest/
     github/           REST payload structs, normalizers, API poller, PR enrichment

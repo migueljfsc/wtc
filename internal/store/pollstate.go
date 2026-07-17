@@ -36,13 +36,16 @@ func (s *Store) PollWatermark(ctx context.Context, repo, resource string) (time.
 // SetPollWatermark persists the newest source timestamp seen for
 // (repo, resource). Monotonic: an older value than the stored one is ignored.
 func (s *Store) SetPollWatermark(ctx context.Context, repo, resource string, watermark time.Time) error {
+	// The DO UPDATE WHERE qualifies the stored column with the table name:
+	// unqualified `watermark` is ambiguous on postgres (target vs excluded);
+	// sqlite accepts the qualified form too, so one query serves both.
 	_, err := s.writeDB.ExecContext(ctx, `
 INSERT INTO github_poll_state (repo, resource, watermark, updated_at)
 VALUES (?, ?, ?, ?)
 ON CONFLICT(repo, resource) DO UPDATE SET
   watermark  = excluded.watermark,
   updated_at = excluded.updated_at
-WHERE excluded.watermark > watermark`,
+WHERE excluded.watermark > github_poll_state.watermark`,
 		repo, resource, model.FormatTS(watermark), model.FormatTS(time.Now()),
 	)
 	if err != nil {

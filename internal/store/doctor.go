@@ -71,9 +71,11 @@ func (s *Store) Doctor(ctx context.Context, now time.Time) (*DoctorReport, error
 	if err := s.readDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM events`).Scan(&r.TotalEvents); err != nil {
 		return nil, fmt.Errorf("doctor: total: %w", err)
 	}
-	if err := s.readDB.QueryRowContext(ctx,
-		`SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()`,
-	).Scan(&r.DBSizeBytes); err != nil {
+	sizeSQL := `SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()`
+	if s.dialect == dialectPostgres {
+		sizeSQL = `SELECT pg_database_size(current_database())`
+	}
+	if err := s.readDB.QueryRowContext(ctx, sizeSQL).Scan(&r.DBSizeBytes); err != nil {
 		return nil, fmt.Errorf("doctor: db size: %w", err)
 	}
 
@@ -140,10 +142,15 @@ FROM events GROUP BY source ORDER BY source`, dayAgo)
 	}
 
 	// |ts - ingested_at| > 10m flags out-of-order arrival / clock skew (trap #6).
-	if err := s.readDB.QueryRowContext(ctx, `
+	skewSQL := `
 SELECT COUNT(*) FROM events
-WHERE ts >= ? AND ABS(julianday(ts) - julianday(ingested_at)) > 10.0/1440.0`, dayAgo,
-	).Scan(&r.ClockSkew24h); err != nil {
+WHERE ts >= ? AND ABS(julianday(ts) - julianday(ingested_at)) > 10.0/1440.0`
+	if s.dialect == dialectPostgres {
+		skewSQL = `
+SELECT COUNT(*) FROM events
+WHERE ts >= ? AND ABS(EXTRACT(EPOCH FROM (ts::timestamptz - ingested_at::timestamptz))) > 600`
+	}
+	if err := s.readDB.QueryRowContext(ctx, skewSQL, dayAgo).Scan(&r.ClockSkew24h); err != nil {
 		return nil, fmt.Errorf("doctor: clock skew: %w", err)
 	}
 
@@ -193,8 +200,7 @@ const (
 // signal is meaningful for any parser), but the footgun it targets is the
 // operator-authored P14 dedup_key template.
 func (s *Store) webhookChurn(ctx context.Context, r *DoctorReport, dayAgo string) error {
-	windowDays := churnWindow.Minutes() / 1440.0
-	rows, err := s.readDB.QueryContext(ctx, `
+	churnSQL := `
 SELECT source, title, COUNT(DISTINCT dedup_key) AS keys,
        CAST((julianday(MAX(ts)) - julianday(MIN(ts))) * 86400 AS INTEGER) AS span_s
 FROM events
@@ -202,7 +208,24 @@ WHERE ts >= ?
 GROUP BY source, title, kind, status
 HAVING keys >= ? AND (julianday(MAX(ts)) - julianday(MIN(ts))) <= ?
 ORDER BY keys DESC
-LIMIT 10`, dayAgo, churnMinRows, windowDays)
+LIMIT 10`
+	var windowArg any = churnWindow.Minutes() / 1440.0 // julianday units: days
+	if s.dialect == dialectPostgres {
+		// Postgres can't reference a select alias in HAVING — repeat the
+		// aggregates; the window compares in seconds via EXTRACT(EPOCH).
+		churnSQL = `
+SELECT source, title, COUNT(DISTINCT dedup_key) AS keys,
+       EXTRACT(EPOCH FROM (MAX(ts)::timestamptz - MIN(ts)::timestamptz))::int AS span_s
+FROM events
+WHERE ts >= ?
+GROUP BY source, title, kind, status
+HAVING COUNT(DISTINCT dedup_key) >= ?
+   AND EXTRACT(EPOCH FROM (MAX(ts)::timestamptz - MIN(ts)::timestamptz)) <= ?
+ORDER BY keys DESC
+LIMIT 10`
+		windowArg = churnWindow.Seconds()
+	}
+	rows, err := s.readDB.QueryContext(ctx, churnSQL, dayAgo, churnMinRows, windowArg)
 	if err != nil {
 		return fmt.Errorf("doctor: webhook churn: %w", err)
 	}

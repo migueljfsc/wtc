@@ -80,6 +80,15 @@ type Auth struct {
 	APITokens []string `yaml:"api_tokens"`
 }
 
+// Storage selects the storage backend (P15). Default sqlite keeps using
+// server.db as the file path — the single-binary story. backend=postgres
+// requires DSN and makes the serve pod stateless; DSN carries credentials, so
+// inject it via ${VAR}/secretRef, never a plain value in a committed file.
+type Storage struct {
+	Backend string `yaml:"backend"` // "sqlite" (default) | "postgres"
+	DSN     string `yaml:"dsn"`     // postgres connection string; required when backend=postgres
+}
+
 // GitHub configures the GitHub ingest paths (SPEC §2). The poller is the
 // primary path for private deployments; webhooks need a public endpoint.
 type GitHub struct {
@@ -150,6 +159,7 @@ type Retention struct {
 // Config is the full wtc.yaml.
 type Config struct {
 	Server      Server           `yaml:"server"`
+	Storage     Storage          `yaml:"storage"` // backend selection (P15); default sqlite
 	Auth        Auth             `yaml:"auth"`
 	Sources     Sources          `yaml:"sources"`
 	Rules       []normalize.Rule `yaml:"rules"`        // ordered env/service inference rules (SPEC §3)
@@ -164,6 +174,9 @@ func Default() Config {
 		Server: Server{
 			Listen: ":8484",
 			DB:     "./wtc.db",
+		},
+		Storage: Storage{
+			Backend: "sqlite",
 		},
 		Sources: Sources{
 			GitHub: GitHub{
@@ -280,6 +293,19 @@ func Load(path string, optional bool) (*Config, error) {
 	if cfg.Server.DB == "" {
 		return nil, fmt.Errorf("config %s: server.db must not be empty", path)
 	}
+	// Storage backend (P15): fail fast on a typo'd backend or a postgres
+	// selection without a DSN — a silently-wrong storage config must never
+	// reach Open.
+	switch cfg.Storage.Backend {
+	case "", "sqlite":
+		cfg.Storage.Backend = "sqlite"
+	case "postgres":
+		if cfg.Storage.DSN == "" {
+			return nil, fmt.Errorf("config %s: storage.backend=postgres requires storage.dsn", path)
+		}
+	default:
+		return nil, fmt.Errorf("config %s: storage.backend must be sqlite or postgres, got %q", path, cfg.Storage.Backend)
+	}
 
 	return &cfg, nil
 }
@@ -295,6 +321,8 @@ func applyEnvOverrides(cfg *Config) {
 	set(&cfg.Server.Listen, "WTC_SERVER_LISTEN")
 	set(&cfg.Server.DB, "WTC_SERVER_DB")
 	set(&cfg.Server.CaptureDir, "WTC_SERVER_CAPTURE_DIR")
+	set(&cfg.Storage.Backend, "WTC_STORAGE_BACKEND")
+	set(&cfg.Storage.DSN, "WTC_STORAGE_DSN")
 	// Comma-separated origins, e.g. "https://portal.example.com,http://localhost:5173".
 	if v, ok := os.LookupEnv("WTC_SERVER_CORS_ALLOWED_ORIGINS"); ok {
 		cfg.Server.CORS.AllowedOrigins = splitAndTrim(v)

@@ -33,7 +33,7 @@ coverage.html
 *.swp
 
 # compose operator config (real tokens live in env)
-/deploy/wtc.yaml
+/deploy/compose/wtc.yaml
 
 # portal SPA (ui/, phases 7-10) — build artifacts, never commit these
 /ui/node_modules/

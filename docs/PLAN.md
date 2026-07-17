@@ -21,7 +21,7 @@ Lives at `docs/PLAN.md`. Each phase ≈ 1–3 Claude Code sessions. A phase is d
 | **P12 GitLab ingest** | ✅ 2026-07-16 | SCM/CI-axis neutrality proof (GitHub↔GitLab, as Flux↔Argo was for GitOps); poller + `X-Gitlab-Token` webhook converge on shared dedup keys (`gl:pipeline`/`gl:mr`/`gl:push`); pipeline/MR/push normalizers + MR-diff enrichment; env inference via shared path rules. Verified live on a gitlab.com project: `wtc where` spans pipeline BUILD → MR merge INTENT → Argo CD APPLIED (private repo via Argo credential) |
 | **P13 GitHub webhook completion** | ✅ 2026-07-17 | `/ingest/github` normalizes workflow_run/push/pull_request into the poller's Events + dedup keys (nested objects reuse the REST structs) — webhook + poller now peer modes, idempotent together; fixtures captured via the hook-deliveries API (no tunnel); onboarding gains the ingest-posture guide |
 | **P14 Mapping webhook** | ✅ 2026-07-17 | `/ingest/webhook/<name>`: config-declared auth (static token XOR hex-HMAC) + payload→Event template mapping (same engine as `rules[].set`) + dedup_key template + rule facts; webhook names are first-class sources. Presets **Grafana + Jenkins** live-captured (Harbor/TFC deferred, capture-first doc covers them); doctor gains an unstable-dedup_key churn heuristic + mapping-error surfacing |
-| **P15 Postgres backend** | ⬜ planned | Opt-in `storage.backend: postgres` (pgx) → stateless wtc pod in k8s (no PVC, RollingUpdate); SQLite stays the default and the single-binary story; Helm bundles an optional postgres (`postgresql.enabled`) or takes an external DSN; one-shot sqlite→pg ledger migration; single replica stays |
+| **P15 Postgres backend** | ✅ 2026-07-17 | Opt-in `storage.backend: postgres` (pgx) → stateless wtc pod; one query surface via `?`→`$n` rebind + 5 explicit dialect branches (FTS→ILIKE, julianday→EXTRACT, GLOB→regex, pragma→pg_database_size; stats unified on substr); per-dialect migrations; `wtc migrate` (log output byte-identical across the copy); Helm bundled-postgres/external-DSN modes verified live on kind (no PVC, pod delete → zero loss, RollingUpdate); TestPG* parity suite + CI postgres service |
 | **P16 Prometheus metrics** | ⬜ planned | `/metrics` (promhttp): per-source ingest/dedup/suppression counters, mapping errors, poller lag, DB size, HTTP latency histograms; optional ServiceMonitor in the chart. ClickHouse evaluated and rejected — change-event volumes never warrant it |
 
 Unplanned addition: `demo/` — three dummy services + fake three-cluster Flux
@@ -391,6 +391,20 @@ Theme: run wtc like a production service. Separate the data from the pod
   if wtc ever ingests high-cardinality telemetry — a stated non-goal.
 
 ## Phase 15 — Postgres backend (stateless wtc pod)
+
+**Shipped 2026-07-17.** As planned below, with two findings worth recording:
+postgres rejects unqualified stored-row columns in `ON CONFLICT DO UPDATE`
+(42702) — the shared upsert now qualifies them (`events.<col>`), which sqlite
+also accepts; and stats bucketing turned out to need no branch at all —
+`substr` over the fixed-width ts text replaced the sqlite-only `strftime` for
+both dialects. Live-verified on kind: bundled-postgres install has no wtc PVC,
+survives pod deletion with the ledger intact, and upgrades via RollingUpdate
+(an init wait was added so first boot doesn't race the DB); `wtc migrate`
+produced byte-identical `wtc log` output across the sqlite→pg copy. Helm
+secrets were consolidated (operator feedback): one chart-wide `existingSecret`
+with opinionated keys covers API tokens + DB auth (`WTC_PG_PASSWORD` /
+`WTC_STORAGE_DSN`); the DSN lands in the ConfigMap referencing
+`${WTC_PG_PASSWORD}`, expanded by wtc's own loader — both modes live-verified.
 
 The driver is **operational posture, not scale** — SQLite handles these
 volumes for a decade. What Postgres buys in k8s: the wtc pod becomes

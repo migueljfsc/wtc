@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/model"
@@ -21,8 +23,9 @@ type RetentionResult struct {
 // everything else — including unmapped env="" rows — uses keep. A zero
 // ephemeralKeep falls back to keep; an empty pattern disables the ephemeral arm.
 //
-// The FTS index stays consistent automatically: the events_fts_ad AFTER DELETE
-// trigger removes each deleted row from the index.
+// On sqlite the FTS index stays consistent automatically: the events_fts_ad
+// AFTER DELETE trigger removes each deleted row from the index. (Postgres has
+// no FTS index — search is ILIKE.)
 //
 // Runs on writeDB, which is capped at one connection (SetMaxOpenConns(1)), so
 // it serializes with the single writer goroutine — no two statements ever hit
@@ -35,6 +38,14 @@ func (s *Store) Retain(ctx context.Context, now time.Time, keep, ephemeralKeep t
 
 	normalCutoff := model.FormatTS(now.Add(-keep))
 
+	// The ephemeral pattern is documented as a SQLite GLOB ("pr-*"). On
+	// postgres the same pattern is translated to an anchored regex and matched
+	// with ~ (case-sensitive, like GLOB).
+	globCond, globArg := "env GLOB ?", func(p string) string { return p }
+	if s.dialect == dialectPostgres {
+		globCond, globArg = "env ~ ?", globToRegex
+	}
+
 	// Ephemeral arm first: prune pr-* rows past their (shorter) cutoff. The
 	// normal arm below explicitly excludes the pattern, so an ephemeral row can
 	// never be kept longer than ephemeralKeep just because keep is larger.
@@ -45,7 +56,7 @@ func (s *Store) Retain(ctx context.Context, now time.Time, keep, ephemeralKeep t
 		}
 		ephCutoff := model.FormatTS(now.Add(-ek))
 		r, err := s.writeDB.ExecContext(ctx,
-			`DELETE FROM events WHERE env GLOB ? AND ts < ?`, ephemeralPattern, ephCutoff)
+			`DELETE FROM events WHERE `+globCond+` AND ts < ?`, globArg(ephemeralPattern), ephCutoff)
 		if err != nil {
 			return res, fmt.Errorf("retain: ephemeral delete: %w", err)
 		}
@@ -59,7 +70,7 @@ func (s *Store) Retain(ctx context.Context, now time.Time, keep, ephemeralKeep t
 	)
 	if ephemeralPattern != "" {
 		r, err = s.writeDB.ExecContext(ctx,
-			`DELETE FROM events WHERE NOT (env GLOB ?) AND ts < ?`, ephemeralPattern, normalCutoff)
+			`DELETE FROM events WHERE NOT (`+globCond+`) AND ts < ?`, globArg(ephemeralPattern), normalCutoff)
 	} else {
 		r, err = s.writeDB.ExecContext(ctx,
 			`DELETE FROM events WHERE ts < ?`, normalCutoff)
@@ -69,9 +80,32 @@ func (s *Store) Retain(ctx context.Context, now time.Time, keep, ephemeralKeep t
 	}
 	res.DeletedNormal, _ = r.RowsAffected()
 
-	// Reclaim pages freed by the deletes above. A no-op when nothing was freed.
-	if _, err := s.writeDB.ExecContext(ctx, `PRAGMA incremental_vacuum`); err != nil {
-		return res, fmt.Errorf("retain: incremental_vacuum: %w", err)
+	// Reclaim pages freed by the deletes above (sqlite only — postgres
+	// autovacuum handles reclamation). A no-op when nothing was freed.
+	if s.dialect == dialectSQLite {
+		if _, err := s.writeDB.ExecContext(ctx, `PRAGMA incremental_vacuum`); err != nil {
+			return res, fmt.Errorf("retain: incremental_vacuum: %w", err)
+		}
 	}
 	return res, nil
+}
+
+// globToRegex translates a SQLite GLOB pattern (* any run, ? one char) into an
+// anchored regex for postgres's ~ operator. Character classes ([...]) are not
+// supported — the retention docs advertise * and ? only.
+func globToRegex(pattern string) string {
+	var b strings.Builder
+	b.WriteString("^")
+	for i := 0; i < len(pattern); i++ {
+		switch c := pattern[i]; c {
+		case '*':
+			b.WriteString(".*")
+		case '?':
+			b.WriteString(".")
+		default:
+			b.WriteString(regexp.QuoteMeta(string(c)))
+		}
+	}
+	b.WriteString("$")
+	return b.String()
 }

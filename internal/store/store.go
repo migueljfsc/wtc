@@ -1,6 +1,7 @@
-// Package store owns SQLite access: open/pragmas, embedded migrations, a
-// single-writer goroutine consuming an ingest channel, and a read-only pool
-// for queries. Nothing outside `wtc serve` opens the DB file.
+// Package store owns database access: open/pragmas, embedded migrations, a
+// single-writer goroutine consuming an ingest channel, and a read pool for
+// queries. Backends: embedded SQLite (default — nothing outside `wtc serve`
+// opens the DB file) and opt-in Postgres (P15, stateless-pod deployments).
 package store
 
 import (
@@ -11,7 +12,8 @@ import (
 	"net/url"
 	"sync"
 
-	_ "modernc.org/sqlite" // registers the "sqlite" driver (pure Go, no CGO)
+	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" driver (pure Go)
+	_ "modernc.org/sqlite"             // registers the "sqlite" driver (pure Go, no CGO)
 
 	"github.com/migueljfsc/wtc/internal/model"
 )
@@ -22,10 +24,11 @@ const busyTimeoutMS = 5000
 // treat it as a retryable condition (the daemon is shutting down).
 var ErrStoreClosed = errors.New("store is closed")
 
-// Store is the single owner of the SQLite database.
+// Store is the single owner of the database.
 type Store struct {
-	writeDB *sql.DB
-	readDB  *sql.DB
+	dialect dialect
+	writeDB *dbConn
+	readDB  *dbConn
 	writeCh chan writeReq
 	wg      sync.WaitGroup
 
@@ -74,6 +77,9 @@ func dsn(path string, readOnly bool) string {
 // url, and duration_ms follow non-empty-wins merge semantics: a later event
 // enriches the row but can never blank out what an earlier event recorded.
 // kind and source are identity — the first event wins, never updated.
+// Stored-row columns are qualified as events.<col>: postgres rejects
+// unqualified names in DO UPDATE as ambiguous (42702); sqlite accepts the
+// qualified form, so one statement serves both dialects.
 const upsertSQL = `
 INSERT INTO events (id, ts, ingested_at, source, kind, status, env, cluster,
                     namespace, service, actor, ref, artifact, title, url,
@@ -83,36 +89,53 @@ ON CONFLICT(dedup_key) DO UPDATE SET
   status      = excluded.status,
   ts          = excluded.ts,
   title       = excluded.title,
-  duration_ms = coalesce(excluded.duration_ms, duration_ms),
-  payload     = coalesce(excluded.payload, payload),
-  url         = coalesce(nullif(excluded.url, ''), url),
-  env         = coalesce(nullif(excluded.env, ''), env),
-  cluster     = coalesce(nullif(excluded.cluster, ''), cluster),
-  namespace   = coalesce(nullif(excluded.namespace, ''), namespace),
-  service     = coalesce(nullif(excluded.service, ''), service),
-  actor       = coalesce(nullif(excluded.actor, ''), actor),
-  ref         = coalesce(nullif(excluded.ref, ''), ref),
-  artifact    = coalesce(nullif(excluded.artifact, ''), artifact)
+  duration_ms = coalesce(excluded.duration_ms, events.duration_ms),
+  payload     = coalesce(excluded.payload, events.payload),
+  url         = coalesce(nullif(excluded.url, ''), events.url),
+  env         = coalesce(nullif(excluded.env, ''), events.env),
+  cluster     = coalesce(nullif(excluded.cluster, ''), events.cluster),
+  namespace   = coalesce(nullif(excluded.namespace, ''), events.namespace),
+  service     = coalesce(nullif(excluded.service, ''), events.service),
+  actor       = coalesce(nullif(excluded.actor, ''), events.actor),
+  ref         = coalesce(nullif(excluded.ref, ''), events.ref),
+  artifact    = coalesce(nullif(excluded.artifact, ''), events.artifact)
 WHERE ? > (CASE events.status WHEN 'degraded' THEN 3 WHEN 'succeeded' THEN 2 WHEN 'failed' THEN 2 WHEN 'started' THEN 1 ELSE 0 END)
 RETURNING id`
 
-// Open opens (creating if needed) the database at path, applies pragmas and
-// migrations, prepares the hot-path statements, and starts the writer.
+// Open opens (creating if needed) the SQLite database at path, applies
+// pragmas and migrations, prepares the hot-path statements, and starts the
+// writer. This is the default backend — the single-binary story.
 func Open(path string) (*Store, error) {
 	if path == "" {
 		// "file:?..." would open a SQLite private temporary database that
 		// silently vanishes on close — never acceptable for a ledger.
 		return nil, fmt.Errorf("store: db path must not be empty")
 	}
+	return open(dialectSQLite, "sqlite", dsn(path, false), dsn(path, true))
+}
 
-	writeDB, err := sql.Open("sqlite", dsn(path, false))
+// OpenPostgres connects to the Postgres database at connString (P15 opt-in
+// backend), applies migrations, and starts the writer. The write pool stays
+// capped at one connection so ordering semantics are identical to sqlite.
+func OpenPostgres(connString string) (*Store, error) {
+	if connString == "" {
+		return nil, fmt.Errorf("store: postgres dsn must not be empty")
+	}
+	return open(dialectPostgres, "pgx", connString, connString)
+}
+
+func open(d dialect, driver, writeDSN, readDSN string) (*Store, error) {
+	rawWrite, err := sql.Open(driver, writeDSN)
 	if err != nil {
 		return nil, fmt.Errorf("open write db: %w", err)
 	}
-	// Single writer: one connection, one goroutine, zero SQLITE_BUSY fights.
-	writeDB.SetMaxOpenConns(1)
+	// Single writer: one connection, one goroutine. On sqlite this is what
+	// prevents SQLITE_BUSY fights; on postgres it keeps write ordering
+	// identical so the two backends behave the same.
+	rawWrite.SetMaxOpenConns(1)
+	writeDB := &dbConn{DB: rawWrite, d: d}
 
-	if err := migrate(writeDB); err != nil {
+	if err := migrate(writeDB, d); err != nil {
 		_ = writeDB.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
@@ -128,16 +151,17 @@ func Open(path string) (*Store, error) {
 		return nil, fmt.Errorf("prepare id lookup: %w", err)
 	}
 
-	readDB, err := sql.Open("sqlite", dsn(path, true))
+	rawRead, err := sql.Open(driver, readDSN)
 	if err != nil {
 		_ = writeDB.Close()
 		return nil, fmt.Errorf("open read db: %w", err)
 	}
-	readDB.SetMaxOpenConns(8)
+	rawRead.SetMaxOpenConns(8)
 
 	s := &Store{
+		dialect:       d,
 		writeDB:       writeDB,
-		readDB:        readDB,
+		readDB:        &dbConn{DB: rawRead, d: d},
 		writeCh:       make(chan writeReq, 256),
 		upsertStmt:    upsertStmt,
 		idByDedupStmt: idByDedupStmt,

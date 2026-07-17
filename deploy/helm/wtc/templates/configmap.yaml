@@ -1,3 +1,24 @@
+{{- /*
+When storage.backend=postgres the chart injects the storage section here
+rather than via env, so the DSN can carry a ${WTC_PG_PASSWORD} reference that
+wtc's own config loader expands at startup (unset variable = fatal). Bundled
+postgres → assembled DSN pointing at the StatefulSet; external → the operator's
+url verbatim (may itself contain ${VAR} references), or nothing at all when the
+whole DSN comes from the existingSecret as WTC_STORAGE_DSN (env override).
+Do not hand-write a storage: section under .Values.config — this wins.
+*/ -}}
+{{- $config := deepCopy .Values.config }}
+{{- if eq .Values.storage.backend "postgres" }}
+  {{- $dsn := "" }}
+  {{- if .Values.postgresql.enabled }}
+    {{- $dsn = printf "postgres://%s:${WTC_PG_PASSWORD}@%s-postgresql:5432/%s?sslmode=disable" .Values.postgresql.auth.username .Release.Name .Values.postgresql.auth.database }}
+  {{- else if .Values.storage.externalDatabase.url }}
+    {{- $dsn = .Values.storage.externalDatabase.url }}
+  {{- end }}
+  {{- $storage := dict "backend" "postgres" }}
+  {{- if $dsn }}{{- $_ := set $storage "dsn" $dsn }}{{- end }}
+  {{- $_ := set $config "storage" $storage }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,4 +28,4 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
 data:
   wtc.yaml: |
-{{ toYaml .Values.config | indent 4 }}
+{{ toYaml $config | indent 4 }}

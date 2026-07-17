@@ -11,6 +11,23 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Postgres service backs the P15 parity suite (TestPG* in internal/store,
+    # gated on WTC_TEST_PG_DSN). SQLite tests run regardless.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: wtc
+          POSTGRES_DB: wtc
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      WTC_TEST_PG_DSN: postgres://postgres:wtc@localhost:5432/wtc?sslmode=disable
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6

@@ -29,7 +29,7 @@ They point at each other: `WTC_API_BASE_URL` is where the SPA sends requests;
 
 ## 2. Docker Compose (both containers)
 
-`deploy/docker-compose.yaml` already wires both. From `deploy/`:
+`deploy/compose/docker-compose.yaml` already wires both. From `deploy/compose/`:
 
 ```sh
 export WTC_API_TOKEN=$(openssl rand -hex 24)

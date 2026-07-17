@@ -93,6 +93,39 @@ retention:
 	}
 }
 
+func TestStorageConfig(t *testing.T) {
+	// Default is sqlite with no DSN required.
+	cfg, err := Load(filepath.Join(t.TempDir(), "missing.yaml"), true)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Storage.Backend != "sqlite" {
+		t.Errorf("default backend = %q, want sqlite", cfg.Storage.Backend)
+	}
+
+	// postgres requires a DSN.
+	path := writeFile(t, "server:\n  listen: \":8484\"\n  db: ./wtc.db\nstorage:\n  backend: postgres\n")
+	if _, err := Load(path, false); err == nil {
+		t.Error("postgres without dsn: want error")
+	}
+
+	// Unknown backend is fatal.
+	path = writeFile(t, "server:\n  listen: \":8484\"\n  db: ./wtc.db\nstorage:\n  backend: mysql\n")
+	if _, err := Load(path, false); err == nil {
+		t.Error("unknown backend: want error")
+	}
+
+	// Valid postgres config.
+	path = writeFile(t, "server:\n  listen: \":8484\"\n  db: ./wtc.db\nstorage:\n  backend: postgres\n  dsn: postgres://u:p@h:5432/wtc\n")
+	cfg, err = Load(path, false)
+	if err != nil {
+		t.Fatalf("Load postgres: %v", err)
+	}
+	if cfg.Storage.Backend != "postgres" || cfg.Storage.DSN == "" {
+		t.Errorf("storage = %+v", cfg.Storage)
+	}
+}
+
 func TestWebhooksConfig(t *testing.T) {
 	t.Setenv("TEST_GRAFANA_TOKEN", "graf-sekrit")
 	path := writeFile(t, `
