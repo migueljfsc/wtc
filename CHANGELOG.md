@@ -27,6 +27,12 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
   summary, jobs. Retention/digest show the scheduler's *effective* defaults
   (interval 24h, pattern `pr-*`, ephemeral keep = keep) and whole-day
   durations render as `180d`, matching the config syntax.
+- **Portal: a real Settings tab** (the old one became Configuration): API
+  version via the new bearer-authed `GET /api/v1/version` (versions
+  fingerprint deployments — not public), UI version injected at build time
+  from `package.json`, connection info (endpoint + reachability), theme
+  choice (light/system/dark), and session/local-data controls (log out,
+  clear saved timeline filters).
 
 ### Added — Phase 16 (Prometheus metrics)
 

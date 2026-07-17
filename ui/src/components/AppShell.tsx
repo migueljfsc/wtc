@@ -9,6 +9,7 @@ import {
   Route,
   Server,
   Settings,
+  SlidersHorizontal,
   Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,8 @@ const NAV = [
   { to: "/where", label: "Where", icon: Route },
   { to: "/diff", label: "Diff", icon: GitCompareArrows },
   { to: "/services", label: "Services", icon: Server },
-  { to: "/configuration", label: "Configuration", icon: Settings },
+  { to: "/configuration", label: "Configuration", icon: SlidersHorizontal },
+  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 function ThemeToggle() {

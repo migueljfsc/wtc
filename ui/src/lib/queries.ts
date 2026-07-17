@@ -103,6 +103,19 @@ export function useConfig() {
   });
 }
 
+/** Server build version — static per process, cache aggressively. */
+export function useVersion() {
+  return useQuery({
+    queryKey: ["version"],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/version", {});
+      if (error) throw new Error("version request failed");
+      return data;
+    },
+    staleTime: Infinity,
+  });
+}
+
 /** Save edited rules (validated + hot-reloaded server-side). Throws the
  *  server's message on 400 so the editor can surface it. */
 export async function putRules(rules: unknown[]): Promise<void> {

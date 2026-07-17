@@ -38,6 +38,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The server's build-stamped version (bearer-authed — versions fingerprint deployments). */
+        get: operations["getVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events": {
         parameters: {
             query?: never;
@@ -540,6 +557,10 @@ export interface components {
             match: components["schemas"]["RuleMatch"];
             set: components["schemas"]["RuleSet"];
         };
+        VersionResponse: {
+            /** @description Build-stamped binary version ("dev" for unstamped builds). */
+            version: string;
+        };
         /** @description Constant "********" when the secret is configured, "" when not. Never the value, never a partial, length-independent (P17). */
         MaskedSecret: string;
         /** @description Serve daemon surface (redacted). */
@@ -727,6 +748,27 @@ export interface operations {
                     "application/json": {
                         ok: boolean;
                     };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];

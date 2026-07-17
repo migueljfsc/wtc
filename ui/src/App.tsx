@@ -12,6 +12,7 @@ const Where = lazy(() => import("@/pages/Where").then((m) => ({ default: m.Where
 const Diff = lazy(() => import("@/pages/Diff").then((m) => ({ default: m.Diff })));
 const Services = lazy(() => import("@/pages/Services").then((m) => ({ default: m.Services })));
 const Configuration = lazy(() => import("@/pages/Configuration").then((m) => ({ default: m.Configuration })));
+const Settings = lazy(() => import("@/pages/Settings").then((m) => ({ default: m.Settings })));
 
 function PageFallback() {
   return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
@@ -41,8 +42,7 @@ export function App() {
           <Route path="diff" element={<Suspense fallback={<PageFallback />}><Diff /></Suspense>} />
           <Route path="services" element={<Suspense fallback={<PageFallback />}><Services /></Suspense>} />
           <Route path="configuration" element={<Suspense fallback={<PageFallback />}><Configuration /></Suspense>} />
-          {/* Old bookmark-friendly alias for the renamed page (P17). */}
-          <Route path="settings" element={<Navigate to="/configuration" replace />} />
+          <Route path="settings" element={<Suspense fallback={<PageFallback />}><Settings /></Suspense>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

@@ -39,6 +39,19 @@
         }
       }
     },
+    "/api/v1/version": {
+      "get": {
+        "operationId": "getVersion",
+        "summary": "The server's build-stamped version (bearer-authed — versions fingerprint deployments).",
+        "responses": {
+          "200": {
+            "description": "Server version.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/VersionResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
     "/api/v1/events": {
       "get": {
         "operationId": "listEvents",
@@ -556,6 +569,13 @@
         "properties": {
           "match": { "$ref": "#/components/schemas/RuleMatch" },
           "set": { "$ref": "#/components/schemas/RuleSet" }
+        }
+      },
+      "VersionResponse": {
+        "type": "object",
+        "required": ["version"],
+        "properties": {
+          "version": { "type": "string", "description": "Build-stamped binary version (\"dev\" for unstamped builds)." }
         }
       },
       "MaskedSecret": {

@@ -69,6 +69,9 @@ type Options struct {
 	// raw secrets it doesn't already need. Static: sources config cannot
 	// change without a restart.
 	ConfigView config.View
+	// Version is the build-stamped binary version served at /api/v1/version
+	// (portal Settings tab). Empty renders as "dev".
+	Version string
 }
 
 // Server routes ingest and query requests onto a Store.
@@ -104,6 +107,7 @@ type Server struct {
 	// configView is the pre-redacted effective-config snapshot (P17);
 	// immutable after New.
 	configView config.View
+	version    string
 }
 
 // New builds the HTTP surface.
@@ -141,8 +145,12 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 		curRules:           opts.Rules,
 		curTags:            opts.TagPatterns,
 		configView:         opts.ConfigView,
+		version:            opts.Version,
 		log:                log,
 		mux:                http.NewServeMux(),
+	}
+	if s.version == "" {
+		s.version = "dev"
 	}
 
 	// Apply any DB-backed config overrides (P10), rebuilding + swapping the
@@ -218,6 +226,7 @@ func (s *Server) apiRoutes() []apiRoute {
 		{"DELETE", "/config/tag_patterns", http.HandlerFunc(s.handleResetTagPatterns)},
 		{"GET", "/stream", http.HandlerFunc(s.handleStream)},
 		{"GET", "/auth/verify", http.HandlerFunc(s.handleAuthVerify)},
+		{"GET", "/version", http.HandlerFunc(s.handleVersion)},
 	}
 }
 

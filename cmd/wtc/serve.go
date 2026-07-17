@@ -136,6 +136,7 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 			TagPatterns:         effectiveTagPatterns,
 			Mappers:             mappers,
 			ConfigView:          config.NewView(cfg),
+			Version:             version,
 		}, log).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

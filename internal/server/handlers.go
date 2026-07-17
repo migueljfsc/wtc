@@ -27,6 +27,18 @@ func (s *Server) handleAuthVerify(w http.ResponseWriter, _ *http.Request) {
 	s.writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
+// VersionResponse is the /api/v1/version payload (portal Settings tab).
+type VersionResponse struct {
+	Version string `json:"version"`
+}
+
+// handleVersion reports the build-stamped binary version. Bearer-authed like
+// the rest of the API — version strings fingerprint deployments, so they are
+// not public.
+func (s *Server) handleVersion(w http.ResponseWriter, _ *http.Request) {
+	s.writeJSON(w, http.StatusOK, VersionResponse{Version: s.version})
+}
+
 // IngestResponse is returned by all ingest endpoints.
 type IngestResponse struct {
 	ID      string `json:"id"`
