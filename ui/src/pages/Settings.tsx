@@ -30,7 +30,9 @@ function About() {
       </CardHeader>
       <CardContent className="space-y-1.5">
         <KV k="API version" v={apiVersion} />
-        <KV k="UI version" v={__WTC_UI_VERSION__} />
+        {/* package.json holds the bare semver; render with the same v-prefix
+            the API's build stamp carries so the two read consistently. */}
+        <KV k="UI version" v={`v${__WTC_UI_VERSION__}`} />
         <div className="flex items-baseline gap-2 text-xs">
           <span className="w-32 shrink-0 text-muted-foreground">project</span>
           <a
