@@ -1,7 +1,7 @@
 {
   "name": "wtc-ui",
   "private": true,
-  "version": "0.14.0",
+  "version": "0.14.1",
   "type": "module",
   "description": "wtc portal — the rich SPA client of the wtc query API (P7-P10).",
   "scripts": {
