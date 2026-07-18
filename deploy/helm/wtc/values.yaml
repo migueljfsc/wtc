@@ -62,7 +62,11 @@ persistence:
 #    (envFrom); the config references them as ${VAR}. Opinionated key names
 #    (all optional — provide what your setup uses):
 #      WTC_API_TOKEN               bearer token for /api/* and /ingest/generic
-#      WTC_GH_API_TOKEN            github poller PAT
+#      WTC_GH_API_TOKEN            github poller PAT — its presence alone
+#                                  ENABLES the poller (WTC_* env override):
+#                                  60s interval, repos auto-discovered; no
+#                                  config edit needed. Scope the PAT read-only
+#                                  (Actions, Contents, Pull requests, Metadata)
 #      WTC_GH_WEBHOOK_SECRET       /ingest/github HMAC secret
 #      WTC_GITLAB_API_TOKEN        gitlab poller token
 #      WTC_GITLAB_WEBHOOK_SECRET   /ingest/gitlab X-Gitlab-Token
