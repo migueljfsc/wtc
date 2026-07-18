@@ -39,7 +39,10 @@ type WhereReport struct {
 // Where composes a change's journey. input is a git sha (short or full) or
 // an image tag resolvable through tag_patterns.
 func Where(ctx context.Context, st *store.Store, tags *normalize.TagResolver, input string) (*WhereReport, error) {
-	r := &WhereReport{Input: input}
+	// Envs starts non-nil: it is built by conditional appends, and the JSON
+	// contract says array, never null (a sha legitimately reaches no env —
+	// e.g. superseded before any reconcile — and clients index the list).
+	r := &WhereReport{Input: input, Envs: []WhereEnv{}}
 
 	sha := strings.ToLower(strings.TrimSpace(input))
 	if !hexRef.MatchString(sha) {

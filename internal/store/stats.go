@@ -216,7 +216,7 @@ func (s *Store) Facets(ctx context.Context) (*Facets, error) {
 			return nil, fmt.Errorf("facets %s: %w", col, err)
 		}
 		defer func() { _ = rows.Close() }()
-		var out []string
+		out := []string{} // marshals as [], never null — clients index facet lists
 		for rows.Next() {
 			var v string
 			if err := rows.Scan(&v); err != nil {

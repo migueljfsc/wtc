@@ -9,21 +9,26 @@ type WhereReport = components["schemas"]["WhereReport"];
  * visualization is P9; this is the inline summary.
  */
 export function WhereJourney({ report }: { report: WhereReport }) {
+  // Servers ≤ v0.20.0 marshalled empty lists as null (fixed since); guard so
+  // one skewed API version can't take down the whole timeline page.
+  const builds = report.builds ?? [];
+  const intents = report.intents ?? [];
+  const envs = report.envs ?? [];
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <span>
           sha <code className="text-foreground">{report.sha.slice(0, 10)}</code>
         </span>
-        <span>{report.builds.length} build{report.builds.length === 1 ? "" : "s"}</span>
-        <span>{report.intents.length} intent{report.intents.length === 1 ? "" : "s"}</span>
+        <span>{builds.length} build{builds.length === 1 ? "" : "s"}</span>
+        <span>{intents.length} intent{intents.length === 1 ? "" : "s"}</span>
       </div>
 
-      {report.envs.length === 0 ? (
+      {envs.length === 0 ? (
         <p className="text-sm text-muted-foreground">Not yet applied to any environment.</p>
       ) : (
         <ul className="space-y-1.5">
-          {report.envs.map((e) => (
+          {envs.map((e) => (
             <li key={e.env} className="flex items-center gap-2 text-sm">
               <span className="w-20 shrink-0 font-mono text-xs">{e.env}</span>
               {e.applied ? (

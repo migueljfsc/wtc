@@ -28,7 +28,9 @@ func (s *Store) queryEvents(ctx context.Context, q string, args ...any) ([]model
 		return nil, fmt.Errorf("query events: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
-	var events []model.Event
+	// Non-nil so callers that marshal these lists emit [] — the openapi
+	// contract types them as required arrays, and clients index them.
+	events := []model.Event{}
 	for rows.Next() {
 		ev, err := scanEvent(rows)
 		if err != nil {
@@ -93,7 +95,7 @@ func (s *Store) LatestSucceededDeploys(ctx context.Context, envs []string) ([]mo
 		return nil, err
 	}
 	seen := map[[2]string]bool{}
-	var latest []model.Event
+	latest := []model.Event{}
 	for _, ev := range all {
 		key := [2]string{ev.Env, ev.Service}
 		if seen[key] {

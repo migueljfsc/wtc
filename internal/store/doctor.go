@@ -88,7 +88,7 @@ func (s *Store) Backend() string {
 // Doctor gathers source health from the read pool (poll state from writeDB,
 // where that table lives — a single cheap row scan).
 func (s *Store) Doctor(ctx context.Context, now time.Time) (*DoctorReport, error) {
-	r := &DoctorReport{}
+	r := &DoctorReport{Sources: []SourceHealth{}} // sources: [] on an empty ledger, never null
 	dayAgo := model.FormatTS(now.Add(-24 * time.Hour))
 
 	if err := s.readDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM events`).Scan(&r.TotalEvents); err != nil {

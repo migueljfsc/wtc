@@ -52,7 +52,7 @@ func Diff(ctx context.Context, st *store.Store, envA, envB string) (*DiffReport,
 		services[ev.Service] = p
 	}
 
-	r := &DiffReport{EnvA: envA, EnvB: envB}
+	r := &DiffReport{EnvA: envA, EnvB: envB, Rows: []DiffRow{}} // rows: [] on empty, never null
 	for svc, p := range services {
 		row := DiffRow{Service: svc}
 		version := func(i *int) (string, bool) { // value + whether it fell back to ref
