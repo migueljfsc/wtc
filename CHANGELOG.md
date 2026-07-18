@@ -32,6 +32,8 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 - **Timeline filter comboboxes** are capped (`max-w-[11rem]`) and ellipsize
   overflowing option text, so a long service name no longer stretches the
   `service` select and reflows `actor` onto the next row.
+- **Event drawer `ref`** is now a link to the Where page for that ref
+  (`/where?ref=…`), closing the drawer on navigation.
 
 ### Fixed — Where dead-end on non-git-traceable diff cells
 

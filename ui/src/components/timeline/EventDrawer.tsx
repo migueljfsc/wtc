@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import type { components } from "@/api/schema";
 import { Drawer } from "@/components/Drawer";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -47,7 +48,18 @@ export function EventDrawer({ event, onClose }: { event: Event | null; onClose: 
               {event.cluster && <Field label="cluster">{event.cluster}</Field>}
               {event.namespace && <Field label="namespace">{event.namespace}</Field>}
               {event.actor && <Field label="actor">{event.actor}</Field>}
-              {event.ref && <Field label="ref"><code className="text-xs">{event.ref}</code></Field>}
+              {event.ref && (
+                <Field label="ref">
+                  <Link
+                    to={`/where?ref=${encodeURIComponent(event.ref)}`}
+                    onClick={onClose}
+                    title="Trace this ref in Where"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    <code className="text-xs">{event.ref}</code>
+                  </Link>
+                </Field>
+              )}
               {event.artifact && <Field label="artifact"><code className="text-xs break-all">{event.artifact}</code></Field>}
               <Field label="time">{dateTime(event.ts)}</Field>
               {event.url && (
