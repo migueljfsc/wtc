@@ -15,11 +15,23 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Skip the redundant re-run our own bump commit triggers. `bump: version …`
+    # carries the vX tag, so it can't take [skip ci] without also suppressing
+    # release.yml (goreleaser) — guard here instead. The real build already ran
+    # on the feature push that produced the bump. (head_commit is absent on
+    # workflow_dispatch → guard is false → manual runs still work.)
+    if: ${{ !startsWith(github.event.head_commit.message, 'bump:') }}
     permissions:
       contents: write   # commitizen pushes the version bump + tag
       packages: write
     concurrency:
-      group: release    # serialize main-push bumps with build-publish-ui.yml
+      # Own group per artifact (was the shared `release`): the wtc and ui
+      # publishers must never sit in the same group, or GitHub's "one pending
+      # per group" rule lets one cancel the other's pending build. Trade-off:
+      # a single commit touching BOTH Go and ui makes the two bump-pushes race;
+      # cz's push step is continue-on-error so the image still ships, and the
+      # skipped tag self-heals on the next push.
+      group: release-wtc
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7

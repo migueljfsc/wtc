@@ -17,7 +17,11 @@ permissions:
   packages: write   # GHCR push
 
 concurrency:
-  group: release          # serialize main-push bumps with build-publish.yml
+  # Own group per artifact (was the shared `release`): keeps the ui publisher
+  # out of the wtc publisher's group so neither can cancel the other's pending
+  # build under rapid pushes. The ui bump commit is [skip ci], so this group is
+  # only ever entered by real ui/** feature pushes — the latest always builds.
+  group: release-ui
   cancel-in-progress: false
 
 jobs:
