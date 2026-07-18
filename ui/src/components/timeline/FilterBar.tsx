@@ -48,8 +48,8 @@ export function FilterBar({
         </div>
         <MultiSelect label="source" value={filters.source} options={facets?.sources ?? []} onChange={(v) => onSelect("source", v)} />
         <MultiSelect label="env" value={filters.env} options={facets?.envs ?? []} onChange={(v) => onSelect("env", v)} />
-        <MultiSelect label="service" value={filters.service} options={facets?.services ?? []} onChange={(v) => onSelect("service", v)} searchable />
         <MultiSelect label="repo" value={filters.repo} options={facets?.repos ?? []} onChange={(v) => onSelect("repo", v)} searchable />
+        <MultiSelect label="service" value={filters.service} options={facets?.services ?? []} onChange={(v) => onSelect("service", v)} searchable />
         <MultiSelect label="kind" value={filters.kind} options={KINDS} onChange={(v) => onSelect("kind", v)} />
         <MultiSelect label="status" value={filters.status} options={STATUSES} onChange={(v) => onSelect("status", v)} />
         <MultiSelect label="actor" value={filters.actor} options={facets?.actors ?? []} onChange={(v) => onSelect("actor", v)} searchable />
