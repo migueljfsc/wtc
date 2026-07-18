@@ -25,10 +25,18 @@ sources:
     api_token: ${WTC_GH_API_TOKEN}
     poll_interval: 60s        # 0 disables the poller
     repos:
-      - your-org/app-api
-      - your-org/app-web
+      - your-org/app-api      # exact
+      - your-org/svc-*        # glob: every repo matching the prefix
+      - "*/deploy-*"          # glob: any org the token can see
     infra_path: infrastructure/
 ```
+
+`repos` entries may be **globs** (`*` = one path segment, `**` = any depth —
+the same dialect as `rules:` matches). Globs are resolved against the repos
+the token can access, **re-discovered every sweep**, so a new repo matching a
+pattern is picked up without a restart. An empty `repos` list still means
+"everything the token can see"; exact entries are polled as-is. A pattern
+that doesn't compile fails startup.
 
 Export `WTC_GH_API_TOKEN` in the serve environment (Kubernetes: a Secret →
 env var). Never write the token into the file.

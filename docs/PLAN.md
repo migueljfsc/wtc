@@ -24,6 +24,7 @@ Lives at `docs/PLAN.md`. Each phase ≈ 1–3 Claude Code sessions. A phase is d
 | **P15 Postgres backend** | ✅ 2026-07-17 | Opt-in `storage.backend: postgres` (pgx) → stateless wtc pod; one query surface via `?`→`$n` rebind + 5 explicit dialect branches (FTS→ILIKE, julianday→EXTRACT, GLOB→regex, pragma→pg_database_size; stats unified on substr); per-dialect migrations; `wtc migrate` (log output byte-identical across the copy); Helm bundled-postgres/external-DSN modes verified live on kind (no PVC, pod delete → zero loss, RollingUpdate); TestPG* parity suite + CI postgres service |
 | **P16 Prometheus metrics** | ✅ 2026-07-17 | `/metrics` (promhttp) bearer-authed with `api_tokens`; ingest/dedup counters live in the single-writer path (complete across every source, zero per-handler wiring); suppression/mapping-error counters, poller last-success gauge, per-backend DB-size gauge, HTTP latency histogram (label = route **pattern**, not raw URL → no sha cardinality), SSE gauge. Optional separate **unauthenticated** listener (`metrics.listen`) for in-cluster scrapes. Helm ServiceMonitor (main-port-bearer XOR unauth-port models) + scrape-annotation toggle; `docs/setup/metrics.md`. ClickHouse rejected — change-event volumes never warrant it |
 | **P17 Configuration tab** | ✅ 2026-07-18 | `/api/v1/config` extended with the redacted effective config (allowlist DTO built in serve.go — the server gains no new raw secrets; constant `"********"` masks; DSN → pgx-parsed host/port/db, creds stripped; sentinel guard test). Portal Settings → Configuration (source cards + doctor health chips, capture-mode warning, `/settings` redirect); mapping templates shown preset-resolved; `wtc config` CLI renders the same endpoint with the schedulers' effective defaults |
+| **P18 Poller globs + Where links** | ✅ 2026-07-18 | Glob entries in `repos`/`projects` — shared dialect via exported `normalize.CompileGlob` + scope helpers (`SplitScope`/`ResolveScope`/`ScopeNamespace`), resolved every sweep; github filters its affiliation-bounded discovery (any glob form ok), gitlab gains scoped namespace discovery (`ListNamespaceProjects`, group→user 404 fallback — the rig project lives in a user namespace; fixture-captured live) with unscoped patterns fatal at config load. Where-page stage cards + drawer applied rows link to `event.url` (new tab, hover affordance, no dead links) |
 
 Unplanned addition: `demo/` — three dummy services + fake three-cluster Flux
 wiring generating real events continuously (operator-requested test bed;
@@ -579,3 +580,77 @@ github/gitlab pollers off, storage postgres, ...) with zero secret values in
 any `/api/v1/config` response body (sentinel guard test + a live
 `curl | grep -c <known-secret>` = 0); an operator can tell at a glance which
 ingest paths are live; CI green including the regenerated UI client.
+
+## Phase 18 — Poller scope globs + Where links (operator-requested 2026-07-18)
+
+**Shipped 2026-07-18.** As planned, with one discovery made fixture-first:
+GitLab **user namespaces are not groups** — `/groups/:path/projects` 404s for
+them (verified live: the rig project lives under the user `migueljfsc`), so
+`ListNamespaceProjects` falls back group→user on 404 and `your-username/*`
+patterns just work. Scope helpers (`SplitScope`/`ResolveScope`/
+`ScopeNamespace`) live in `internal/normalize` next to the now-exported
+`CompileGlob` — one glob dialect, one home. A failed discovery degrades to
+the exact entries for that sweep (logged), never an aborted poll of the
+pinned repos.
+
+Two independent items; **A ships first (operator ordering)**.
+
+### A. Glob patterns in poller repo/project scope
+
+`sources.github.repos` / `sources.gitlab.projects` entries may carry globs —
+no new config keys, exact entries keep byte-identical behavior:
+
+```yaml
+sources:
+  github:
+    repos:
+      - my-org/*             # every repo in the org the token can see
+      - my-org/my-prefix-*   # narrowed by name prefix
+```
+
+- **One glob dialect product-wide**: export the rules engine's compiler as
+  `normalize.CompileGlob` (`*` = one path segment, `**` = any depth — so
+  `group/*` stays flat and `group/**` reaches GitLab subgroups). Patterns
+  compile at startup; a bad glob is a fatal config error, never a silent
+  empty scope.
+- **Resolution every sweep** (same cadence as today's empty-list
+  auto-discovery, so a new repo matching a prefix is picked up without a
+  restart). Per provider:
+  - *github*: any glob present → `ListAccessibleRepos` (exists) → union of
+    exact entries + glob matches. A bare `*/*` is allowed — it is just a
+    filter over what the token can already see. Empty list stays
+    "everything accessible" (unchanged).
+  - *gitlab*: gains **scoped discovery** (new client method): the static
+    prefix before the first glob-bearing segment is the group path; list its
+    projects (`GET /groups/:path/projects`, `include_subgroups=true`,
+    `archived=false`, paginated) and filter full paths against the pattern.
+    A pattern with no static group prefix (`*`, `*/x`) is a config error —
+    unscoped listing is exactly what P12 declined. This amends the P12 "no
+    discovery" note to "no *unscoped* discovery".
+- **Fixture-first**: capture a real group-projects payload from the
+  wtc-demo-gitlab rig before writing the list parser; github reuses the
+  existing discovery path (no new payload shape).
+- Poller logs keep reporting the resolved count; the P17 config view already
+  shows the patterns verbatim.
+
+**Accept:** `my-org/*` and `my-org/prefix-*` poll exactly the matching repos
+on both providers (live check on wtc-dev: `migueljfsc/wtc*` narrows the
+discovered set); exact lists behave identically to today; a bad glob fails
+startup; `docs/setup/github-poller.md` + `gitlab.md` document the syntax.
+
+### B. Clickable BUILD → INTENT → APPLIED on the Where page
+
+Every event rendered on the Where page (builds list, intents list, per-env
+applied rows) and in the timeline drawer's journey links out to `event.url`
+when non-empty — the exact run/PR/commit on the source system, opened in a
+new tab (reuse EventDrawer's anchor idiom: `target="_blank"
+rel="noreferrer"`, real anchors so keyboard/middle-click work; nested inside
+clickable rows → stopPropagation). Events without a URL (flux reconciles
+typically carry none) render as plain text today and stay that way — no dead
+links, no invented targets. Internal deep-links (env row → filtered
+Timeline) are explicitly deferred — this phase is external URLs only.
+
+**Accept:** on the wtc-dev rig, a Where lookup of a real sha links its build
+to the GitHub Actions run, its intent to the commit/PR, and an applied row
+with a URL to its source; URL-less rows are visually unchanged; UI
+lint/typecheck/build green.

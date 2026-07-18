@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/capture"
@@ -31,26 +32,71 @@ type Poller struct {
 	store      *store.Store
 	engine     *normalize.EngineHolder
 	projects   []string
+	exact      []string         // scope entries without globs
+	globs      []*regexp.Regexp // compiled glob entries (P18), rules dialect
+	namespaces []string         // static prefixes of the globs — the bounded discovery scopes
 	interval   time.Duration
 	captureDir string
 	log        *slog.Logger
 }
 
 // NewPoller wires a poller; captureDir "" disables capture. The engine is a
-// holder so a live rule edit re-routes poller events too (P10).
+// holder so a live rule edit re-routes poller events too (P10). projects
+// entries may be globs with a static namespace prefix (P18, validated at
+// config load) — resolved against that namespace's project list every sweep.
 func NewPoller(client *Client, st *store.Store, engine *normalize.EngineHolder, projects []string, interval time.Duration, captureDir string, log *slog.Logger) *Poller {
 	if log == nil {
 		log = slog.Default()
+	}
+	exact, globs := normalize.SplitScope(projects)
+	nsSeen := map[string]bool{}
+	var namespaces []string
+	for _, entry := range projects {
+		if !normalize.IsGlob(entry) {
+			continue
+		}
+		if ns, ok := normalize.ScopeNamespace(entry); ok && !nsSeen[ns] {
+			nsSeen[ns] = true
+			namespaces = append(namespaces, ns)
+		}
 	}
 	return &Poller{
 		client:     client,
 		store:      st,
 		engine:     engine,
 		projects:   projects,
+		exact:      exact,
+		globs:      globs,
+		namespaces: namespaces,
 		interval:   interval,
 		captureDir: captureDir,
 		log:        log,
 	}
+}
+
+// resolveScope returns this sweep's effective project list: exact entries
+// plus every project in the globs' namespaces that matches a pattern. A
+// failed namespace listing degrades to the exact entries (logged) — the
+// watermark model makes the next successful sweep catch up.
+func (p *Poller) resolveScope(ctx context.Context) []string {
+	if len(p.globs) == 0 {
+		return p.exact
+	}
+	var candidates []string
+	for _, ns := range p.namespaces {
+		paths, err := p.client.ListNamespaceProjects(ctx, ns)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
+			p.log.Error("gitlab scope discovery failed", "namespace", ns, "error", err)
+			continue
+		}
+		candidates = append(candidates, paths...)
+	}
+	projects := normalize.ResolveScope(p.exact, p.globs, candidates)
+	p.log.Info("gitlab poller resolved scope", "patterns", len(p.globs), "projects", len(projects))
+	return projects
 }
 
 // Run polls until ctx is cancelled. The first sweep starts immediately.
@@ -75,7 +121,7 @@ func (p *Poller) Run(ctx context.Context) {
 // GitHub there is no cheap "all accessible projects" discovery equivalent that
 // maps to the poller model, so projects must be configured explicitly.
 func (p *Poller) Sweep(ctx context.Context) {
-	for _, project := range p.projects {
+	for _, project := range p.resolveScope(ctx) {
 		for _, res := range []string{"pipelines", "mrs", "commits"} {
 			if err := p.pollResource(ctx, project, res); err != nil {
 				if ctx.Err() != nil {

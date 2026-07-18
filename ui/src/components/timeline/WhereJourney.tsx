@@ -34,9 +34,20 @@ export function WhereJourney({ report }: { report: WhereReport }) {
               {e.applied ? (
                 <>
                   <StatusDot status={e.applied.status} />
-                  <span className="text-muted-foreground">
-                    applied {relativeTime(e.applied.ts)}
-                  </span>
+                  {e.applied.url ? (
+                    <a
+                      href={e.applied.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                    >
+                      applied {relativeTime(e.applied.ts)}
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground">
+                      applied {relativeTime(e.applied.ts)}
+                    </span>
+                  )}
                   {typeof e.lag_ms === "number" && (
                     <span className="text-xs text-muted-foreground">
                       · lag {duration(e.lag_ms)}

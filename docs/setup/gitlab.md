@@ -32,15 +32,26 @@ sources:
     base_url: https://gitlab.com          # set to your instance for self-managed
     api_token: ${WTC_GITLAB_API_TOKEN}    # PRIVATE-TOKEN; enables poller + MR-diff enrichment
     poll_interval: 60s                    # 0 disables the poller (webhook-only)
-    projects:                             # group/service paths — no auto-discovery analog
-      - your-group/app-api
-      - your-group/app-web
+    projects:
+      - your-group/app-api                # exact
+      - your-group/svc-*                  # glob: that group's matching projects
+      - your-group/**                     # glob: subgroups too
     infra_path: infrastructure/           # per-project manifests dir
 ```
 
+`projects` entries may be **globs** (`*` = one path segment, `**` = any depth
+— the same dialect as `rules:` matches), resolved every sweep so new projects
+matching a pattern are picked up without a restart. A glob's **static prefix
+is mandatory** (`your-group/*`, never a bare `*`): the prefix names the group
+or user namespace whose project list is fetched — that scoping is what keeps
+discovery bounded, and unscoped patterns fail at startup. User namespaces
+work too (`your-username/*`); wtc falls back from the group endpoint to the
+user endpoint automatically.
+
 Export `WTC_GITLAB_API_TOKEN` in the serve environment (Kubernetes: a Secret →
 env var). Never write the token into the file. Unlike the GitHub poller there
-is no "watch everything the token can see" mode — list `projects` explicitly.
+is still no "watch everything the token can see" mode — every glob is scoped
+to a namespace.
 
 ### Verify
 

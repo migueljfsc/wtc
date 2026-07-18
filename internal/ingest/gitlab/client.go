@@ -3,13 +3,19 @@ package gitlab
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
+
+// errNotFound marks an HTTP 404 so ListNamespaceProjects can fall back from
+// the group endpoint to the user endpoint (user namespaces are not groups).
+var errNotFound = errors.New("not found")
 
 const defaultBase = "https://gitlab.com"
 
@@ -69,10 +75,77 @@ func (c *Client) get(ctx context.Context, path string, params url.Values) ([]byt
 	if err != nil {
 		return nil, fmt.Errorf("gitlab api %s: read body: %w", path, err)
 	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("gitlab api %s: HTTP 404: %w", path, errNotFound)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("gitlab api %s: HTTP %d: %.200s", path, resp.StatusCode, body)
 	}
 	return body, nil
+}
+
+// parseProjectPaths extracts non-archived project paths from one page of a
+// group/user project listing (fixture: testdata/gitlab/api/
+// namespace_projects.json). total is the RAW page size — pagination must stop
+// on it, not on the filtered count.
+func parseProjectPaths(body []byte) (paths []string, total int, err error) {
+	var batch []struct {
+		PathWithNamespace string `json:"path_with_namespace"`
+		Archived          bool   `json:"archived"`
+	}
+	if err := json.Unmarshal(body, &batch); err != nil {
+		return nil, 0, fmt.Errorf("decode project list: %w", err)
+	}
+	paths = make([]string, 0, len(batch))
+	for _, p := range batch {
+		if p.PathWithNamespace != "" && !p.Archived {
+			paths = append(paths, p.PathWithNamespace)
+		}
+	}
+	return paths, len(batch), nil
+}
+
+// ListNamespaceProjects lists project paths under a namespace, for glob scope
+// resolution (P18). A namespace may be a group (subgroups included — `**`
+// patterns reach them) or a user; GitLab serves them on different endpoints,
+// so a group 404 falls back to the user endpoint. Pages like the github
+// discovery.
+func (c *Client) ListNamespaceProjects(ctx context.Context, namespace string) ([]string, error) {
+	paths, err := c.listProjects(ctx, "/groups/"+encodeProject(namespace)+"/projects",
+		url.Values{"include_subgroups": {"true"}})
+	if errors.Is(err, errNotFound) {
+		return c.listProjects(ctx, "/users/"+url.PathEscape(namespace)+"/projects", nil)
+	}
+	return paths, err
+}
+
+func (c *Client) listProjects(ctx context.Context, path string, extra url.Values) ([]string, error) {
+	const perPage = 100
+	var all []string
+	for page := 1; ; page++ {
+		params := url.Values{
+			"per_page": {strconv.Itoa(perPage)},
+			"page":     {strconv.Itoa(page)},
+			"archived": {"false"},
+			"order_by": {"path"},
+			"sort":     {"asc"},
+		}
+		for k, v := range extra {
+			params[k] = v
+		}
+		body, err := c.get(ctx, path, params)
+		if err != nil {
+			return nil, err
+		}
+		paths, total, err := parseProjectPaths(body)
+		if err != nil {
+			return nil, fmt.Errorf("gitlab api %s: %w", path, err)
+		}
+		all = append(all, paths...)
+		if total < perPage {
+			return all, nil
+		}
+	}
 }
 
 // The three poller resources (SPEC §7 analog).

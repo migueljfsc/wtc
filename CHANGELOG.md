@@ -4,6 +4,24 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Phase 18 (Poller scope globs + Where links)
+
+- **Glob patterns in poller scope**: `sources.github.repos` /
+  `sources.gitlab.projects` entries may be globs (`my-org/*`,
+  `my-org/prefix-*`; `*` = one segment, `**` = any depth — the same dialect
+  as `rules:` matches, via the newly exported `normalize.CompileGlob`).
+  Resolved against discovery **every sweep**, so new repos matching a pattern
+  are polled without a restart; exact entries and the empty-list
+  "everything accessible" github mode are unchanged. GitHub accepts any glob
+  (discovery is affiliation-bounded, a pattern only filters); GitLab requires
+  a static namespace prefix — the prefix names the group/user whose projects
+  are listed (new `ListNamespaceProjects`, group→user endpoint fallback,
+  fixture-captured from gitlab.com), and unscoped patterns fail at startup.
+- **Where page links out** (P18-B): build/intent/applied stage cards — and
+  the timeline drawer's applied rows — link to `event.url` (the Actions run,
+  commit/PR, or deploy) in a new tab when the event carries one; URL-less
+  events render exactly as before, never a dead link.
+
 ### Added — Phase 17 (Configuration visibility)
 
 - **`/api/v1/config` now carries the full effective config** (post `${VAR}`

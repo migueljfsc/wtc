@@ -126,6 +126,30 @@ func TestStorageConfig(t *testing.T) {
 	}
 }
 
+func TestScopeGlobValidation(t *testing.T) {
+	base := "server:\n  listen: \":8484\"\n  db: ./wtc.db\n"
+
+	// github: any glob form is fine — discovery there is affiliation-bounded.
+	path := writeFile(t, base+"sources:\n  github:\n    repos: [\"my-org/*\", \"*/deploy-*\", \"exact/repo\"]\n")
+	if _, err := Load(path, false); err != nil {
+		t.Errorf("github globs: %v", err)
+	}
+
+	// gitlab: glob with a static namespace prefix is fine.
+	path = writeFile(t, base+"sources:\n  gitlab:\n    projects: [\"my-group/*\", \"group/sub/prefix-*\"]\n")
+	if _, err := Load(path, false); err != nil {
+		t.Errorf("gitlab scoped globs: %v", err)
+	}
+
+	// gitlab: unscoped glob is fatal — no bounded discovery call exists.
+	for _, bad := range []string{"*", "*/x", "pre*/x"} {
+		path = writeFile(t, base+"sources:\n  gitlab:\n    projects: [\""+bad+"\"]\n")
+		if _, err := Load(path, false); err == nil {
+			t.Errorf("gitlab unscoped glob %q: want error", bad)
+		}
+	}
+}
+
 func TestWebhooksConfig(t *testing.T) {
 	t.Setenv("TEST_GRAFANA_TOKEN", "graf-sekrit")
 	path := writeFile(t, `

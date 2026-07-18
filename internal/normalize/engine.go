@@ -124,7 +124,7 @@ func NewEngine(rules []Rule) (*Engine, error) {
 			if err != nil || pattern == "" {
 				return
 			}
-			*dst, err = compileGlob(pattern)
+			*dst, err = CompileGlob(pattern)
 		}
 		compile(&c.globs.source, r.Match.Source)
 		compile(&c.globs.repo, r.Match.Repo)
@@ -140,7 +140,7 @@ func NewEngine(rules []Rule) (*Engine, error) {
 				break
 			}
 			var re *regexp.Regexp
-			if re, err = compileGlob(p); err == nil {
+			if re, err = CompileGlob(p); err == nil {
 				c.globs.paths = append(c.globs.paths, re)
 			}
 		}
@@ -259,9 +259,10 @@ func setField(ev *model.Event, field, value string) {
 	}
 }
 
-// compileGlob turns a glob with * (one path segment) and ** (any depth) into
-// an anchored regexp. Everything else is literal.
-func compileGlob(pattern string) (*regexp.Regexp, error) {
+// CompileGlob turns a glob with * (one path segment) and ** (any depth) into
+// an anchored regexp; everything else is literal. Exported (P18) so the
+// poller repo/project scope shares ONE glob dialect with the rules engine.
+func CompileGlob(pattern string) (*regexp.Regexp, error) {
 	var b strings.Builder
 	b.WriteString("^")
 	for i := 0; i < len(pattern); i++ {

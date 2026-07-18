@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/capture"
@@ -33,22 +34,29 @@ type Poller struct {
 	store      *store.Store
 	engine     *normalize.EngineHolder
 	repos      []string
+	exact      []string         // scope entries without globs
+	globs      []*regexp.Regexp // compiled glob entries (P18), rules dialect
 	interval   time.Duration
 	captureDir string
 	log        *slog.Logger
 }
 
 // NewPoller wires a poller; captureDir "" disables capture. The engine is a
-// holder so a live rule edit re-routes poller events too (P10).
+// holder so a live rule edit re-routes poller events too (P10). repos entries
+// may be globs (P18, validated at config load) — resolved against discovery
+// every sweep.
 func NewPoller(client *Client, st *store.Store, engine *normalize.EngineHolder, repos []string, interval time.Duration, captureDir string, log *slog.Logger) *Poller {
 	if log == nil {
 		log = slog.Default()
 	}
+	exact, globs := normalize.SplitScope(repos)
 	return &Poller{
 		client:     client,
 		store:      st,
 		engine:     engine,
 		repos:      repos,
+		exact:      exact,
+		globs:      globs,
 		interval:   interval,
 		captureDir: captureDir,
 		log:        log,
@@ -78,21 +86,29 @@ func (p *Poller) Run(ctx context.Context) {
 
 // Sweep polls every (repo, resource) pair once. Failures are logged and
 // skipped — the watermark only advances on success, so nothing is lost. When
-// no repos are configured, the accessible set is (re)discovered each sweep, so
-// repos added to/removed from the token are picked up automatically.
+// no repos are configured, or entries carry globs (P18), the accessible set
+// is (re)discovered each sweep, so repos added to/removed from the token —
+// or newly created ones matching a pattern — are picked up automatically.
 func (p *Poller) Sweep(ctx context.Context) {
-	repos := p.repos
-	if len(repos) == 0 {
+	repos := p.exact
+	if len(p.repos) == 0 || len(p.globs) > 0 {
 		discovered, err := p.client.ListAccessibleRepos(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
 				return
 			}
 			p.log.Error("github repo discovery failed", "error", err)
-			return
+			if len(p.repos) == 0 {
+				return
+			}
+			// Glob resolution failed but exact entries are still pollable.
+		} else if len(p.repos) == 0 {
+			repos = discovered
+			p.log.Info("github poller discovered repos", "count", len(repos))
+		} else {
+			repos = normalize.ResolveScope(p.exact, p.globs, discovered)
+			p.log.Info("github poller resolved scope", "patterns", len(p.globs), "repos", len(repos))
 		}
-		p.log.Info("github poller discovered repos", "count", len(discovered))
-		repos = discovered
 	}
 	for _, repo := range repos {
 		for _, res := range []string{"runs", "prs", "commits"} {

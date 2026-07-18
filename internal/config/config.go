@@ -318,6 +318,32 @@ func Load(path string, optional bool) (*Config, error) {
 		return nil, fmt.Errorf("config %s: storage.backend must be sqlite or postgres, got %q", path, cfg.Storage.Backend)
 	}
 
+	// Poller scope globs (P18): compile up front — a bad pattern must fail
+	// startup, never become a silently-empty scope. GitLab patterns
+	// additionally need a static namespace prefix: that prefix is the bounded
+	// discovery call, and unscoped listing is not supported there. GitHub
+	// accepts any glob — its discovery is already bounded by token
+	// affiliation, so a pattern only ever filters.
+	for _, r := range cfg.Sources.GitHub.Repos {
+		if !normalize.IsGlob(r) {
+			continue
+		}
+		if _, err := normalize.CompileGlob(r); err != nil {
+			return nil, fmt.Errorf("config %s: sources.github.repos %q: %w", path, r, err)
+		}
+	}
+	for _, pr := range cfg.Sources.GitLab.Projects {
+		if !normalize.IsGlob(pr) {
+			continue
+		}
+		if _, err := normalize.CompileGlob(pr); err != nil {
+			return nil, fmt.Errorf("config %s: sources.gitlab.projects %q: %w", path, pr, err)
+		}
+		if _, ok := normalize.ScopeNamespace(pr); !ok {
+			return nil, fmt.Errorf("config %s: sources.gitlab.projects glob %q needs a static namespace prefix (e.g. my-group/*) — unscoped discovery is not supported on gitlab", path, pr)
+		}
+	}
+
 	return &cfg, nil
 }
 

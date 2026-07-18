@@ -144,9 +144,9 @@ func TestCompileGlob(t *testing.T) {
 		{"a.b", "aXb", false}, // dot is literal
 	}
 	for _, tt := range tests {
-		re, err := compileGlob(tt.pattern)
+		re, err := CompileGlob(tt.pattern)
 		if err != nil {
-			t.Fatalf("compileGlob(%q): %v", tt.pattern, err)
+			t.Fatalf("CompileGlob(%q): %v", tt.pattern, err)
 		}
 		if got := re.MatchString(tt.s); got != tt.want {
 			t.Errorf("glob %q vs %q = %v, want %v", tt.pattern, tt.s, got, tt.want)
