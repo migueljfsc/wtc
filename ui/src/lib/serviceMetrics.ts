@@ -7,7 +7,12 @@ export interface ServiceMetrics {
   failed: number;
   /** failed / total, or null when there are no deploys. */
   failureRate: number | null;
-  /** Deploys per week over the observed span, or null when < 2 deploys. */
+  /**
+   * Deploys per week since the first observed deploy, or null with none.
+   * The window is floored at one week: a young service reads as "N this
+   * week" instead of extrapolating a few closely-spaced deploys into an
+   * absurd rate (3 deploys 50ms apart is not 30M/wk).
+   */
   perWeek: number | null;
   /** Mean time between failed deploys, ms — null with < 2 failures. */
   mtbfMs: number | null;
@@ -26,8 +31,10 @@ export function serviceMetrics(deploys: Event[]): ServiceMetrics {
   const failed = failedEvents.length;
 
   const times = deploys.map((d) => new Date(d.ts).getTime()).sort((a, b) => a - b);
-  const span = times.length >= 2 ? times[times.length - 1] - times[0] : 0;
-  const perWeek = span > 0 ? (total / span) * WEEK : null;
+  // Observation window: first deploy → now, never less than a week (also
+  // guards future timestamps from clock skew).
+  const span = total > 0 ? Math.max(Date.now() - times[0], WEEK) : 0;
+  const perWeek = total > 0 ? (total / span) * WEEK : null;
 
   const failTimes = failedEvents.map((d) => new Date(d.ts).getTime()).sort((a, b) => a - b);
   let mtbfMs: number | null = null;
