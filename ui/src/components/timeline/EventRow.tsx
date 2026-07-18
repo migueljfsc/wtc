@@ -1,4 +1,5 @@
 import type { components } from "@/api/schema";
+import { SourceIcon } from "@/components/SourceIcon";
 import { StatusDot } from "@/components/StatusBadge";
 import { relativeTime } from "@/lib/format";
 
@@ -11,6 +12,10 @@ export function EventRow({ event, onSelect }: { event: Event; onSelect: (e: Even
       className="flex w-full items-center gap-3 px-2 py-2.5 text-left text-sm transition-colors hover:bg-accent"
     >
       <StatusDot status={event.status} />
+      {/* Fixed-width slot so titles align whether or not a mark exists. */}
+      <span className="flex w-3.5 shrink-0 justify-center">
+        <SourceIcon source={event.source} />
+      </span>
       <span className="w-16 shrink-0 text-xs uppercase tracking-wide text-muted-foreground">
         {event.kind.replace("_", " ")}
       </span>
