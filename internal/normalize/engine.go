@@ -186,6 +186,12 @@ func (e *Engine) Apply(ev *model.Event, f Facts) error {
 			setField(ev, field, b.String())
 		}
 	}
+	// repo is a raw source-side fact (owner/name), not an inference — persist it
+	// verbatim as the facet dimension. Rules never set it; cluster-side sources
+	// (flux/argo) leave it empty. A normalizer that already set repo wins.
+	if ev.Repo == "" {
+		ev.Repo = f.Repo
+	}
 	RedactEvent(ev)
 	return nil
 }

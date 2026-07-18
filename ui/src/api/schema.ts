@@ -329,6 +329,8 @@ export interface components {
             cluster: string;
             namespace: string;
             service: string;
+            /** @description Source repo (owner/name); empty for cluster-side events (flux/argo). */
+            repo: string;
             actor: string;
             /** @description Git sha / revision. */
             ref: string;
@@ -512,6 +514,7 @@ export interface components {
             sources: string[];
             envs: string[];
             services: string[];
+            repos: string[];
             actors: string[];
         };
         MatrixCell: {
@@ -806,6 +809,8 @@ export interface operations {
                 env?: string;
                 /** @description Facet OR-set (comma-separated). */
                 service?: string;
+                /** @description Facet OR-set (comma-separated): source repo (owner/name). */
+                repo?: string;
                 /** @description Facet OR-set (comma-separated). */
                 kind?: string;
                 /** @description Facet OR-set (comma-separated). */

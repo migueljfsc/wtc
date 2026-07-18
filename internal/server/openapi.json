@@ -60,6 +60,7 @@
           { "name": "source", "in": "query", "description": "Facet OR-set (comma-separated): github/gitlab/flux/argocd/… or mapping-webhook names.", "schema": { "type": "string" } },
           { "name": "env", "in": "query", "description": "Facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "service", "in": "query", "description": "Facet OR-set (comma-separated).", "schema": { "type": "string" } },
+          { "name": "repo", "in": "query", "description": "Facet OR-set (comma-separated): source repo (owner/name).", "schema": { "type": "string" } },
           { "name": "kind", "in": "query", "description": "Facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "status", "in": "query", "description": "Facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "actor", "in": "query", "description": "Facet OR-set (comma-separated).", "schema": { "type": "string" } },
@@ -294,7 +295,7 @@
       },
       "Event": {
         "type": "object",
-        "required": ["id", "ts", "ingested_at", "source", "kind", "status", "env", "cluster", "namespace", "service", "actor", "ref", "artifact", "title", "url", "dedup_key"],
+        "required": ["id", "ts", "ingested_at", "source", "kind", "status", "env", "cluster", "namespace", "service", "repo", "actor", "ref", "artifact", "title", "url", "dedup_key"],
         "properties": {
           "id": { "type": "string", "description": "ULID." },
           "ts": { "type": "string", "format": "date-time", "description": "Source event time (UTC)." },
@@ -306,6 +307,7 @@
           "cluster": { "type": "string" },
           "namespace": { "type": "string" },
           "service": { "type": "string" },
+          "repo": { "type": "string", "description": "Source repo (owner/name); empty for cluster-side events (flux/argo)." },
           "actor": { "type": "string" },
           "ref": { "type": "string", "description": "Git sha / revision." },
           "artifact": { "type": "string", "description": "Primary artifact, e.g. registry/app:tag." },
@@ -501,11 +503,12 @@
       },
       "Facets": {
         "type": "object",
-        "required": ["sources", "envs", "services", "actors"],
+        "required": ["sources", "envs", "services", "repos", "actors"],
         "properties": {
           "sources": { "type": "array", "items": { "type": "string" } },
           "envs": { "type": "array", "items": { "type": "string" } },
           "services": { "type": "array", "items": { "type": "string" } },
+          "repos": { "type": "array", "items": { "type": "string" } },
           "actors": { "type": "array", "items": { "type": "string" } }
         }
       },

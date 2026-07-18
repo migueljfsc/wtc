@@ -4,6 +4,25 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — `repo` dimension & timeline facet (monorepo support)
+
+- **Events now carry a `repo` (owner/name)** — persisted and facetable. Filter
+  the timeline (and `wtc log --repo`) by source repo, and see it on the event
+  detail. Populated on source/CI rows (github/gitlab PR/push/build); stays empty
+  for cluster-side events (flux/argo carry no source repo in their payloads).
+- **Why:** in a monorepo, a source PR fans out to 0..N deploy units, so the
+  single-valued `service` has no honest value for a cross-app change and reads
+  as "serviceless". `repo` is the codebase lens (`service`/`env` stay the deploy
+  lens): a cross-app PR is now findable by `repo` instead of silently blank.
+  `service` still resolves per app on build/deploy rows and single-app PRs.
+- `repo` is a raw source-side fact — the rules engine persists it verbatim
+  (never inferred); a normalizer that already set it wins.
+- Migration `0005`/`0004` (sqlite/postgres): `events.repo` + `idx_events_repo_ts`.
+  New events only — existing rows keep `repo=''` until re-ingested by a poller.
+- `wtc demo` seeds a monorepo (`acme/storefront`: apps `catalog`/`checkout`
+  + a cross-app PR with no single service) alongside the single-service repos.
+- Facet grouping (services nested under their repo) is a deliberate fast-follow.
+
 ### Added — multi-select timeline facets (incl. new source facet)
 
 - **Every timeline facet is now multi-select** — source, env, service, kind,

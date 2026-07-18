@@ -17,7 +17,8 @@ CREATE TABLE events (
   env         TEXT NOT NULL DEFAULT '',    -- prod | staging | dev | pr-123 | '' (unmapped)
   cluster     TEXT NOT NULL DEFAULT '',
   namespace   TEXT NOT NULL DEFAULT '',
-  service     TEXT NOT NULL DEFAULT '',
+  service     TEXT NOT NULL DEFAULT '',    -- deploy unit; '' when a change maps to no single service (e.g. a cross-app monorepo PR)
+  repo        TEXT NOT NULL DEFAULT '',    -- source repo owner/name; '' for cluster-side events (flux/argo carry no source repo)
   actor       TEXT NOT NULL DEFAULT '',    -- human login, bot name, or 'flux'
   ref         TEXT NOT NULL DEFAULT '',    -- git sha / revision (manifest repo revision for flux events)
   artifact    TEXT NOT NULL DEFAULT '',    -- primary artifact, e.g. registry/app:tag or chart@version
@@ -30,13 +31,14 @@ CREATE TABLE events (
 CREATE INDEX idx_events_ts         ON events(ts);
 CREATE INDEX idx_events_env_ts     ON events(env, ts);
 CREATE INDEX idx_events_service_ts ON events(service, ts);
+CREATE INDEX idx_events_repo_ts    ON events(repo, ts);
 CREATE INDEX idx_events_ref        ON events(ref);
 CREATE INDEX idx_events_kind_ts    ON events(kind, ts);
 ```
 
 Full-text search: FTS5 external-content table over `(title, service, actor, artifact)` maintained by triggers; backs `wtc log -q <text>`.
 
-Upsert rule: `INSERT ... ON CONFLICT(dedup_key) DO UPDATE` — only when the incoming status **strictly outranks** the stored one (`unknown < started < succeeded|failed < degraded`; equal rank never overwrites, so a stale terminal replay cannot flip `succeeded↔failed` or move `ts` backward). `degraded` (argocd on-health-degraded, P11) outranks the terminal pair by design: a health regression is observed AFTER the sync operation's row already completed and must win the upsert; a fix arrives as a new revision (or a retry — a new operation, hence a new row), so recovery stays visible. On update: `status`, `ts`, `title` always; `duration_ms`, `payload`, `url`, and identity fields (`env`, `cluster`, `namespace`, `service`, `actor`, `ref`, `artifact`) follow **non-empty-wins merge** — a later event enriches the row but never blanks what an earlier event recorded. `kind` and `source` are set by the first event and never updated.
+Upsert rule: `INSERT ... ON CONFLICT(dedup_key) DO UPDATE` — only when the incoming status **strictly outranks** the stored one (`unknown < started < succeeded|failed < degraded`; equal rank never overwrites, so a stale terminal replay cannot flip `succeeded↔failed` or move `ts` backward). `degraded` (argocd on-health-degraded, P11) outranks the terminal pair by design: a health regression is observed AFTER the sync operation's row already completed and must win the upsert; a fix arrives as a new revision (or a retry — a new operation, hence a new row), so recovery stays visible. On update: `status`, `ts`, `title` always; `duration_ms`, `payload`, `url`, and identity fields (`env`, `cluster`, `namespace`, `service`, `repo`, `actor`, `ref`, `artifact`) follow **non-empty-wins merge** — a later event enriches the row but never blanks what an earlier event recorded. `kind` and `source` are set by the first event and never updated.
 
 ### kind semantics
 

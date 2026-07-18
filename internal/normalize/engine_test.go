@@ -110,6 +110,20 @@ func TestEngineRules(t *testing.T) {
 		}
 	})
 
+	t.Run("repo defaults from fact, not inferred by rules", func(t *testing.T) {
+		ev := apply(t, e, &model.Event{}, Facts{Source: "github", Repo: "acme/storefront"})
+		if ev.Repo != "acme/storefront" {
+			t.Errorf("Repo = %q, want acme/storefront (raw fact persisted)", ev.Repo)
+		}
+	})
+
+	t.Run("empty repo fact leaves repo empty", func(t *testing.T) {
+		ev := apply(t, e, &model.Event{}, Facts{Source: "flux", Cluster: "prod"})
+		if ev.Repo != "" {
+			t.Errorf("Repo = %q, want \"\" (cluster-side events carry no repo)", ev.Repo)
+		}
+	})
+
 	t.Run("invalid kind from rule ignored", func(t *testing.T) {
 		bad := mustEngine(t, []Rule{{Match: RuleMatch{Source: "github"}, Set: RuleSet{Kind: "notakind"}}})
 		ev := apply(t, bad, &model.Event{}, Facts{Source: "github"})

@@ -112,6 +112,7 @@ func buildDemoEvents(now time.Time, days int, run string) ([]generic.Request, st
 				Kind:     string(model.KindBuild),
 				Status:   statusIf(failed),
 				Service:  svc,
+				Repo:     demoRepo(svc),
 				Actor:    "ci-bot",
 				Ref:      sha,
 				Artifact: artifact,
@@ -139,6 +140,9 @@ func buildDemoEvents(now time.Time, days int, run string) ([]generic.Request, st
 		demoDeploy(run, "web", "pr-502", demoSHA(run, "web-pr", 502), demoSHA(run, "web-pr", 502)[:7],
 			"ghcr.io/acme/web:pr-502", now.Add(-6*time.Hour), "bob"),
 	)
+
+	// The monorepo case the `repo` facet exists for.
+	reqs = append(reqs, demoMonorepoEvents(now, run)...)
 
 	// A hand-recorded change and a config bump — not everything flows through CI.
 	reqs = append(reqs,
@@ -189,11 +193,86 @@ func demoDeploy(run, svc, env, sha, short, artifact string, ts time.Time, actor 
 		Env:      env,
 		Cluster:  demoCluster(env),
 		Service:  svc,
+		Repo:     demoRepo(svc),
 		Actor:    actor,
 		Ref:      sha,
 		Artifact: artifact,
 		Title:    fmt.Sprintf("deploy %s to %s (sha-%s)", svc, env, short),
 	})
+}
+
+// demoRepo maps a demo service to the source repo that produces it. Most demo
+// services are single-service repos (acme/<svc>); the storefront apps ship from
+// ONE monorepo, so repo != service for them — the case the `repo` facet exists
+// to disambiguate.
+func demoRepo(svc string) string {
+	switch svc {
+	case "catalog", "checkout":
+		return "acme/storefront"
+	default:
+		return "acme/" + svc
+	}
+}
+
+// demoMonorepoEvents highlights the monorepo case the `repo` facet is built for:
+// two apps (catalog, checkout) shipped from one repo (acme/storefront), plus two
+// merged PRs. The cross-app PR carries a repo but NO single service — it touched
+// both apps and shared code — exactly the row that reads as "serviceless" until
+// you facet by repo. The single-app PR resolves to checkout.
+func demoMonorepoEvents(now time.Time, run string) []generic.Request {
+	const repo = "acme/storefront"
+	var reqs []generic.Request
+
+	// A recent release of each app: build → dev/staging/prod.
+	for ai, app := range []string{"catalog", "checkout"} {
+		sha := demoSHA(run, app, 900)
+		short := sha[:7]
+		artifact := fmt.Sprintf("ghcr.io/acme/storefront/%s:sha-%s", app, short)
+		bt := now.Add(-30 * time.Hour).Add(-time.Duration(ai) * 53 * time.Minute)
+		reqs = append(reqs, demoReq(run, "build", app, bt, generic.Request{
+			Source:   string(model.SourceGeneric),
+			Kind:     string(model.KindBuild),
+			Status:   string(model.StatusSucceeded),
+			Service:  app,
+			Repo:     repo,
+			Actor:    "ci-bot",
+			Ref:      sha,
+			Artifact: artifact,
+			Title:    fmt.Sprintf("build %s (sha-%s)", app, short),
+		}))
+		reqs = append(reqs,
+			demoDeploy(run, app, "dev", sha, short, artifact, bt.Add(8*time.Minute), "flux-bot"),
+			demoDeploy(run, app, "staging", sha, short, artifact, bt.Add(5*time.Hour), "alice"),
+			demoDeploy(run, app, "prod", sha, short, artifact, bt.Add(24*time.Hour), "bob"),
+		)
+	}
+
+	// Two merged PRs on the monorepo. #48 touched both apps + shared design
+	// tokens → no single service (repo carries it); #45 is scoped to one app.
+	reqs = append(reqs,
+		demoReq(run, "pr-48", "storefront", now.Add(-31*time.Hour), generic.Request{
+			Source: string(model.SourceGeneric),
+			Kind:   string(model.KindMerge),
+			Status: string(model.StatusSucceeded),
+			Repo:   repo,
+			Actor:  "carol",
+			Ref:    demoSHA(run, "sf-48", 48),
+			Title:  "PR #48 merged: feat(ui): restyle shared button component",
+			URL:    "https://github.com/acme/storefront/pull/48",
+		}),
+		demoReq(run, "pr-45", "checkout", now.Add(-40*time.Hour), generic.Request{
+			Source:  string(model.SourceGeneric),
+			Kind:    string(model.KindMerge),
+			Status:  string(model.StatusSucceeded),
+			Repo:    repo,
+			Service: "checkout",
+			Actor:   "alice",
+			Ref:     demoSHA(run, "sf-45", 45),
+			Title:   "PR #45 merged: feat(checkout): add express checkout",
+			URL:     "https://github.com/acme/storefront/pull/45",
+		}),
+	)
+	return reqs
 }
 
 // demoReq stamps the timestamp and a stable, run-namespaced dedup key onto a

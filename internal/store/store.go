@@ -83,9 +83,9 @@ func dsn(path string, readOnly bool) string {
 // qualified form, so one statement serves both dialects.
 const upsertSQL = `
 INSERT INTO events (id, ts, ingested_at, source, kind, status, env, cluster,
-                    namespace, service, actor, ref, artifact, title, url,
+                    namespace, service, repo, actor, ref, artifact, title, url,
                     duration_ms, dedup_key, payload)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(dedup_key) DO UPDATE SET
   status      = excluded.status,
   ts          = excluded.ts,
@@ -97,6 +97,7 @@ ON CONFLICT(dedup_key) DO UPDATE SET
   cluster     = coalesce(nullif(excluded.cluster, ''), events.cluster),
   namespace   = coalesce(nullif(excluded.namespace, ''), events.namespace),
   service     = coalesce(nullif(excluded.service, ''), events.service),
+  repo        = coalesce(nullif(excluded.repo, ''), events.repo),
   actor       = coalesce(nullif(excluded.actor, ''), events.actor),
   ref         = coalesce(nullif(excluded.ref, ''), events.ref),
   artifact    = coalesce(nullif(excluded.artifact, ''), events.artifact)
@@ -267,7 +268,7 @@ func (s *Store) upsert(ev *model.Event) (string, bool, error) {
 	err := s.upsertStmt.QueryRow(
 		ev.ID, model.FormatTS(ev.TS), model.FormatTS(ev.IngestedAt),
 		string(ev.Source), string(ev.Kind), string(ev.Status),
-		ev.Env, ev.Cluster, ev.Namespace, ev.Service, ev.Actor,
+		ev.Env, ev.Cluster, ev.Namespace, ev.Service, ev.Repo, ev.Actor,
 		ev.Ref, ev.Artifact, ev.Title, ev.URL,
 		ev.DurationMS, ev.DedupKey, payload,
 		model.StatusRank(ev.Status), // strict-outrank guard on the update arm

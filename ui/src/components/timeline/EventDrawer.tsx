@@ -45,6 +45,7 @@ export function EventDrawer({ event, onClose }: { event: Event | null; onClose: 
             <dl className="divide-y">
               {event.env && <Field label="env">{event.env}</Field>}
               {event.service && <Field label="service">{event.service}</Field>}
+              {event.repo && <Field label="repo">{event.repo}</Field>}
               {event.cluster && <Field label="cluster">{event.cluster}</Field>}
               {event.namespace && <Field label="namespace">{event.namespace}</Field>}
               {event.actor && <Field label="actor">{event.actor}</Field>}
