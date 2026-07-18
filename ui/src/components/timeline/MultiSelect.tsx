@@ -96,12 +96,12 @@ export function MultiSelect({
                   type="button"
                   onClick={() => toggle(o)}
                   className={cn(
-                    "flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs transition-colors hover:bg-accent",
+                    "flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-xs transition-colors hover:bg-accent",
                     on ? "text-foreground" : "text-muted-foreground",
                   )}
                 >
-                  <Check className={cn("size-3.5 shrink-0", on ? "opacity-100" : "opacity-0")} />
-                  <span className="truncate font-mono">{o}</span>
+                  <span className="min-w-0 truncate font-mono">{o}</span>
+                  {on && <Check className="size-3.5 shrink-0" />}
                 </button>
               );
             })
