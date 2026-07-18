@@ -12,6 +12,7 @@ func kind(k model.Kind) func(*model.Event)     { return func(e *model.Event) { e
 func status(s model.Status) func(*model.Event) { return func(e *model.Event) { e.Status = s } }
 func env(v string) func(*model.Event)          { return func(e *model.Event) { e.Env = v } }
 func service(v string) func(*model.Event)      { return func(e *model.Event) { e.Service = v } }
+func repo(v string) func(*model.Event)         { return func(e *model.Event) { e.Repo = v } }
 
 func TestActivityStats(t *testing.T) {
 	s := openTestStore(t)
@@ -91,10 +92,10 @@ func TestFacets(t *testing.T) {
 	now := time.Now().UTC()
 
 	seed := []*model.Event{
-		testEvent("f:1", now, env("prod"), service("api"), actor("alice")),
-		testEvent("f:2", now, env("dev"), service("web"), actor("bob")),
-		testEvent("f:3", now, env("prod"), service("api"), actor("alice")), // dupes collapse
-		testEvent("f:4", now, env(""), service(""), actor("")),             // empties excluded
+		testEvent("f:1", now, env("prod"), service("api"), repo("acme/api"), actor("alice")),
+		testEvent("f:2", now, env("dev"), service("web"), repo("acme/web"), actor("bob")),
+		testEvent("f:3", now, env("prod"), service("api"), repo("acme/api"), actor("alice")), // dupes collapse
+		testEvent("f:4", now, env(""), service(""), repo(""), actor("")),                     // empties excluded
 	}
 	for _, e := range seed {
 		if _, _, err := s.Ingest(ctx, e); err != nil {
@@ -112,8 +113,42 @@ func TestFacets(t *testing.T) {
 	if got := f.Services; len(got) != 2 || got[0] != "api" || got[1] != "web" {
 		t.Errorf("services = %v, want [api web]", got)
 	}
+	if got := f.Repos; len(got) != 2 || got[0] != "acme/api" || got[1] != "acme/web" {
+		t.Errorf("repos = %v, want [acme/api acme/web]", got)
+	}
 	if got := f.Actors; len(got) != 2 || got[0] != "alice" || got[1] != "bob" {
 		t.Errorf("actors = %v, want [alice bob]", got)
+	}
+}
+
+func TestListEventsRepoFilter(t *testing.T) {
+	s := openTestStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	// A monorepo cross-app merge (repo set, service blank) must still be found
+	// by repo — the whole point of the facet.
+	seed := []*model.Event{
+		testEvent("r:1", now, repo("acme/storefront"), service(""), kind(model.KindMerge)),
+		testEvent("r:2", now, repo("acme/storefront"), service("checkout")),
+		testEvent("r:3", now, repo("acme/api"), service("api")),
+	}
+	for _, e := range seed {
+		if _, _, err := s.Ingest(ctx, e); err != nil {
+			t.Fatalf("ingest %s: %v", e.DedupKey, err)
+		}
+	}
+
+	got, _, err := s.ListEvents(ctx, Filter{Repos: []string{"acme/storefront"}})
+	if err != nil {
+		t.Fatalf("ListEvents: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("repo filter returned %d events, want 2: %+v", len(got), got)
+	}
+	for _, ev := range got {
+		if ev.Repo != "acme/storefront" {
+			t.Errorf("got repo %q, want acme/storefront", ev.Repo)
+		}
 	}
 }
 

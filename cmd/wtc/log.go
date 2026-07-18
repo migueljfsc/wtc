@@ -18,10 +18,10 @@ import (
 
 func newLogCmd(flags *clientFlags) *cobra.Command {
 	var (
-		env, service, kind, status string
-		since, until, query        string
-		limit                      int
-		asJSON                     bool
+		env, service, repo, kind, status string
+		since, until, query              string
+		limit                            int
+		asJSON                           bool
 	)
 
 	cmd := &cobra.Command{
@@ -57,6 +57,7 @@ func newLogCmd(flags *clientFlags) *cobra.Command {
 			}
 			set("env", env)
 			set("service", service)
+			set("repo", repo)
 			set("kind", kind)
 			set("status", status)
 			set("q", query)
@@ -106,6 +107,7 @@ func newLogCmd(flags *clientFlags) *cobra.Command {
 	f := cmd.Flags()
 	f.StringVar(&env, "env", "", "filter by environment")
 	f.StringVar(&service, "service", "", "filter by service")
+	f.StringVar(&repo, "repo", "", "filter by source repo (owner/name)")
 	f.StringVar(&kind, "kind", "", "filter by kind")
 	f.StringVar(&status, "status", "", "filter by status")
 	f.StringVarP(&query, "query", "q", "", "full-text search over title/service/actor/artifact")

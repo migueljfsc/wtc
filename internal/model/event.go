@@ -144,6 +144,7 @@ type Event struct {
 	Cluster    string    `json:"cluster"`
 	Namespace  string    `json:"namespace"`
 	Service    string    `json:"service"`
+	Repo       string    `json:"repo"` // source repo (owner/name); "" for cluster-side events (flux/argo)
 	Actor      string    `json:"actor"`
 	Ref        string    `json:"ref"`      // git sha / revision
 	Artifact   string    `json:"artifact"` // primary artifact, e.g. registry/app:tag

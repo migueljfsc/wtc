@@ -216,6 +216,7 @@ func (s *Server) handleListEvents(w http.ResponseWriter, r *http.Request) {
 		Sources:  csv(q.Get("source")),
 		Envs:     csv(q.Get("env")),
 		Services: csv(q.Get("service")),
+		Repos:    csv(q.Get("repo")),
 		Kinds:    csv(q.Get("kind")),
 		Statuses: csv(q.Get("status")),
 		Actors:   csv(q.Get("actor")),

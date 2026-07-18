@@ -7,6 +7,7 @@ export interface EventFilters {
   source?: string;
   env?: string;
   service?: string;
+  repo?: string;
   kind?: string;
   status?: string;
   actor?: string;

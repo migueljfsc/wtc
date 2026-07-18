@@ -35,6 +35,7 @@ type Request struct {
 	Cluster    string   `json:"cluster,omitempty"`
 	Namespace  string   `json:"namespace,omitempty"`
 	Service    string   `json:"service,omitempty"`
+	Repo       string   `json:"repo,omitempty"` // source repo (owner/name); facet dimension
 	Actor      string   `json:"actor,omitempty"`
 	Ref        string   `json:"ref,omitempty"`
 	Artifact   string   `json:"artifact,omitempty"`
@@ -62,6 +63,7 @@ func (r *Request) ToEvent(now time.Time) (*model.Event, error) {
 		Cluster:    r.Cluster,
 		Namespace:  r.Namespace,
 		Service:    r.Service,
+		Repo:       r.Repo,
 		Actor:      r.Actor,
 		Ref:        r.Ref,
 		Artifact:   r.Artifact,

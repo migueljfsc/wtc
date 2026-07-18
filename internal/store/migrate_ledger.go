@@ -75,9 +75,9 @@ func copyEvents(ctx context.Context, src *sql.DB, dst *dbConn, res *MigrateResul
 
 	ins, err := tx.Prepare(dst.rebind(`
 INSERT INTO events (id, ts, ingested_at, source, kind, status, env, cluster,
-                    namespace, service, actor, ref, artifact, title, url,
+                    namespace, service, repo, actor, ref, artifact, title, url,
                     duration_ms, dedup_key, payload)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT DO NOTHING`))
 	if err != nil {
 		return fmt.Errorf("prepare postgres insert: %w", err)
@@ -88,19 +88,19 @@ ON CONFLICT DO NOTHING`))
 		// Scan raw column values — no Event round-trip, so rows that predate
 		// today's validation rules still copy verbatim.
 		var (
-			id, ts, ingestedAt, source, kind, status string
-			env, cluster, namespace, service, actor  string
-			ref, artifact, title, url, dedupKey      string
-			durationMS                               sql.NullInt64
-			payload                                  sql.NullString
+			id, ts, ingestedAt, source, kind, status      string
+			env, cluster, namespace, service, repo, actor string
+			ref, artifact, title, url, dedupKey           string
+			durationMS                                    sql.NullInt64
+			payload                                       sql.NullString
 		)
 		if err := rows.Scan(&id, &ts, &ingestedAt, &source, &kind, &status,
-			&env, &cluster, &namespace, &service, &actor,
+			&env, &cluster, &namespace, &service, &repo, &actor,
 			&ref, &artifact, &title, &url, &durationMS, &dedupKey, &payload); err != nil {
 			return fmt.Errorf("scan sqlite event: %w", err)
 		}
 		r, err := ins.ExecContext(ctx, id, ts, ingestedAt, source, kind, status,
-			env, cluster, namespace, service, actor,
+			env, cluster, namespace, service, repo, actor,
 			ref, artifact, title, url, durationMS, dedupKey, payload)
 		if err != nil {
 			return fmt.Errorf("insert event %s: %w", id, err)
