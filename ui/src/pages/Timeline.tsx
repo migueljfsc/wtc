@@ -74,7 +74,7 @@ export function Timeline() {
   const onDelete = useCallback((name: string) => setSaved(deleteFilter(name)), []);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
+    <div className="mx-auto max-w-7xl space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Timeline</h1>
         <p className="text-sm text-muted-foreground">Every change, newest first.</p>

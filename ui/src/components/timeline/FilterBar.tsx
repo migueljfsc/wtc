@@ -32,7 +32,8 @@ function Facet({
       aria-label={label}
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value)}
-      className="w-auto min-w-[7rem]"
+      title={value || label}
+      className="w-auto min-w-[6.5rem] max-w-[11rem] truncate"
     >
       <option value="">{label}</option>
       {options.map((o) => (

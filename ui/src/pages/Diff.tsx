@@ -26,7 +26,7 @@ export function Diff() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-7xl space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Diff</h1>
         <p className="text-sm text-muted-foreground">

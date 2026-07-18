@@ -4,6 +4,18 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Changed — portal layout: service list, page width, filter comboboxes
+
+- **Services tab** now uses a searchable master-detail layout (filter box +
+  scrollable list on the left, detail on the right) instead of a wrapping wall
+  of pills — scales to many services. Long names truncate with a tooltip.
+- **Wider pages** — data-dense tabs (Dashboard, Timeline, Diff, Services,
+  Configuration) widen to `max-w-7xl`; form tabs (Where, Settings) to
+  `max-w-5xl`. Removes the large left/right gutters on wide screens.
+- **Timeline filter comboboxes** are capped (`max-w-[11rem]`) and ellipsize
+  overflowing option text, so a long service name no longer stretches the
+  `service` select and reflows `actor` onto the next row.
+
 ### Fixed — Where dead-end on non-git-traceable diff cells
 
 - Diff-matrix cells sourced from OCI artifacts (Flux `OCIRepository`, e.g.
