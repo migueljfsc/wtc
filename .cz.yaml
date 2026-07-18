@@ -3,7 +3,7 @@ commitizen:
   name: cz_conventional_commits
   tag_format: v$version
   update_changelog_on_bump: false
-  version: 0.22.0
+  version: 0.22.1
   version_files:
   - .cz.yaml:version
   - deploy/helm/wtc/Chart.yaml:appVersion
