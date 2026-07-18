@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Star, X } from "lucide-react";
 import type { components } from "@/api/schema";
 import { FilterBar } from "@/components/timeline/FilterBar";
 import { EventRow } from "@/components/timeline/EventRow";
@@ -75,9 +76,21 @@ export function Timeline() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Timeline</h1>
-        <p className="text-sm text-muted-foreground">Every change, newest first.</p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Timeline</h1>
+          <p className="text-sm text-muted-foreground">Every change, newest first.</p>
+        </div>
+        {hasActive && (
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={onClear}>
+              <X className="mr-1 size-3.5" /> Clear
+            </Button>
+            <Button variant="outline" size="sm" onClick={onSave}>
+              <Star className="mr-1 size-3.5" /> Save
+            </Button>
+          </div>
+        )}
       </div>
 
       <FilterBar
@@ -85,11 +98,8 @@ export function Timeline() {
         onSelect={onSelect}
         search={search}
         onSearch={setSearch}
-        onClear={onClear}
-        hasActive={hasActive}
         facets={facets.data}
         saved={saved}
-        onSave={onSave}
         onApply={onApply}
         onDelete={onDelete}
       />

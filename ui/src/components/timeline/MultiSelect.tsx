@@ -75,7 +75,7 @@ export function MultiSelect({
       </button>
 
       {open && (
-        <div className="absolute left-0 z-20 mt-1 max-h-72 w-48 overflow-auto rounded-md border bg-background p-1 shadow-md">
+        <div className="absolute left-0 z-20 mt-1 max-h-72 w-max min-w-full max-w-[12rem] overflow-auto rounded-md border bg-background p-1 shadow-md">
           {searchable && (
             <input
               autoFocus

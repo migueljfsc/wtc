@@ -16,6 +16,8 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
   webhook sources appear).
 - Backend: each `/events?<facet>=` takes a comma-separated OR-set
   (`<col> IN (…)`); `store.Filter` facet fields are now slices.
+- Filter dropdowns size to their content (capped), and Clear/Save moved to the
+  Timeline page header so selecting a facet no longer shifts the filter row.
 
 ### Added — Flux/ArgoCD ingest scope (allow/deny)
 

@@ -1,9 +1,8 @@
-import { Search, Star, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import type { components } from "@/api/schema";
 import type { EventFilters } from "@/lib/queries";
 import type { SavedFilter } from "@/lib/savedFilters";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { MultiSelect } from "@/components/timeline/MultiSelect";
 
 type Facets = components["schemas"]["Facets"];
@@ -21,11 +20,8 @@ export function FilterBar({
   onSelect,
   search,
   onSearch,
-  onClear,
-  hasActive,
   facets,
   saved,
-  onSave,
   onApply,
   onDelete,
 }: {
@@ -33,11 +29,8 @@ export function FilterBar({
   onSelect: (key: SelectKey, value: string) => void;
   search: string;
   onSearch: (v: string) => void;
-  onClear: () => void;
-  hasActive: boolean;
   facets?: Facets;
   saved: SavedFilter[];
-  onSave: () => void;
   onApply: (f: SavedFilter) => void;
   onDelete: (name: string) => void;
 }) {
@@ -59,16 +52,6 @@ export function FilterBar({
         <MultiSelect label="kind" value={filters.kind} options={KINDS} onChange={(v) => onSelect("kind", v)} />
         <MultiSelect label="status" value={filters.status} options={STATUSES} onChange={(v) => onSelect("status", v)} />
         <MultiSelect label="actor" value={filters.actor} options={facets?.actors ?? []} onChange={(v) => onSelect("actor", v)} searchable />
-        {hasActive && (
-          <>
-            <Button variant="ghost" size="sm" onClick={onClear}>
-              <X className="mr-1 size-3.5" /> Clear
-            </Button>
-            <Button variant="outline" size="sm" onClick={onSave}>
-              <Star className="mr-1 size-3.5" /> Save
-            </Button>
-          </>
-        )}
       </div>
 
       {saved.length > 0 && (
