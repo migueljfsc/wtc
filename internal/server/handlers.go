@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/ingest/generic"
@@ -195,16 +196,31 @@ type EventsResponse struct {
 	NextCursor string        `json:"next_cursor,omitempty"`
 }
 
+// csv splits a comma-separated query value into trimmed, non-empty parts.
+func csv(v string) []string {
+	if v == "" {
+		return nil
+	}
+	var out []string
+	for _, p := range strings.Split(v, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func (s *Server) handleListEvents(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	f := store.Filter{
-		Env:     q.Get("env"),
-		Service: q.Get("service"),
-		Kind:    q.Get("kind"),
-		Status:  q.Get("status"),
-		Actor:   q.Get("actor"),
-		Query:   q.Get("q"),
-		Cursor:  q.Get("cursor"),
+		Sources:  csv(q.Get("source")),
+		Envs:     csv(q.Get("env")),
+		Services: csv(q.Get("service")),
+		Kinds:    csv(q.Get("kind")),
+		Statuses: csv(q.Get("status")),
+		Actors:   csv(q.Get("actor")),
+		Query:    q.Get("q"),
+		Cursor:   q.Get("cursor"),
 	}
 
 	if v := q.Get("since"); v != "" {

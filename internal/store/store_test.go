@@ -296,13 +296,14 @@ func TestListFilters(t *testing.T) {
 		want   []string // dedup keys, newest first
 	}{
 		{"all", Filter{}, []string{"f:3", "f:2", "f:1"}},
-		{"env", Filter{Env: "prod"}, []string{"f:3", "f:1"}},
-		{"kind", Filter{Kind: "build"}, []string{"f:2"}},
-		{"service", Filter{Service: "api"}, []string{"f:2", "f:1"}},
-		{"status", Filter{Status: "failed"}, []string{"f:3"}},
+		{"env", Filter{Envs: []string{"prod"}}, []string{"f:3", "f:1"}},
+		{"kind", Filter{Kinds: []string{"build"}}, []string{"f:2"}},
+		{"service", Filter{Services: []string{"api"}}, []string{"f:2", "f:1"}},
+		{"status", Filter{Statuses: []string{"failed"}}, []string{"f:3"}},
+		{"env OR-set", Filter{Envs: []string{"prod", "dev"}}, []string{"f:3", "f:2", "f:1"}},
 		{"since", Filter{Since: base.Add(30 * time.Minute)}, []string{"f:3", "f:2"}},
 		{"until", Filter{Until: base.Add(30 * time.Minute)}, []string{"f:1"}},
-		{"combo", Filter{Env: "prod", Since: base.Add(time.Hour)}, []string{"f:3"}},
+		{"combo", Filter{Envs: []string{"prod"}, Since: base.Add(time.Hour)}, []string{"f:3"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

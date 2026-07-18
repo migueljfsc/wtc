@@ -4,6 +4,19 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — multi-select timeline facets (incl. new source facet)
+
+- **Every timeline facet is now multi-select** — source, env, service, kind,
+  status, actor (OR within a facet, AND across facets). A new compact
+  `MultiSelect` dropdown replaces the single-select dropdowns — searchable for
+  high-cardinality facets (service/actor), no popover dependency, closes on
+  outside-click/Escape.
+- New **`source`** facet — filter by `github`/`gitlab`/`flux`/`argocd`/… or any
+  mapping-webhook name; dynamic from the ledger (`/facets.sources`, so custom
+  webhook sources appear).
+- Backend: each `/events?<facet>=` takes a comma-separated OR-set
+  (`<col> IN (…)`); `store.Filter` facet fields are now slices.
+
 ### Added — Flux/ArgoCD ingest scope (allow/deny)
 
 - **`sources.flux.scope` / `sources.argocd.scope`** — an ingest-time allow/deny

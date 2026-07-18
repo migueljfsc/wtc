@@ -196,6 +196,7 @@ ORDER BY ts DESC`, model.FormatTS(since), model.FormatTS(until))
 // timeline's filter dropdowns. Kind and status are fixed enums (the client
 // knows them); env/service/actor are dynamic.
 type Facets struct {
+	Sources  []string `json:"sources"`
 	Envs     []string `json:"envs"`
 	Services []string `json:"services"`
 	Actors   []string `json:"actors"`
@@ -229,6 +230,9 @@ func (s *Store) Facets(ctx context.Context) (*Facets, error) {
 
 	f := &Facets{}
 	var err error
+	if f.Sources, err = distinct("source"); err != nil {
+		return nil, err
+	}
 	if f.Envs, err = distinct("env"); err != nil {
 		return nil, err
 	}

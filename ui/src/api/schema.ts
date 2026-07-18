@@ -509,6 +509,7 @@ export interface components {
             envs: components["schemas"]["EnvDeployStats"][];
         };
         Facets: {
+            sources: string[];
             envs: string[];
             services: string[];
             actors: string[];
@@ -799,11 +800,17 @@ export interface operations {
     listEvents: {
         parameters: {
             query?: {
+                /** @description Facet OR-set (comma-separated): github/gitlab/flux/argocd/… or mapping-webhook names. */
+                source?: string;
+                /** @description Facet OR-set (comma-separated). */
                 env?: string;
+                /** @description Facet OR-set (comma-separated). */
                 service?: string;
+                /** @description Facet OR-set (comma-separated). */
                 kind?: string;
+                /** @description Facet OR-set (comma-separated). */
                 status?: string;
-                /** @description Exact actor match (facet). */
+                /** @description Facet OR-set (comma-separated). */
                 actor?: string;
                 /** @description Full-text search over event text. */
                 q?: string;

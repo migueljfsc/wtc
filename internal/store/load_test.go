@@ -50,7 +50,7 @@ func TestLoadSanity(t *testing.T) {
 			return err
 		}},
 		{"log-env-filter", func() error {
-			_, _, err := s.ListEvents(ctx, Filter{Env: "prod", Limit: 50})
+			_, _, err := s.ListEvents(ctx, Filter{Envs: []string{"prod"}, Limit: 50})
 			return err
 		}},
 		{"diff-latest-deploys", func() error {

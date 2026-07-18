@@ -3,8 +3,8 @@ import type { components } from "@/api/schema";
 import type { EventFilters } from "@/lib/queries";
 import type { SavedFilter } from "@/lib/savedFilters";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { MultiSelect } from "@/components/timeline/MultiSelect";
 
 type Facets = components["schemas"]["Facets"];
 
@@ -14,36 +14,7 @@ const KINDS = [
 ];
 const STATUSES = ["started", "succeeded", "failed", "degraded", "unknown"];
 
-type SelectKey = "env" | "service" | "kind" | "status" | "actor";
-
-function Facet({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string | undefined;
-  options: string[];
-  onChange: (v: string) => void;
-}) {
-  return (
-    <Select
-      aria-label={label}
-      value={value ?? ""}
-      onChange={(e) => onChange(e.target.value)}
-      title={value || label}
-      className="w-auto min-w-[6.5rem] max-w-[11rem] truncate"
-    >
-      <option value="">{label}</option>
-      {options.map((o) => (
-        <option key={o} value={o}>
-          {o}
-        </option>
-      ))}
-    </Select>
-  );
-}
+type SelectKey = "source" | "env" | "service" | "kind" | "status" | "actor";
 
 export function FilterBar({
   filters,
@@ -82,11 +53,12 @@ export function FilterBar({
             onChange={(e) => onSearch(e.target.value)}
           />
         </div>
-        <Facet label="env" value={filters.env} options={facets?.envs ?? []} onChange={(v) => onSelect("env", v)} />
-        <Facet label="service" value={filters.service} options={facets?.services ?? []} onChange={(v) => onSelect("service", v)} />
-        <Facet label="kind" value={filters.kind} options={KINDS} onChange={(v) => onSelect("kind", v)} />
-        <Facet label="status" value={filters.status} options={STATUSES} onChange={(v) => onSelect("status", v)} />
-        <Facet label="actor" value={filters.actor} options={facets?.actors ?? []} onChange={(v) => onSelect("actor", v)} />
+        <MultiSelect label="source" value={filters.source} options={facets?.sources ?? []} onChange={(v) => onSelect("source", v)} />
+        <MultiSelect label="env" value={filters.env} options={facets?.envs ?? []} onChange={(v) => onSelect("env", v)} />
+        <MultiSelect label="service" value={filters.service} options={facets?.services ?? []} onChange={(v) => onSelect("service", v)} searchable />
+        <MultiSelect label="kind" value={filters.kind} options={KINDS} onChange={(v) => onSelect("kind", v)} />
+        <MultiSelect label="status" value={filters.status} options={STATUSES} onChange={(v) => onSelect("status", v)} />
+        <MultiSelect label="actor" value={filters.actor} options={facets?.actors ?? []} onChange={(v) => onSelect("actor", v)} searchable />
         {hasActive && (
           <>
             <Button variant="ghost" size="sm" onClick={onClear}>

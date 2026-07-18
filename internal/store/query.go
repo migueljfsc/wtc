@@ -28,16 +28,20 @@ const eventColumns = `id, ts, ingested_at, source, kind, status, env, cluster,
 
 // Filter selects events for ListEvents. Zero values mean "no constraint".
 type Filter struct {
-	Env     string
-	Service string
-	Kind    string
-	Status  string
-	Actor   string // exact match (facet); FTS `Query` covers actor text search
-	Query   string // FTS5 MATCH over title/service/actor/artifact
-	Since   time.Time
-	Until   time.Time
-	Limit   int
-	Cursor  string // opaque, from a previous ListEvents call
+	// Facet OR-sets: each is a set of exact values ORed within the facet, and
+	// the facets are ANDed together. Empty = unconstrained. github/gitlab/flux/
+	// argocd/… or mapping-webhook names for Sources.
+	Sources  []string
+	Envs     []string
+	Services []string
+	Kinds    []string
+	Statuses []string
+	Actors   []string
+	Query    string // FTS5 MATCH over title/service/actor/artifact
+	Since    time.Time
+	Until    time.Time
+	Limit    int
+	Cursor   string // opaque, from a previous ListEvents call
 }
 
 // ListEvents returns events newest-first (ts DESC, id DESC) with cursor
@@ -58,21 +62,25 @@ func (s *Store) ListEvents(ctx context.Context, f Filter) (events []model.Event,
 		args = append(args, vals...)
 	}
 
-	if f.Env != "" {
-		add("env = ?", f.Env)
+	// addIn ANDs a `col IN (?,…)` set into the query; empty set = no constraint.
+	addIn := func(col string, vals []string) {
+		if len(vals) == 0 {
+			return
+		}
+		ph := make([]string, len(vals))
+		as := make([]any, len(vals))
+		for i, v := range vals {
+			ph[i] = "?"
+			as[i] = v
+		}
+		add(col+" IN ("+strings.Join(ph, ", ")+")", as...)
 	}
-	if f.Service != "" {
-		add("service = ?", f.Service)
-	}
-	if f.Kind != "" {
-		add("kind = ?", f.Kind)
-	}
-	if f.Status != "" {
-		add("status = ?", f.Status)
-	}
-	if f.Actor != "" {
-		add("actor = ?", f.Actor)
-	}
+	addIn("source", f.Sources)
+	addIn("env", f.Envs)
+	addIn("service", f.Services)
+	addIn("kind", f.Kinds)
+	addIn("status", f.Statuses)
+	addIn("actor", f.Actors)
 	if !f.Since.IsZero() {
 		add("ts >= ?", model.FormatTS(f.Since))
 	}

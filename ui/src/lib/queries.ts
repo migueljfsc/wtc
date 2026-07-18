@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 
 /** The timeline's faceted filter state. Empty fields mean "no constraint". */
 export interface EventFilters {
+  source?: string;
   env?: string;
   service?: string;
   kind?: string;

@@ -128,7 +128,7 @@ func TestListEventsActorFilter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, _, err := s.ListEvents(ctx, Filter{Actor: "alice"})
+	got, _, err := s.ListEvents(ctx, Filter{Actors: []string{"alice"}})
 	if err != nil {
 		t.Fatalf("ListEvents: %v", err)
 	}

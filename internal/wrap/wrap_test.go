@@ -174,7 +174,7 @@ echo '{"type":"change_summary","changes":{"add":3,"change":1,"remove":2}}'`
 		t.Fatalf("exit = %d, stderr %s", code, errBuf.String())
 	}
 
-	events, _, err := st.ListEvents(context.Background(), store.Filter{Kind: "infra_change"})
+	events, _, err := st.ListEvents(context.Background(), store.Filter{Kinds: []string{"infra_change"}})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,7 +14,7 @@ import {
 } from "@/lib/savedFilters";
 
 type Event = components["schemas"]["Event"];
-type SelectKey = "env" | "service" | "kind" | "status" | "actor";
+type SelectKey = "source" | "env" | "service" | "kind" | "status" | "actor";
 
 export function Timeline() {
   const [filters, setFilters] = useState<EventFilters>({});
