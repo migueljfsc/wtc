@@ -118,6 +118,9 @@ func githubDetails(gh config.GitHubView) string {
 		return "-"
 	}
 	d := "interval " + gh.PollInterval
+	if gh.PollerEnabled {
+		d += " · backfill " + gh.Backfill
+	}
 	if gh.PollerEnabled && len(gh.Repos) == 0 {
 		d += " · repos auto-discover"
 	} else if len(gh.Repos) > 0 {
@@ -131,6 +134,9 @@ func gitlabDetails(gl config.GitLabView) string {
 		return "-"
 	}
 	d := "interval " + gl.PollInterval
+	if gl.PollerEnabled {
+		d += " · backfill " + gl.Backfill
+	}
 	d += fmt.Sprintf(" · %d project(s)", len(gl.Projects))
 	if gl.BaseURL != "" {
 		d += " · " + gl.BaseURL

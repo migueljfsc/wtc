@@ -613,19 +613,20 @@
       },
       "ConfigGitHub": {
         "type": "object",
-        "required": ["webhook_secret", "api_token", "poll_interval", "poller_enabled", "repos", "infra_path"],
+        "required": ["webhook_secret", "api_token", "poll_interval", "poller_enabled", "repos", "infra_path", "backfill"],
         "properties": {
           "webhook_secret": { "$ref": "#/components/schemas/MaskedSecret" },
           "api_token": { "$ref": "#/components/schemas/MaskedSecret" },
           "poll_interval": { "type": "string" },
           "poller_enabled": { "type": "boolean" },
-          "repos": { "type": "array", "items": { "type": "string" }, "description": "Poller scope; empty with poller_enabled means auto-discovery." },
-          "infra_path": { "type": "string" }
+          "repos": { "type": "array", "items": { "type": "string" }, "description": "Poller scope; empty with poller_enabled means auto-discovery. Entries may be globs (P18)." },
+          "infra_path": { "type": "string" },
+          "backfill": { "type": "string", "description": "First-poll history window (P19), e.g. \"1d\", \"7d\"." }
         }
       },
       "ConfigGitLab": {
         "type": "object",
-        "required": ["base_url", "webhook_secret", "api_token", "poll_interval", "poller_enabled", "projects", "infra_path"],
+        "required": ["base_url", "webhook_secret", "api_token", "poll_interval", "poller_enabled", "projects", "infra_path", "backfill"],
         "properties": {
           "base_url": { "type": "string" },
           "webhook_secret": { "$ref": "#/components/schemas/MaskedSecret" },
@@ -633,7 +634,8 @@
           "poll_interval": { "type": "string" },
           "poller_enabled": { "type": "boolean" },
           "projects": { "type": "array", "items": { "type": "string" } },
-          "infra_path": { "type": "string" }
+          "infra_path": { "type": "string" },
+          "backfill": { "type": "string", "description": "First-poll history window (P19)." }
         }
       },
       "ConfigFlux": {

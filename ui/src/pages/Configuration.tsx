@@ -115,6 +115,7 @@ function Sources({ cfg }: { cfg: ConfigResponse }) {
         {gh.poller_enabled && (
           <KV k="repos" v={gh.repos.length > 0 ? gh.repos.join(", ") : "auto-discover (all accessible)"} />
         )}
+        {gh.poller_enabled && <KV k="backfill" v={gh.backfill} />}
         <KV k="infra path" v={gh.infra_path} />
       </SourceCard>
 
@@ -128,6 +129,7 @@ function Sources({ cfg }: { cfg: ConfigResponse }) {
         <KV k="webhook secret" v={gl.webhook_secret} />
         {gl.poller_enabled && <KV k="poll interval" v={gl.poll_interval} />}
         {gl.projects.length > 0 && <KV k="projects" v={gl.projects.join(", ")} />}
+        {gl.poller_enabled && <KV k="backfill" v={gl.backfill} />}
         <KV k="infra path" v={gl.infra_path} />
       </SourceCard>
 

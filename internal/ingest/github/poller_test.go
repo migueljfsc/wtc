@@ -81,7 +81,7 @@ func TestPollerAutoDiscoversRepos(t *testing.T) {
 	engine, _ := normalize.NewEngine(nil)
 	// nil repos => auto-discover.
 	p := NewPoller(NewClient("test-token", gh.URL), st, normalize.NewEngineHolder(engine),
-		nil, time.Minute, "", slog.New(slog.DiscardHandler))
+		nil, time.Minute, 0, "", slog.New(slog.DiscardHandler))
 	p.Sweep(ctx)
 
 	events, _, err := st.ListEvents(ctx, store.Filter{})
@@ -121,7 +121,7 @@ func TestPollerSweepIngestsAndDedups(t *testing.T) {
 	}
 
 	p := NewPoller(NewClient("test-token", gh.URL), st, normalize.NewEngineHolder(engine),
-		[]string{"migueljfsc/wtc"}, time.Minute, "", slog.New(slog.DiscardHandler))
+		[]string{"migueljfsc/wtc"}, time.Minute, 0, "", slog.New(slog.DiscardHandler))
 
 	p.Sweep(ctx)
 
@@ -193,7 +193,7 @@ func TestPollerSurvivesAPIFailure(t *testing.T) {
 	engine, _ := normalize.NewEngine(nil)
 
 	p := NewPoller(NewClient("t", bad.URL), st, normalize.NewEngineHolder(engine),
-		[]string{"migueljfsc/wtc"}, time.Minute, "", slog.New(slog.DiscardHandler))
+		[]string{"migueljfsc/wtc"}, time.Minute, 0, "", slog.New(slog.DiscardHandler))
 	p.Sweep(context.Background()) // must not panic or wedge
 
 	// Watermark untouched on failure — nothing lost.

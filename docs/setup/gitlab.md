@@ -62,9 +62,12 @@ wtc log --since 24h             # pipelines (build), merged MRs (merge), pushes
 wtc doctor                      # per-source health + per-project watermarks
 ```
 
-First run backfills 24h; each poll re-reads a 1h overlap so a pipeline still
-running when last seen gets its terminal status — duplicates are impossible by
-design (`dedup_key` upsert). `wtc doctor` lists `gitlab:pipelines`,
+First run backfills **24h by default**; set `sources.gitlab.backfill: 7d` (any
+Go/`d`/`w` duration) to seed a fresh install with more history — it affects
+only the first sweep of each project, then the watermark takes over. Each poll
+re-reads a 1h overlap so a pipeline still running when last seen gets its
+terminal status — duplicates are impossible by design (`dedup_key` upsert).
+`wtc doctor` lists `gitlab:pipelines`,
 `gitlab:mrs`, `gitlab:commits` watermarks per project.
 
 ## 3. Webhook (optional — needs a public endpoint)

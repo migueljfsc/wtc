@@ -325,6 +325,7 @@ prod` and the portal's env matrix then compare what's actually running per env.
   (public-endpoint webhook mode)
 - [flux.md](flux.md) · [flux-provider.yaml](flux-provider.yaml)
 - [argocd.md](argocd.md) · [argocd-notifications.yaml](argocd-notifications.yaml)
+- [multi-cluster.md](multi-cluster.md) (one central hub for N clusters)
 - [portal.md](portal.md) (portal deploy + auth) · [deploy.md](deploy.md)
 - [retention.md](retention.md) · [alertmanager.md](alertmanager.md) (alert
   correlation) · [slack-digest.md](slack-digest.md)

@@ -37,6 +37,7 @@ func fullyPopulatedConfig() *Config {
 				PollInterval:  Duration(90 * time.Second),
 				Repos:         []string{"org/api", "org/web"},
 				InfraPath:     "infrastructure/",
+				Backfill:      Duration(7 * 24 * time.Hour),
 			},
 			GitLab: GitLab{
 				BaseURL:       "https://gitlab.example.com",
@@ -45,6 +46,7 @@ func fullyPopulatedConfig() *Config {
 				PollInterval:  Duration(2 * time.Minute),
 				Projects:      []string{"group/svc"},
 				InfraPath:     "deploy/",
+				Backfill:      Duration(24 * time.Hour),
 			},
 			Flux: Flux{
 				HMACKey:           sentinel + "-flux-hmac",
@@ -152,6 +154,9 @@ func TestViewShape(t *testing.T) {
 	}
 	if v.Sources.GitHub.PollInterval != "1m30s" {
 		t.Errorf("github poll_interval = %q, want 1m30s", v.Sources.GitHub.PollInterval)
+	}
+	if v.Sources.GitHub.Backfill != "7d" {
+		t.Errorf("github backfill = %q, want 7d", v.Sources.GitHub.Backfill)
 	}
 
 	// Jobs and flags.

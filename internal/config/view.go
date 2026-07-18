@@ -78,6 +78,7 @@ type GitHubView struct {
 	PollerEnabled bool     `json:"poller_enabled"`
 	Repos         []string `json:"repos"`
 	InfraPath     string   `json:"infra_path"`
+	Backfill      string   `json:"backfill"`
 }
 
 // GitLabView mirrors config.GitLab; unlike github the poller also requires an
@@ -90,6 +91,7 @@ type GitLabView struct {
 	PollerEnabled bool     `json:"poller_enabled"`
 	Projects      []string `json:"projects"`
 	InfraPath     string   `json:"infra_path"`
+	Backfill      string   `json:"backfill"`
 }
 
 // FluxView mirrors config.Flux.
@@ -202,6 +204,7 @@ func NewView(cfg *Config) View {
 				PollerEnabled: cfg.Sources.GitHub.APIToken != "" && cfg.Sources.GitHub.PollInterval.Std() > 0,
 				Repos:         copyList(cfg.Sources.GitHub.Repos),
 				InfraPath:     cfg.Sources.GitHub.InfraPath,
+				Backfill:      durString(cfg.Sources.GitHub.Backfill),
 			},
 			GitLab: GitLabView{
 				BaseURL:       cfg.Sources.GitLab.BaseURL,
@@ -213,6 +216,7 @@ func NewView(cfg *Config) View {
 				PollerEnabled: cfg.Sources.GitLab.APIToken != "" && cfg.Sources.GitLab.PollInterval.Std() > 0 && len(cfg.Sources.GitLab.Projects) > 0,
 				Projects:      copyList(cfg.Sources.GitLab.Projects),
 				InfraPath:     cfg.Sources.GitLab.InfraPath,
+				Backfill:      durString(cfg.Sources.GitLab.Backfill),
 			},
 			Flux: FluxView{
 				HMACKey:           mask(cfg.Sources.Flux.HMACKey),

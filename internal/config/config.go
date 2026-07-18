@@ -97,6 +97,7 @@ type GitHub struct {
 	PollInterval  Duration `yaml:"poll_interval"`  // 0 disables the poller (webhook-only mode)
 	Repos         []string `yaml:"repos"`          // poller scope, owner/name; empty = every repo the token can access
 	InfraPath     string   `yaml:"infra_path"`     // per-repo manifests dir (microservices layout)
+	Backfill      Duration `yaml:"backfill"`       // first-poll history window (default 24h); GitHub retains runs ~90d
 }
 
 // GitLab configures the GitLab ingest paths (SPEC §2, P12) — the SCM/CI-axis
@@ -110,6 +111,7 @@ type GitLab struct {
 	PollInterval  Duration `yaml:"poll_interval"`  // 0 disables the poller (webhook-only mode)
 	Projects      []string `yaml:"projects"`       // poller scope, group/service paths (no auto-discovery)
 	InfraPath     string   `yaml:"infra_path"`     // per-project manifests dir (microservices layout)
+	Backfill      Duration `yaml:"backfill"`       // first-poll history window (default 24h)
 }
 
 // Flux configures the notification-controller ingest path (SPEC §2).
@@ -193,10 +195,12 @@ func Default() Config {
 			GitHub: GitHub{
 				PollInterval: Duration(60 * time.Second),
 				InfraPath:    "infrastructure/",
+				Backfill:     Duration(24 * time.Hour),
 			},
 			GitLab: GitLab{
 				PollInterval: Duration(60 * time.Second),
 				InfraPath:    "infrastructure/",
+				Backfill:     Duration(24 * time.Hour),
 			},
 			Flux: Flux{
 				SuppressionWindow: Duration(10 * time.Minute),
@@ -316,6 +320,12 @@ func Load(path string, optional bool) (*Config, error) {
 		}
 	default:
 		return nil, fmt.Errorf("config %s: storage.backend must be sqlite or postgres, got %q", path, cfg.Storage.Backend)
+	}
+
+	// Backfill windows must be positive — a negative window would poll the
+	// future; zero falls back to the 24h default at poller construction.
+	if cfg.Sources.GitHub.Backfill.Std() < 0 || cfg.Sources.GitLab.Backfill.Std() < 0 {
+		return nil, fmt.Errorf("config %s: sources.*.backfill must not be negative", path)
 	}
 
 	// Poller scope globs (P18): compile up front — a bad pattern must fail

@@ -4,6 +4,22 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — first-run backfill window + multi-cluster hub docs
+
+- **`sources.github.backfill` / `sources.gitlab.backfill`** — the first-poll
+  history window (default `24h`, unchanged behavior). Set `7d`/`30d`/etc. to
+  seed a fresh install with more history; it affects only the first sweep of
+  each repo/project (the watermark takes over after), at the cost of
+  proportional pagination + PR-diff enrichment up front. Surfaced in the
+  Configuration tab source cards and `wtc config`; negative values rejected at
+  config load.
+- **`docs/setup/multi-cluster.md`** — how to run one central wtc ("the hub")
+  that ingests Flux/Argo events from N clusters: per-spoke Provider/Alert
+  pointing at the hub, cluster identity via `eventMetadata.cluster`, and
+  `cluster → env` rules. SCM pollers run once on the hub. No new code — the
+  HTTP ingest + cluster-label design already supported it; this documents the
+  flagship topology.
+
 ### Added — Phase 18 (Poller scope globs + Where links)
 
 - **Glob patterns in poller scope**: `sources.github.repos` /

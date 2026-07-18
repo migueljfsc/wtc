@@ -72,7 +72,7 @@ func TestPollerTwiceIsIdempotent(t *testing.T) {
 	defer func() { _ = st.Close() }()
 
 	client := NewClient("t", gl.URL)
-	p := NewPoller(client, st, newEngine(t), []string{testProject}, time.Minute, "", slog.New(slog.NewTextHandler(nopWriter{}, nil)))
+	p := NewPoller(client, st, newEngine(t), []string{testProject}, time.Minute, 0, "", slog.New(slog.NewTextHandler(nopWriter{}, nil)))
 
 	ctx := context.Background()
 	p.Sweep(ctx)
@@ -102,7 +102,7 @@ func TestPollerEnrichesMR(t *testing.T) {
 	}
 	defer func() { _ = st.Close() }()
 
-	p := NewPoller(NewClient("t", gl.URL), st, newEngine(t), []string{testProject}, time.Minute, "", slog.New(slog.NewTextHandler(nopWriter{}, nil)))
+	p := NewPoller(NewClient("t", gl.URL), st, newEngine(t), []string{testProject}, time.Minute, 0, "", slog.New(slog.NewTextHandler(nopWriter{}, nil)))
 	p.Sweep(context.Background())
 
 	var found bool

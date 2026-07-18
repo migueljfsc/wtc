@@ -150,7 +150,7 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 	if gh := cfg.Sources.GitHub; gh.APIToken != "" && gh.PollInterval.Std() > 0 {
 		poller := github.NewPoller(
 			github.NewClient(gh.APIToken, ""),
-			st, engineHolder, gh.Repos, gh.PollInterval.Std(), cfg.Server.CaptureDir, log,
+			st, engineHolder, gh.Repos, gh.PollInterval.Std(), gh.Backfill.Std(), cfg.Server.CaptureDir, log,
 		)
 		go poller.Run(ctx)
 	} else {
@@ -164,7 +164,7 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 	if gl := cfg.Sources.GitLab; gl.APIToken != "" && gl.PollInterval.Std() > 0 && len(gl.Projects) > 0 {
 		poller := gitlab.NewPoller(
 			gitlab.NewClient(gl.APIToken, gl.BaseURL),
-			st, engineHolder, gl.Projects, gl.PollInterval.Std(), cfg.Server.CaptureDir, log,
+			st, engineHolder, gl.Projects, gl.PollInterval.Std(), gl.Backfill.Std(), cfg.Server.CaptureDir, log,
 		)
 		go poller.Run(ctx)
 	} else {

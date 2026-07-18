@@ -50,9 +50,21 @@ wtc log --since 24h            # builds/merges/pushes appear
 wtc doctor                     # per-source health + poller watermarks
 ```
 
-First run backfills 24h. Each poll re-reads a 1h overlap window so runs that
-were in progress get their terminal status — duplicates are impossible by
-design (`dedup_key` upsert).
+First run backfills **24h by default** — override with `backfill` to seed a
+fresh install with more history:
+
+```yaml
+sources:
+  github:
+    backfill: 7d          # first-poll window; default 24h
+```
+
+GitHub retains workflow runs ~90 days, so up to `90d` is meaningful. A deep
+window only affects the **first** sweep of each repo (the watermark takes over
+after that), but it costs proportional pagination and PR-diff enrichment calls
+up front — on a large org start modest and widen if needed. Each poll then
+re-reads a 1h overlap window so runs that were in progress get their terminal
+status — duplicates are impossible by design (`dedup_key` upsert).
 
 ## Notes
 

@@ -588,9 +588,11 @@ export interface components {
             api_token: components["schemas"]["MaskedSecret"];
             poll_interval: string;
             poller_enabled: boolean;
-            /** @description Poller scope; empty with poller_enabled means auto-discovery. */
+            /** @description Poller scope; empty with poller_enabled means auto-discovery. Entries may be globs (P18). */
             repos: string[];
             infra_path: string;
+            /** @description First-poll history window (P19), e.g. "1d", "7d". */
+            backfill: string;
         };
         ConfigGitLab: {
             base_url: string;
@@ -600,6 +602,8 @@ export interface components {
             poller_enabled: boolean;
             projects: string[];
             infra_path: string;
+            /** @description First-poll history window (P19). */
+            backfill: string;
         };
         ConfigFlux: {
             hmac_key: components["schemas"]["MaskedSecret"];

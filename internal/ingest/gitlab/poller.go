@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	// backfillWindow bounds the first poll of a project with no stored
-	// watermark so a fresh install doesn't ingest the project's whole history.
-	backfillWindow = 24 * time.Hour
+	// defaultBackfill bounds the first poll of a project with no stored
+	// watermark so a fresh install doesn't ingest the project's whole
+	// history. Overridable via sources.gitlab.backfill (P19).
+	defaultBackfill = 24 * time.Hour
 	// overlap is subtracted from the watermark on every query so pipelines
 	// still running when last seen get their terminal state, and borderline
 	// timestamps are never skipped. Dedup makes re-ingest free.
@@ -36,6 +37,7 @@ type Poller struct {
 	globs      []*regexp.Regexp // compiled glob entries (P18), rules dialect
 	namespaces []string         // static prefixes of the globs — the bounded discovery scopes
 	interval   time.Duration
+	backfill   time.Duration // first-poll history window; <=0 = defaultBackfill
 	captureDir string
 	log        *slog.Logger
 }
@@ -44,9 +46,12 @@ type Poller struct {
 // holder so a live rule edit re-routes poller events too (P10). projects
 // entries may be globs with a static namespace prefix (P18, validated at
 // config load) — resolved against that namespace's project list every sweep.
-func NewPoller(client *Client, st *store.Store, engine *normalize.EngineHolder, projects []string, interval time.Duration, captureDir string, log *slog.Logger) *Poller {
+func NewPoller(client *Client, st *store.Store, engine *normalize.EngineHolder, projects []string, interval, backfill time.Duration, captureDir string, log *slog.Logger) *Poller {
 	if log == nil {
 		log = slog.Default()
+	}
+	if backfill <= 0 {
+		backfill = defaultBackfill
 	}
 	exact, globs := normalize.SplitScope(projects)
 	nsSeen := map[string]bool{}
@@ -69,6 +74,7 @@ func NewPoller(client *Client, st *store.Store, engine *normalize.EngineHolder, 
 		globs:      globs,
 		namespaces: namespaces,
 		interval:   interval,
+		backfill:   backfill,
 		captureDir: captureDir,
 		log:        log,
 	}
@@ -139,7 +145,7 @@ func (p *Poller) pollResource(ctx context.Context, project, resource string) err
 		return err
 	}
 	if watermark.IsZero() {
-		watermark = time.Now().Add(-backfillWindow)
+		watermark = time.Now().Add(-p.backfill)
 	}
 	since := watermark.Add(-overlap)
 
