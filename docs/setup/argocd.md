@@ -19,6 +19,32 @@ sources:
 
 Unset secret ⇒ `/ingest/argocd` fails closed (503).
 
+### Scope: only track the apps you care about
+
+Restrict which Applications enter the ledger with an allow/deny list matched on
+**raw facts** (`namespace` = destNamespace, `object_name` = app name,
+`object_kind` = `Application`, `project`). Empty ⇒ ingest every notification.
+
+```yaml
+sources:
+  argocd:
+    webhook_secret: ${WTC_ARGOCD_WEBHOOK_SECRET}
+    suppression_window: 10m
+    scope:
+      allow:                          # empty ⇒ ingest everything
+        - { project: "team-a" }       # fields within an entry are AND
+        - { object_name: "payments-*" }
+      deny:                           # deny wins over allow
+        - { object_name: "*-preview" }
+```
+
+**Deny wins** over allow; empty `allow` allows all; empty `deny` denies none;
+fields within an entry are AND, entries are OR; globs are `*`/`**`. Dropped
+events are never stored (counted by `wtc_filtered_total{source="argocd"}`); a
+bad pattern or an all-empty entry fails `wtc serve` at startup. It is a scope
+declaration, not a query filter — Argo has no poller, so widening it later does
+not recover past events.
+
 Auth is a **static shared secret** sent verbatim as the `X-WTC-Token` header
 and compared constant-time — Argo's notification templates cannot compute a
 body HMAC like Flux's generic-hmac provider. Treat the value like a password;

@@ -118,6 +118,11 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 	engineHolder := normalize.NewEngineHolder(engine)
 	tagHolder := normalize.NewTagResolverHolder(tags)
 
+	// Ingest scope filters — errors already surfaced by config.Load's
+	// validation, so a compile miss here is impossible; ignore it.
+	fluxScope, _ := cfg.Sources.Flux.Scope.Compile()
+	argocdScope, _ := cfg.Sources.ArgoCD.Scope.Compile()
+
 	httpSrv := &http.Server{
 		Addr: cfg.Server.Listen,
 		Handler: server.New(st, server.Options{
@@ -127,6 +132,8 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 			FluxSuppression:     cfg.Sources.Flux.SuppressionWindow.Std(),
 			ArgoCDWebhookToken:  cfg.Sources.ArgoCD.WebhookSecret,
 			ArgoCDSuppression:   cfg.Sources.ArgoCD.SuppressionWindow.Std(),
+			FluxScope:           fluxScope,
+			ArgoCDScope:         argocdScope,
 			GitLabWebhookToken:  cfg.Sources.GitLab.WebhookSecret,
 			Engine:              engineHolder,
 			Tags:                tagHolder,

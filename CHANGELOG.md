@@ -4,6 +4,23 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — Flux/ArgoCD ingest scope (allow/deny)
+
+- **`sources.flux.scope` / `sources.argocd.scope`** — an ingest-time allow/deny
+  list that keeps third-party reconciles/apps (cert-manager, external-dns,
+  operator CRDs, …) out of the ledger, the push sources' analog of the
+  GitHub/GitLab poller repo scope. Matches on **raw facts** — `namespace`,
+  `object_name` (Flux involvedObject.name / Argo app), `object_kind`, `cluster`
+  (Flux), `project` (Argo) — never inferred env/service, so the drop decision
+  is deterministic. Globs use the shared `*`/`**` dialect.
+- Semantics: **deny wins** over allow; empty `allow` ⇒ allow all; empty `deny`
+  ⇒ deny none; fields within an entry are AND, entries are OR. Non-matching
+  events are dropped before rules/storage (`202 {"status":"filtered"}`) and
+  counted by `wtc_filtered_total{source}`. Bad patterns or all-empty entries
+  fail `wtc serve` at config load. Surfaced in `wtc config` and the
+  Configuration tab. Labels are intentionally out of scope — Flux events carry
+  none and Argo's template exposes only `envLabel`.
+
 ### Changed — portal layout: service list, page width, filter comboboxes
 
 - **Services tab** now uses a searchable master-detail layout (filter box +

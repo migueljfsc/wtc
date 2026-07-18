@@ -118,6 +118,10 @@ type GitLab struct {
 type Flux struct {
 	HMACKey           string   `yaml:"hmac_key"`           // generic-hmac provider shared key
 	SuppressionWindow Duration `yaml:"suppression_window"` // drop repeats of (object,revision,reason) inside this window
+	// Scope is the ingest allow/deny list (raw facts: namespace, object_name,
+	// object_kind, cluster). Empty = ingest every reconcile. Deny wins over
+	// allow; validated/compiled at config load.
+	Scope normalize.ScopeFilter `yaml:"scope"`
 }
 
 // ArgoCD configures the notifications-controller webhook ingest path
@@ -127,6 +131,10 @@ type Flux struct {
 type ArgoCD struct {
 	WebhookSecret     string   `yaml:"webhook_secret"`     // static shared secret, X-WTC-Token header
 	SuppressionWindow Duration `yaml:"suppression_window"` // drop repeats of (app,revision,phase|health) inside this window
+	// Scope is the ingest allow/deny list (raw facts: namespace, object_name
+	// [=app], object_kind, project). Empty = ingest every notification. Deny
+	// wins over allow; validated/compiled at config load.
+	Scope normalize.ScopeFilter `yaml:"scope"`
 }
 
 // Sources groups per-source ingest configuration.
@@ -352,6 +360,16 @@ func Load(path string, optional bool) (*Config, error) {
 		if _, ok := normalize.ScopeNamespace(pr); !ok {
 			return nil, fmt.Errorf("config %s: sources.gitlab.projects glob %q needs a static namespace prefix (e.g. my-group/*) — unscoped discovery is not supported on gitlab", path, pr)
 		}
+	}
+
+	// Flux/ArgoCD ingest scope (allow/deny): compile the globs up front so a
+	// bad pattern or an empty (match-everything) entry fails startup instead of
+	// silently dropping — or admitting — every event.
+	if _, err := cfg.Sources.Flux.Scope.Compile(); err != nil {
+		return nil, fmt.Errorf("config %s: sources.flux.scope: %w", path, err)
+	}
+	if _, err := cfg.Sources.ArgoCD.Scope.Compile(); err != nil {
+		return nil, fmt.Errorf("config %s: sources.argocd.scope: %w", path, err)
 	}
 
 	return &cfg, nil

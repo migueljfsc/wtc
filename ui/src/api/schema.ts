@@ -605,13 +605,31 @@ export interface components {
             /** @description First-poll history window (P19). */
             backfill: string;
         };
+        /** @description Ingest allow/deny selector; empty fields are unconstrained, string fields are globs (* one segment, ** any depth). */
+        ConfigScopeMatch: {
+            namespace?: string;
+            /** @description Flux involvedObject.name / Argo app name. */
+            object_name?: string;
+            object_kind?: string;
+            /** @description Flux only. */
+            cluster?: string;
+            /** @description ArgoCD only. */
+            project?: string;
+        };
+        /** @description Ingest allow/deny lists. Deny wins over allow; empty allow = allow all; empty deny = deny none. */
+        ConfigScope: {
+            allow: components["schemas"]["ConfigScopeMatch"][];
+            deny: components["schemas"]["ConfigScopeMatch"][];
+        };
         ConfigFlux: {
             hmac_key: components["schemas"]["MaskedSecret"];
             suppression_window: string;
+            scope: components["schemas"]["ConfigScope"];
         };
         ConfigArgoCD: {
             webhook_secret: components["schemas"]["MaskedSecret"];
             suppression_window: string;
+            scope: components["schemas"]["ConfigScope"];
         };
         ConfigWebhookAuth: {
             /** @enum {string} */

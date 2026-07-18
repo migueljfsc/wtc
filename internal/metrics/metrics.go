@@ -47,6 +47,14 @@ var (
 		Help: "Events dropped inside a suppression window, by source.",
 	}, []string{"source"})
 
+	// Filtered counts events dropped at ingest by a source's allow/deny scope
+	// (flux and argocd only — the push sources' analog of poller repo scope).
+	// Distinct from Suppressed: these never belong in the ledger at all.
+	Filtered = factory.NewCounterVec(prometheus.CounterOpts{
+		Name: "wtc_filtered_total",
+		Help: "Events dropped at ingest by an allow/deny scope, by source.",
+	}, []string{"source"})
+
 	// MappingErrors counts mapping-webhook template failures (P14). The
 	// delivery is rejected so the sender can retry; alert on any increase.
 	MappingErrors = factory.NewCounterVec(prometheus.CounterOpts{

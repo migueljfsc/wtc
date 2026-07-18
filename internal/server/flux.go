@@ -52,6 +52,14 @@ func (s *Server) handleIngestFlux(w http.ResponseWriter, r *http.Request) {
 		s.writeJSON(w, http.StatusAccepted, map[string]string{"status": "ignored"})
 		return
 	}
+	// Ingest scope: drop reconciles outside the configured allow/deny before
+	// any rules/storage — third-party controllers never enter the ledger.
+	// Matches raw facts only, so the decision is independent of inference.
+	if !s.fluxScope.Permit(facts) {
+		metrics.Filtered.WithLabelValues("flux").Inc()
+		s.writeJSON(w, http.StatusAccepted, map[string]string{"status": "filtered"})
+		return
+	}
 	if err := s.engine.Apply(ev, facts); err != nil {
 		// Rules failing must not drop the event; it lands unenriched.
 		s.log.Error("rules apply", "dedup_key", ev.DedupKey, "error", err)

@@ -57,8 +57,8 @@ func newConfigCmd(flags *clientFlags) *cobra.Command {
 			_, _ = fmt.Fprintf(w, "github\t%s\t%s\n", githubModes(gh.PollerEnabled, gh.WebhookSecret != ""), githubDetails(gh))
 			gl := r.Sources.GitLab
 			_, _ = fmt.Fprintf(w, "gitlab\t%s\t%s\n", githubModes(gl.PollerEnabled, gl.WebhookSecret != ""), gitlabDetails(gl))
-			_, _ = fmt.Fprintf(w, "flux\t%s\t%s\n", onOff(r.Sources.Flux.HMACKey != "", "webhook"), "suppression "+r.Sources.Flux.SuppressionWindow)
-			_, _ = fmt.Fprintf(w, "argocd\t%s\t%s\n", onOff(r.Sources.ArgoCD.WebhookSecret != "", "webhook"), "suppression "+r.Sources.ArgoCD.SuppressionWindow)
+			_, _ = fmt.Fprintf(w, "flux\t%s\t%s\n", onOff(r.Sources.Flux.HMACKey != "", "webhook"), "suppression "+r.Sources.Flux.SuppressionWindow+scopeDetails(r.Sources.Flux.Scope))
+			_, _ = fmt.Fprintf(w, "argocd\t%s\t%s\n", onOff(r.Sources.ArgoCD.WebhookSecret != "", "webhook"), "suppression "+r.Sources.ArgoCD.SuppressionWindow+scopeDetails(r.Sources.ArgoCD.Scope))
 			for _, wh := range r.Sources.Webhooks {
 				details := "auth " + wh.Auth.Mode
 				if wh.Preset != "" {
@@ -111,6 +111,15 @@ func githubModes(poller, webhook bool) string {
 		return "webhook"
 	}
 	return "off"
+}
+
+// scopeDetails appends an ingest-scope summary when a source has an allow/deny
+// list configured; empty scope (ingest all) adds nothing.
+func scopeDetails(s config.ScopeView) string {
+	if len(s.Allow) == 0 && len(s.Deny) == 0 {
+		return ""
+	}
+	return fmt.Sprintf(" · scope %d allow/%d deny", len(s.Allow), len(s.Deny))
 }
 
 func githubDetails(gh config.GitHubView) string {

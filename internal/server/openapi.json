@@ -638,20 +638,42 @@
           "backfill": { "type": "string", "description": "First-poll history window (P19)." }
         }
       },
+      "ConfigScopeMatch": {
+        "type": "object",
+        "description": "Ingest allow/deny selector; empty fields are unconstrained, string fields are globs (* one segment, ** any depth).",
+        "properties": {
+          "namespace": { "type": "string" },
+          "object_name": { "type": "string", "description": "Flux involvedObject.name / Argo app name." },
+          "object_kind": { "type": "string" },
+          "cluster": { "type": "string", "description": "Flux only." },
+          "project": { "type": "string", "description": "ArgoCD only." }
+        }
+      },
+      "ConfigScope": {
+        "type": "object",
+        "description": "Ingest allow/deny lists. Deny wins over allow; empty allow = allow all; empty deny = deny none.",
+        "required": ["allow", "deny"],
+        "properties": {
+          "allow": { "type": "array", "items": { "$ref": "#/components/schemas/ConfigScopeMatch" } },
+          "deny": { "type": "array", "items": { "$ref": "#/components/schemas/ConfigScopeMatch" } }
+        }
+      },
       "ConfigFlux": {
         "type": "object",
-        "required": ["hmac_key", "suppression_window"],
+        "required": ["hmac_key", "suppression_window", "scope"],
         "properties": {
           "hmac_key": { "$ref": "#/components/schemas/MaskedSecret" },
-          "suppression_window": { "type": "string" }
+          "suppression_window": { "type": "string" },
+          "scope": { "$ref": "#/components/schemas/ConfigScope" }
         }
       },
       "ConfigArgoCD": {
         "type": "object",
-        "required": ["webhook_secret", "suppression_window"],
+        "required": ["webhook_secret", "suppression_window", "scope"],
         "properties": {
           "webhook_secret": { "$ref": "#/components/schemas/MaskedSecret" },
-          "suppression_window": { "type": "string" }
+          "suppression_window": { "type": "string" },
+          "scope": { "$ref": "#/components/schemas/ConfigScope" }
         }
       },
       "ConfigWebhookAuth": {

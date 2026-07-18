@@ -45,6 +45,11 @@ type Options struct {
 	// (app+revision+phase|health) inside this window — Argo re-notifies on
 	// every resync, same trap as Flux. <= 0 disables.
 	ArgoCDSuppression time.Duration
+	// FluxScope / ArgoCDScope drop non-matching events at ingest by raw-fact
+	// allow/deny (the push sources' analog of poller repo scope). nil permits
+	// everything; the caller (serve.go) compiles these from config.
+	FluxScope   *normalize.CompiledScope
+	ArgoCDScope *normalize.CompiledScope
 	// Engine runs the normalization rules on webhook-ingested events; nil
 	// means an empty rule set. A holder so rules can be hot-reloaded (P10) —
 	// the same holder must be shared with the poller.
@@ -83,7 +88,9 @@ type Server struct {
 	argocdWebhookToken string
 	gitlabWebhookToken string
 	fluxSuppressor     *flux.Suppressor
-	argocdSuppressor   *flux.Suppressor // same window mechanism; keys are argocd-shaped
+	argocdSuppressor   *flux.Suppressor         // same window mechanism; keys are argocd-shaped
+	fluxScope          *normalize.CompiledScope // ingest allow/deny; nil = permit all
+	argocdScope        *normalize.CompiledScope
 	engine             *normalize.EngineHolder
 	tags               *normalize.TagResolverHolder
 	mappers            map[string]*mapping.Mapper
@@ -134,6 +141,8 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 		gitlabWebhookToken: opts.GitLabWebhookToken,
 		fluxSuppressor:     flux.NewSuppressor(opts.FluxSuppression),
 		argocdSuppressor:   flux.NewSuppressor(opts.ArgoCDSuppression),
+		fluxScope:          opts.FluxScope,
+		argocdScope:        opts.ArgoCDScope,
 		engine:             engine,
 		tags:               tags,
 		mappers:            opts.Mappers,

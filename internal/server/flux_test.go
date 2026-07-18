@@ -166,6 +166,51 @@ func TestFluxSuppressionDisabledStillDedups(t *testing.T) {
 	}
 }
 
+func TestFluxScopeDropsUnlisted(t *testing.T) {
+	st, err := store.Open(filepath.Join(t.TempDir(), "wtc.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	// The fixture reconciles a Kustomization in namespace flux-system; deny it.
+	scope, err := normalize.ScopeFilter{
+		Deny: []normalize.ScopeMatch{{Namespace: "flux-system"}},
+	}.Compile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := New(st, Options{
+		Tokens:      []string{testToken},
+		FluxHMACKey: testFluxKey,
+		FluxScope:   scope,
+	}, slog.New(slog.DiscardHandler))
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+
+	filteredBefore := testutil.ToFloat64(metrics.Filtered.WithLabelValues("flux"))
+	body := fluxFixture(t, "kustomization_reconcile_succeeded.json")
+
+	resp, rbody := postFlux(t, ts.URL, body, fluxSign(body))
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("filtered = %d %s, want 202", resp.StatusCode, rbody)
+	}
+	var out map[string]string
+	if err := json.Unmarshal(rbody, &out); err != nil || out["status"] != "filtered" {
+		t.Fatalf("response = %s, want status filtered", rbody)
+	}
+	events, _, err := st.ListEvents(t.Context(), store.Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 0 {
+		t.Fatalf("denied event stored %d rows, want 0", len(events))
+	}
+	if got := testutil.ToFloat64(metrics.Filtered.WithLabelValues("flux")) - filteredBefore; got != 1 {
+		t.Errorf("wtc_filtered_total{source=\"flux\"} moved by %v, want 1", got)
+	}
+}
+
 func TestFluxNotConfiguredFailsClosed(t *testing.T) {
 	st, err := store.Open(filepath.Join(t.TempDir(), "wtc.db"))
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/migueljfsc/wtc/internal/ingest/mapping"
+	"github.com/migueljfsc/wtc/internal/normalize"
 )
 
 // Mask is the constant placeholder for every configured secret in a View.
@@ -96,14 +97,24 @@ type GitLabView struct {
 
 // FluxView mirrors config.Flux.
 type FluxView struct {
-	HMACKey           string `json:"hmac_key"`
-	SuppressionWindow string `json:"suppression_window"`
+	HMACKey           string    `json:"hmac_key"`
+	SuppressionWindow string    `json:"suppression_window"`
+	Scope             ScopeView `json:"scope"`
 }
 
 // ArgoCDView mirrors config.ArgoCD.
 type ArgoCDView struct {
-	WebhookSecret     string `json:"webhook_secret"`
-	SuppressionWindow string `json:"suppression_window"`
+	WebhookSecret     string    `json:"webhook_secret"`
+	SuppressionWindow string    `json:"suppression_window"`
+	Scope             ScopeView `json:"scope"`
+}
+
+// ScopeView mirrors normalize.ScopeFilter — the ingest allow/deny lists. Not a
+// secret (raw-fact globs, operator-authored config-as-code, same exposure
+// class as rules), so shown in full. Lists are always arrays, never null.
+type ScopeView struct {
+	Allow []normalize.ScopeMatch `json:"allow"`
+	Deny  []normalize.ScopeMatch `json:"deny"`
 }
 
 // WebhookView is one mapping webhook (P14). Templates are shown in full
@@ -150,6 +161,18 @@ type RetentionView struct {
 // (P16) is open; the address is topology, not a secret.
 type MetricsView struct {
 	Listen string `json:"listen"`
+}
+
+// scopeView copies the ingest allow/deny lists, normalizing nil to empty so
+// the JSON is always an array. ScopeMatch is a value type, so copy is a deep
+// copy — the view never aliases the loaded config.
+func scopeView(f normalize.ScopeFilter) ScopeView {
+	cp := func(in []normalize.ScopeMatch) []normalize.ScopeMatch {
+		out := make([]normalize.ScopeMatch, len(in))
+		copy(out, in)
+		return out
+	}
+	return ScopeView{Allow: cp(f.Allow), Deny: cp(f.Deny)}
 }
 
 // mask replaces a configured secret with the constant Mask; an unset secret
@@ -221,10 +244,12 @@ func NewView(cfg *Config) View {
 			Flux: FluxView{
 				HMACKey:           mask(cfg.Sources.Flux.HMACKey),
 				SuppressionWindow: durString(cfg.Sources.Flux.SuppressionWindow),
+				Scope:             scopeView(cfg.Sources.Flux.Scope),
 			},
 			ArgoCD: ArgoCDView{
 				WebhookSecret:     mask(cfg.Sources.ArgoCD.WebhookSecret),
 				SuppressionWindow: durString(cfg.Sources.ArgoCD.SuppressionWindow),
+				Scope:             scopeView(cfg.Sources.ArgoCD.Scope),
 			},
 			Webhooks: make([]WebhookView, 0, len(cfg.Sources.Webhooks)),
 		},

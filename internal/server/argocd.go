@@ -47,6 +47,13 @@ func (s *Server) handleIngestArgoCD(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ev, facts, suppressKey := argocd.Normalize(n, time.Now())
+	// Ingest scope: drop apps outside the configured allow/deny before any
+	// rules/storage. Matches raw facts only (app name, namespace, project).
+	if !s.argocdScope.Permit(facts) {
+		metrics.Filtered.WithLabelValues("argocd").Inc()
+		s.writeJSON(w, http.StatusAccepted, map[string]string{"status": "filtered"})
+		return
+	}
 	if err := s.engine.Apply(ev, facts); err != nil {
 		// Rules failing must not drop the event; it lands unenriched.
 		s.log.Error("rules apply", "dedup_key", ev.DedupKey, "error", err)

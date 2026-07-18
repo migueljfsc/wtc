@@ -67,6 +67,29 @@ function KV({ k, v, mono = true }: { k: string; v: string; mono?: boolean }) {
   );
 }
 
+/** Compact one-line rendering of a scope match, e.g. "ns=prod-* kind=HelmRelease". */
+function scopeMatch(m: components["schemas"]["ConfigScopeMatch"]): string {
+  const parts: string[] = [];
+  if (m.namespace) parts.push(`ns=${m.namespace}`);
+  if (m.object_name) parts.push(`name=${m.object_name}`);
+  if (m.object_kind) parts.push(`kind=${m.object_kind}`);
+  if (m.cluster) parts.push(`cluster=${m.cluster}`);
+  if (m.project) parts.push(`project=${m.project}`);
+  return parts.join(" ");
+}
+
+/** Ingest allow/deny lists; renders nothing when scope is unset (ingest all). */
+function ScopeKV({ scope }: { scope: components["schemas"]["ConfigScope"] }) {
+  const { allow, deny } = scope;
+  if (allow.length === 0 && deny.length === 0) return null;
+  return (
+    <>
+      {allow.length > 0 && <KV k="scope allow" v={allow.map(scopeMatch).join("  ·  ")} />}
+      {deny.length > 0 && <KV k="scope deny" v={deny.map(scopeMatch).join("  ·  ")} />}
+    </>
+  );
+}
+
 function SourceCard({
   name,
   modes,
@@ -136,11 +159,13 @@ function Sources({ cfg }: { cfg: ConfigResponse }) {
       <SourceCard name="flux" modes={flux.hmac_key ? ["webhook"] : []} health={healthBy.get("flux")}>
         <KV k="hmac key" v={flux.hmac_key} />
         <KV k="suppression" v={flux.suppression_window} />
+        <ScopeKV scope={flux.scope} />
       </SourceCard>
 
       <SourceCard name="argocd" modes={argo.webhook_secret ? ["webhook"] : []} health={healthBy.get("argocd")}>
         <KV k="webhook secret" v={argo.webhook_secret} />
         <KV k="suppression" v={argo.suppression_window} />
+        <ScopeKV scope={argo.scope} />
       </SourceCard>
 
       {cfg.sources.webhooks.map((wh) => (
