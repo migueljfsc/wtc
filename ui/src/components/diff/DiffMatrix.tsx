@@ -11,6 +11,25 @@ function version(cell: Cell): string {
   return cell.artifact || (cell.ref ? cell.ref.slice(0, 7) : "—");
 }
 
+const GIT_SHA = /^[0-9a-f]{7,40}$/;
+
+/** The ref `wtc where` would trace for this cell (ref wins over artifact). */
+function whereRef(cell: Cell): string {
+  return cell.ref || cell.artifact || "";
+}
+
+/**
+ * Can `where` resolve this cell to a git sha? It traces git-sha lineage only, so
+ * a cell is traceable when its ref is a git sha, or (no ref) its artifact is an
+ * image tag that embeds one via tag_patterns. Flux OCI/helm reconciles surface
+ * as a `name@revision` artifact — an OCI content digest or chart version with no
+ * git sha — so they must NOT link (clicking dead-ends on a 400 in Where).
+ */
+function traceable(cell: Cell): boolean {
+  if (cell.ref) return GIT_SHA.test(cell.ref);
+  return !!cell.artifact && !cell.artifact.includes("@");
+}
+
 function rowStatus(envs: string[], cells: Matrix["services"][number]["cells"]) {
   const present = envs.filter((e) => cells[e]);
   const versions = new Set(present.map((e) => version(cells[e])));
@@ -89,22 +108,40 @@ export function DiffMatrix({ matrix }: { matrix: Matrix }) {
                   // laggard needing promotion, not the up-to-date envs.
                   const behind = lead !== null && ver !== lead;
                   const revOnly = !cell.artifact && !!cell.ref;
+                  const canTrace = traceable(cell);
+                  const label = (
+                    <>
+                      {ver}
+                      {revOnly && <sup className="ml-0.5 text-[9px] text-muted-foreground">rev</sup>}
+                    </>
+                  );
                   return (
                     <td key={e} className={cn("px-3 py-2", behind && "bg-amber-500/10")}>
-                      <Link
-                        to={`/where?ref=${encodeURIComponent(cell.ref || cell.artifact || "")}`}
-                        className={cn("font-mono text-xs hover:underline", behind && TONE.drift)}
-                        title={
-                          behind
-                            ? `behind ${lead}`
-                            : revOnly
-                              ? "revision-only (no artifact reported)"
-                              : cell.artifact || cell.ref
-                        }
-                      >
-                        {ver}
-                        {revOnly && <sup className="ml-0.5 text-[9px] text-muted-foreground">rev</sup>}
-                      </Link>
+                      {canTrace ? (
+                        <Link
+                          to={`/where?ref=${encodeURIComponent(whereRef(cell))}`}
+                          className={cn("font-mono text-xs hover:underline", behind && TONE.drift)}
+                          title={
+                            behind
+                              ? `behind ${lead}`
+                              : revOnly
+                                ? "revision-only (no artifact reported)"
+                                : cell.artifact || cell.ref
+                          }
+                        >
+                          {label}
+                        </Link>
+                      ) : (
+                        <span
+                          className={cn(
+                            "font-mono text-xs text-muted-foreground",
+                            behind && TONE.drift,
+                          )}
+                          title="OCI artifact or chart version — no git lineage to trace"
+                        >
+                          {label}
+                        </span>
+                      )}
                       <div className="text-[10px] text-muted-foreground">{relativeTime(cell.ts)}</div>
                     </td>
                   );

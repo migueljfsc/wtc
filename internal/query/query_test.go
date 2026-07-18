@@ -203,9 +203,14 @@ func TestWhereFullJourney(t *testing.T) {
 		t.Errorf("unknown sha must yield explicit empty report: %+v", r)
 	}
 
-	// Unresolvable input errors.
-	if _, err := Where(ctx, st, resolver(t), "latest"); err == nil {
-		t.Error("unresolvable tag must error")
+	// Unresolvable input (not a sha, matches no tag_pattern) is not an error:
+	// it yields an empty journey with an explanatory note.
+	ur, err := Where(ctx, st, resolver(t), "latest")
+	if err != nil {
+		t.Fatalf("unresolvable input must not error: %v", err)
+	}
+	if ur.Sha != "" || len(ur.Builds) != 0 || len(ur.Envs) != 0 || len(ur.Notes) == 0 {
+		t.Errorf("unresolvable input must yield empty report with a note: %+v", ur)
 	}
 }
 

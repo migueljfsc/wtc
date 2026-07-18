@@ -81,7 +81,8 @@ export function Diff() {
           partial (not deployed in every env).
         </p>
         <p>
-          <sup>rev</sup> = revision-only (no artifact reported). Click a version to trace it.
+          <sup>rev</sup> = revision-only (no artifact reported). Click a version to trace it —
+          OCI-artifact and chart-version cells carry no git lineage and aren’t linked.
         </p>
       </div>
     </div>

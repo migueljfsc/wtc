@@ -48,7 +48,15 @@ func Where(ctx context.Context, st *store.Store, tags *normalize.TagResolver, in
 	if !hexRef.MatchString(sha) {
 		resolved := tags.Resolve(input)
 		if resolved == "" {
-			return nil, fmt.Errorf("%q is neither a git sha nor a tag matching any configured tag_pattern", input)
+			// Not a git sha, and no tag_pattern matches — e.g. an OCI content
+			// digest (`name@sha256:…`) or a Helm chart version, both of which
+			// carry no git lineage, or simply a typo. This is a legitimate
+			// "nothing to trace" answer, not a client error: return an empty
+			// journey with a note so the UI/CLI explain rather than 400.
+			r.Notes = append(r.Notes, fmt.Sprintf(
+				"%q is not a git sha and matches no configured tag_pattern — nothing to trace "+
+					"(OCI content digests and chart versions carry no git lineage)", input))
+			return r, nil
 		}
 		r.Notes = append(r.Notes, fmt.Sprintf("tag %q resolved to sha %s", input, resolved))
 		sha = resolved

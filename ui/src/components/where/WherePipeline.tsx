@@ -74,15 +74,17 @@ export function WherePipeline({ report }: { report: WhereReport }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-        <span className="text-muted-foreground">
-          resolved sha <code className="text-foreground">{report.sha.slice(0, 12)}</code>
-        </span>
-        <span className="text-muted-foreground">
-          {builds.length} build{builds.length === 1 ? "" : "s"} ·{" "}
-          {intents.length} intent{intents.length === 1 ? "" : "s"}
-        </span>
-      </div>
+      {report.sha && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <span className="text-muted-foreground">
+            resolved sha <code className="text-foreground">{report.sha.slice(0, 12)}</code>
+          </span>
+          <span className="text-muted-foreground">
+            {builds.length} build{builds.length === 1 ? "" : "s"} ·{" "}
+            {intents.length} intent{intents.length === 1 ? "" : "s"}
+          </span>
+        </div>
+      )}
 
       {envs.length === 0 ? (
         <p className="text-sm text-muted-foreground">Not applied to any environment yet.</p>

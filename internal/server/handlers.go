@@ -84,8 +84,10 @@ func (s *Server) handleIngestGeneric(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleWhere(w http.ResponseWriter, r *http.Request) {
 	report, err := query.Where(r.Context(), s.store, s.tags.Load(), r.PathValue("ref"))
 	if err != nil {
-		// Input-shaped errors (unresolvable ref) are the client's problem.
-		s.writeError(w, http.StatusBadRequest, err.Error())
+		// Unresolvable refs are no longer errors — Where returns an empty
+		// journey with a note. A remaining error is an internal (store) fault.
+		s.log.Error("where", "error", err)
+		s.writeError(w, http.StatusInternalServerError, "query error")
 		return
 	}
 	s.writeJSON(w, http.StatusOK, report)

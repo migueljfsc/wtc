@@ -4,6 +4,20 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Fixed — Where dead-end on non-git-traceable diff cells
+
+- Diff-matrix cells sourced from OCI artifacts (Flux `OCIRepository`, e.g.
+  Crossplane composition modules) or Helm chart versions carry no git sha:
+  their revision is a content digest (`name@sha256:…`) or a chart version, not
+  a commit. The matrix previously linked every cell to **Where**, so clicking
+  one dead-ended on a 400. Cells now link only when git-traceable (a git-sha
+  `ref`, or an image tag embedding one via `tag_patterns`); the rest render as
+  plain text with an explanatory tooltip.
+- **`/api/where`** no longer 400s on an unresolvable ref. An OCI content
+  digest, chart version, or typo now returns an empty journey with a note
+  ("nothing to trace") — the CLI and portal explain instead of erroring; a
+  remaining error is treated as an internal fault (500).
+
 ### Added — first-run backfill window + multi-cluster hub docs
 
 - **`sources.github.backfill` / `sources.gitlab.backfill`** — the first-poll
