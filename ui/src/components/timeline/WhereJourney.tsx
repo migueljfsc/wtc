@@ -5,8 +5,8 @@ import { duration, relativeTime } from "@/lib/format";
 type WhereReport = components["schemas"]["WhereReport"];
 
 /**
- * Compact BUILD → INTENT → APPLIED journey for the drawer. The full pipeline
- * visualization is P9; this is the inline summary.
+ * Compact BUILD → INTENT → APPLIED journey for the drawer — the inline
+ * summary; the full pipeline visualization lives on the Where page.
  */
 export function WhereJourney({ report }: { report: WhereReport }) {
   // Servers ≤ v0.20.0 marshalled empty lists as null (fixed since); guard so

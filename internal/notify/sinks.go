@@ -43,7 +43,7 @@ func (d *Dispatcher) sendWebhook(ctx context.Context, dl delivery) error {
 
 // grafanaAnnotation is the Grafana POST /api/annotations request body.
 // Shape verified against a live Grafana round-trip — see
-// testdata/grafana/annotation-*.json (P21 fixture discipline).
+// testdata/grafana/annotation-*.json.
 type grafanaAnnotation struct {
 	Time int64    `json:"time"` // epoch millis
 	Tags []string `json:"tags"`

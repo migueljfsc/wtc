@@ -1,5 +1,5 @@
 // Package capture writes raw ingest payloads to disk for the fixture-first
-// workflow (CLAUDE.md). It is a leaf dependency shared by the HTTP server and
+// workflow. It is a leaf dependency shared by the HTTP server and
 // the API pollers, so ingest packages can capture without importing server
 // (which would form an import cycle once server routes to those packages).
 package capture

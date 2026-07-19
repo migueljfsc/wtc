@@ -9,7 +9,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/model"
 )
 
-// Dashboard aggregations (SPEC: DORA-ish portal metrics, P8). All grouping is
+// Dashboard aggregations (DORA-ish portal metrics). All grouping is
 // done in SQL over the events table; ts is stored as sortable fixed-width UTC
 // ISO-8601 text, so substr slices the bucket label directly (portable across
 // sqlite and postgres). Buckets are UTC — the client formats to local for

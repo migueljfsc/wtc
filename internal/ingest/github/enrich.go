@@ -26,8 +26,8 @@ type prFile struct {
 const prFilesPerPage = 100
 
 // ListPRFiles fetches one page of a merged PR's changed files. truncated
-// reports a full page — callers must treat the path list as incomplete
-// (trap #3), exactly like GitHub's own push-payload cap.
+// reports a full page — callers must treat the path list as incomplete,
+// exactly like GitHub's own push-payload cap.
 func (c *Client) ListPRFiles(ctx context.Context, repo string, number int) (files []prFile, truncated bool, err error) {
 	raw, err := c.Get(ctx, fmt.Sprintf("/repos/%s/pulls/%d/files", repo, number), url.Values{
 		"per_page": {fmt.Sprint(prFilesPerPage)},

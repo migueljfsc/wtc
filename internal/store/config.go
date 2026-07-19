@@ -10,7 +10,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/model"
 )
 
-// Config overrides (P10): DB-backed editable normalization config. Values are
+// Config overrides: DB-backed editable normalization config. Values are
 // opaque JSON; the server owns the schema. Reads use the read pool; writes go
 // to the single write connection (MaxOpenConns=1), so they serialize with the
 // event writer at the connection level — safe for the infrequent config edit.

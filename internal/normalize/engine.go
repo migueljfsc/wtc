@@ -24,7 +24,7 @@ type Facts struct {
 	ObjectName string `json:"object_name,omitempty"`
 	Namespace  string `json:"namespace,omitempty"`
 	Reason     string `json:"reason,omitempty"`
-	// ArgoCD facts (P11). One Argo instance manages many clusters and its
+	// ArgoCD facts. One Argo instance manages many clusters and its
 	// "cluster" is a destination server URL — env inference for argocd runs
 	// off EnvLabel/Namespace/ObjectName, never cluster=env.
 	Project    string   `json:"project,omitempty"`
@@ -34,7 +34,7 @@ type Facts struct {
 	Paths      []string `json:"paths,omitempty"`
 	// PathsTruncated marks an unknown/truncated changed-file list (GitHub
 	// caps push payloads; list APIs omit files). Path-based rules are then
-	// SKIPPED — never treated as "no match" (CLAUDE.md trap #3).
+	// SKIPPED — never treated as "no match".
 	PathsTruncated bool `json:"paths_truncated,omitempty"`
 }
 
@@ -101,7 +101,7 @@ var tmplFuncs = template.FuncMap{
 
 // TemplateFuncs returns the funcs available to rules `set:` templates
 // (trimPrefix, trimSuffix, lower, regexReplace). Exposed so the mapping-webhook
-// engine (P14) renders payload→Event templates with the identical func set —
+// engine renders payload→Event templates with the identical func set —
 // one documented template vocabulary across the two config surfaces.
 func TemplateFuncs() template.FuncMap {
 	fm := template.FuncMap{}
@@ -168,9 +168,9 @@ func NewEngine(rules []Rule) (*Engine, error) {
 }
 
 // Apply runs the rules over ev, filling unset fields, then redacts. Env stays
-// "" when nothing matched — surfaced by doctor, never guessed (trap #2).
+// "" when nothing matched — surfaced by doctor, never guessed.
 // It also records the facts + the pre-rules field snapshot on ev.Facts so
-// `wtc explain` can later replay the inference (P22).
+// `wtc explain` can later replay the inference.
 func (e *Engine) Apply(ev *model.Event, f Facts) error {
 	preset := presetFields(ev)
 	for i := range e.rules {
@@ -211,7 +211,7 @@ func (r *compiledRule) matches(f Facts) bool {
 	}
 	if len(r.globs.paths) > 0 {
 		if f.PathsTruncated {
-			return false // unknown file list: skip, don't misroute (trap #3)
+			return false // unknown file list: skip, don't misroute
 		}
 		any := false
 		for _, re := range r.globs.paths {
@@ -270,7 +270,7 @@ func setField(ev *model.Event, field, value string) {
 }
 
 // CompileGlob turns a glob with * (one path segment) and ** (any depth) into
-// an anchored regexp; everything else is literal. Exported (P18) so the
+// an anchored regexp; everything else is literal. Exported so the
 // poller repo/project scope shares ONE glob dialect with the rules engine.
 func CompileGlob(pattern string) (*regexp.Regexp, error) {
 	var b strings.Builder

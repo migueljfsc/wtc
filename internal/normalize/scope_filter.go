@@ -8,10 +8,10 @@ import (
 // Ingest scope filtering for the push-only sources (Flux, ArgoCD): an
 // allow/deny list applied at ingest so third-party reconciles/apps (cert-
 // manager, external-dns, operator CRDs, …) never enter the ledger. The poller
-// sources (GitHub, GitLab) scope instead via repos/projects (P18); this is
+// sources (GitHub, GitLab) scope instead via repos/projects; this is
 // their analog for sources that have no poll list.
 //
-// Semantics (operator-approved 2026-07-18):
+// Semantics:
 //   - deny wins over allow — a broad allow with a specific deny is the shape;
 //   - an empty allow list means "allow everything";
 //   - an empty deny list means "deny nothing".
@@ -139,7 +139,7 @@ func anyMatch(ms []compiledMatch, f Facts) bool {
 	return false
 }
 
-// Permit applies the operator-approved decision: deny wins; an empty allow
+// Permit applies the scope decision: deny wins; an empty allow
 // list permits all; otherwise the facts must match some allow entry. A nil
 // receiver (no scope configured) permits everything.
 func (cs *CompiledScope) Permit(f Facts) bool {

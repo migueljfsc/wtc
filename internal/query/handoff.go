@@ -11,8 +11,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
-// HandoffReport is the digest for `wtc handoff` (SPEC §6). Alert correlation
-// arrives with phase 5.
+// HandoffReport is the digest for `wtc handoff` (SPEC §6).
 type HandoffReport struct {
 	Since        time.Time           `json:"since"`
 	DeploysByEnv map[string]EnvStats `json:"deploys_by_env"`

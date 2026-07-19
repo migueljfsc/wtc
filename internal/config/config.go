@@ -1,6 +1,6 @@
 // Package config loads the single wtc.yaml configuration file, expands
 // ${VAR} references from the environment, and applies WTC_* env overrides.
-// Hand-rolled on purpose (no viper/koanf) — see CLAUDE.md hard decisions.
+// Hand-rolled on purpose: no viper/koanf, one YAML file plus WTC_* overrides.
 package config
 
 import (
@@ -81,7 +81,7 @@ type Auth struct {
 	APITokens []string `yaml:"api_tokens"`
 }
 
-// Storage selects the storage backend (P15). Default sqlite keeps using
+// Storage selects the storage backend. Default sqlite keeps using
 // server.db as the file path — the single-binary story. backend=postgres
 // requires DSN and makes the serve pod stateless; DSN carries credentials, so
 // inject it via ${VAR}/secretRef, never a plain value in a committed file.
@@ -101,7 +101,7 @@ type GitHub struct {
 	Backfill      Duration `yaml:"backfill"`       // first-poll history window (default 24h); GitHub retains runs ~90d
 }
 
-// GitLab configures the GitLab ingest paths (SPEC §2, P12) — the SCM/CI-axis
+// GitLab configures the GitLab ingest paths (SPEC §2) — the SCM/CI-axis
 // neutrality peer of GitHub. The poller is the primary path for private
 // deployments; the webhook needs a public endpoint. BaseURL targets
 // self-managed instances (empty = gitlab.com).
@@ -126,7 +126,7 @@ type Flux struct {
 }
 
 // ArgoCD configures the notifications-controller webhook ingest path
-// (SPEC §2, P11). Argo's notification templates can't HMAC-sign the body
+// (SPEC §2). Argo's notification templates can't HMAC-sign the body
 // like Flux's generic-hmac provider, so auth is a static shared secret sent
 // as the X-WTC-Token header (see docs/setup/argocd-notifications.yaml).
 type ArgoCD struct {
@@ -144,10 +144,10 @@ type Sources struct {
 	GitLab   GitLab            `yaml:"gitlab"`
 	Flux     Flux              `yaml:"flux"`
 	ArgoCD   ArgoCD            `yaml:"argocd"`
-	Webhooks []mapping.Webhook `yaml:"webhooks"` // config-declared mapping webhooks (P14)
+	Webhooks []mapping.Webhook `yaml:"webhooks"` // config-declared mapping webhooks
 }
 
-// Metrics configures the Prometheus exposition surface (P16). /metrics on the
+// Metrics configures the Prometheus exposition surface. /metrics on the
 // main listener is always on and bearer-authed with api_tokens. Listen
 // optionally opens a SECOND, UNAUTHENTICATED listener serving only /metrics —
 // for in-cluster scrapes where handing Prometheus an api_token (which also
@@ -180,17 +180,17 @@ type Retention struct {
 // Config is the full wtc.yaml.
 type Config struct {
 	Server      Server           `yaml:"server"`
-	Storage     Storage          `yaml:"storage"` // backend selection (P15); default sqlite
+	Storage     Storage          `yaml:"storage"` // backend selection; default sqlite
 	Auth        Auth             `yaml:"auth"`
 	Sources     Sources          `yaml:"sources"`
 	Rules       []normalize.Rule `yaml:"rules"`        // ordered env/service inference rules (SPEC §3)
 	TagPatterns []string         `yaml:"tag_patterns"` // tag→sha extraction; empty = defaults (SPEC §2)
 	Digest      Digest           `yaml:"digest"`       // optional scheduled Slack digest
 	Retention   Retention        `yaml:"retention"`    // optional prune job (SPEC §8)
-	Metrics     Metrics          `yaml:"metrics"`      // Prometheus exposition (P16)
-	// Notifications are the P21 outbound subscriptions: glob match over stored
+	Metrics     Metrics          `yaml:"metrics"`      // Prometheus exposition
+	// Notifications are the outbound subscriptions: glob match over stored
 	// events → sink (slack | webhook | grafana-annotation). Schema lives in
-	// internal/notify (the P14 mapping.Webhook pattern).
+	// internal/notify, mirroring the mapping.Webhook pattern.
 	Notifications []notify.Subscription `yaml:"notifications"`
 }
 
@@ -321,7 +321,7 @@ func Load(path string, optional bool) (*Config, error) {
 	if cfg.Server.DB == "" {
 		return nil, fmt.Errorf("config %s: server.db must not be empty", path)
 	}
-	// Storage backend (P15): fail fast on a typo'd backend or a postgres
+	// Storage backend: fail fast on a typo'd backend or a postgres
 	// selection without a DSN — a silently-wrong storage config must never
 	// reach Open.
 	switch cfg.Storage.Backend {
@@ -341,7 +341,7 @@ func Load(path string, optional bool) (*Config, error) {
 		return nil, fmt.Errorf("config %s: sources.*.backfill must not be negative", path)
 	}
 
-	// Poller scope globs (P18): compile up front — a bad pattern must fail
+	// Poller scope globs: compile up front — a bad pattern must fail
 	// startup, never become a silently-empty scope. GitLab patterns
 	// additionally need a static namespace prefix: that prefix is the bounded
 	// discovery call, and unscoped listing is not supported there. GitHub
@@ -367,7 +367,7 @@ func Load(path string, optional bool) (*Config, error) {
 		}
 	}
 
-	// Notifications (P21): compile up front — a bad sink shape or glob must
+	// Notifications: compile up front — a bad sink shape or glob must
 	// fail startup, never a delivery.
 	if _, err := notify.Compile(cfg.Notifications); err != nil {
 		return nil, fmt.Errorf("config %s: %w", path, err)

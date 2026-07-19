@@ -74,7 +74,7 @@
   "head_commit": {
     "id": "a43e0f0e815fbccb3fe0be2fba5085135ab7f7df",
     "tree_id": "8fd5de2ba83901be4efbf2ef793ffff2179844a9",
-    "message": "test(github): freeze REST fixtures from real captured payloads\n\nCaptured via wtc serve --capture-dir from migueljfsc/{wtc,motorcycle-journey,\nportfolio,aws-app-platform}: workflow runs (success + failure), merged PR,\ndefault-branch commit, empty-response edges. These are the contract for the\nP1 normalizers (fixture-first rule).\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>",
+    "message": "test(github): freeze REST fixtures from real captured payloads\n\nCaptured via wtc serve --capture-dir from migueljfsc/{wtc,motorcycle-journey,\nportfolio,aws-app-platform}: workflow runs (success + failure), merged PR,\ndefault-branch commit, empty-response edges. These are the contract for the\nP1 normalizers (fixture-first rule).",
     "timestamp": "2026-07-13T15:32:33Z",
     "author": {
       "name": "Miguel Cardoso",

@@ -16,7 +16,7 @@ import (
 const (
 	// defaultBackfill bounds the first poll of a project with no stored
 	// watermark so a fresh install doesn't ingest the project's whole
-	// history. Overridable via sources.gitlab.backfill (P19).
+	// history. Overridable via sources.gitlab.backfill.
 	defaultBackfill = 24 * time.Hour
 	// overlap is subtracted from the watermark on every query so pipelines
 	// still running when last seen get their terminal state, and borderline
@@ -34,7 +34,7 @@ type Poller struct {
 	engine     *normalize.EngineHolder
 	projects   []string
 	exact      []string         // scope entries without globs
-	globs      []*regexp.Regexp // compiled glob entries (P18), rules dialect
+	globs      []*regexp.Regexp // compiled glob entries, rules dialect
 	namespaces []string         // static prefixes of the globs — the bounded discovery scopes
 	interval   time.Duration
 	backfill   time.Duration // first-poll history window; <=0 = defaultBackfill
@@ -43,8 +43,8 @@ type Poller struct {
 }
 
 // NewPoller wires a poller; captureDir "" disables capture. The engine is a
-// holder so a live rule edit re-routes poller events too (P10). projects
-// entries may be globs with a static namespace prefix (P18, validated at
+// holder so a live rule edit re-routes poller events too. projects
+// entries may be globs with a static namespace prefix (validated at
 // config load) — resolved against that namespace's project list every sweep.
 func NewPoller(client *Client, st *store.Store, engine *normalize.EngineHolder, projects []string, interval, backfill time.Duration, captureDir string, log *slog.Logger) *Poller {
 	if log == nil {
@@ -172,7 +172,7 @@ func (p *Poller) pollResource(ctx context.Context, project, resource string) err
 	if err != nil {
 		return err
 	}
-	// P16: lag alerts derive from time() minus this gauge (repo = project path).
+	// Lag alerts derive from time() minus this gauge (repo = project path).
 	metrics.PollLastSuccess.WithLabelValues("gitlab", project, resource).SetToCurrentTime()
 	if stored > 0 {
 		p.log.Info("polled", "project", project, "resource", resource, "stored", stored)

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.21.0",
   "type": "module",
-  "description": "wtc portal — the rich SPA client of the wtc query API (P7-P10).",
+  "description": "wtc portal — the rich SPA client of the wtc query API.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

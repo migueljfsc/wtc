@@ -325,7 +325,7 @@ function SourceHealth() {
   );
 }
 
-// ---------- normalization (live-editable, P10 — unchanged behavior) ----------
+// ---------- normalization (live-editable) ----------
 
 function RuleView({ rule }: { rule: Rule }) {
   const match = Object.entries(rule.match).filter(([, v]) => v != null && String(v).length > 0);

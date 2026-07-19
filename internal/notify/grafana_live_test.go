@@ -19,7 +19,7 @@ import (
 )
 
 // TestGrafanaLiveRoundTrip drives the real grafana-annotation sink against a
-// real Grafana (P21 fixture discipline: the frozen payloads under
+// real Grafana (fixture discipline: the frozen payloads under
 // testdata/grafana/ come from this test). Gated behind env vars — locally:
 //
 //	docker run -d --rm --name wtc-grafana -p 3300:3000 grafana/grafana:11.3.0

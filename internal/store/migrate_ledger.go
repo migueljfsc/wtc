@@ -14,7 +14,7 @@ type MigrateResult struct {
 	Overrides     int64 `json:"overrides"`
 }
 
-// MigrateLedger copies a sqlite ledger into a postgres database (P15 one-shot
+// MigrateLedger copies a sqlite ledger into a postgres database (a one-shot
 // switch-over): events, poller watermarks, and DB-backed config overrides.
 // The postgres schema is created (migrations run) if absent. Idempotent — all
 // inserts are ON CONFLICT DO NOTHING, so an interrupted run can simply be

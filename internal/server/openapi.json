@@ -586,8 +586,8 @@
           "unmapped_samples": { "type": "array", "items": { "type": "string" } },
           "clock_skew_24h": { "type": "integer" },
           "poll": { "type": "array", "items": { "$ref": "#/components/schemas/PollState" } },
-          "webhook_churn": { "type": "array", "items": { "$ref": "#/components/schemas/WebhookChurn" }, "description": "Mapping-webhook sources with a probable unstable dedup_key (P14 heuristic)." },
-          "webhook_mapping_errors": { "type": "array", "items": { "$ref": "#/components/schemas/WebhookMappingError" }, "description": "Recent per-source mapping-template eval failures (P14)." }
+          "webhook_churn": { "type": "array", "items": { "$ref": "#/components/schemas/WebhookChurn" }, "description": "Mapping-webhook sources with a probable unstable dedup_key." },
+          "webhook_mapping_errors": { "type": "array", "items": { "$ref": "#/components/schemas/WebhookMappingError" }, "description": "Recent per-source mapping-template eval failures." }
         }
       },
       "WebhookChurn": {
@@ -736,7 +736,7 @@
       },
       "MaskedSecret": {
         "type": "string",
-        "description": "Constant \"********\" when the secret is configured, \"\" when not. Never the value, never a partial, length-independent (P17)."
+        "description": "Constant \"********\" when the secret is configured, \"\" when not. Never the value, never a partial, length-independent."
       },
       "ConfigServer": {
         "type": "object",
@@ -775,9 +775,9 @@
           "api_token": { "$ref": "#/components/schemas/MaskedSecret" },
           "poll_interval": { "type": "string" },
           "poller_enabled": { "type": "boolean" },
-          "repos": { "type": "array", "items": { "type": "string" }, "description": "Poller scope; empty with poller_enabled means auto-discovery. Entries may be globs (P18)." },
+          "repos": { "type": "array", "items": { "type": "string" }, "description": "Poller scope; empty with poller_enabled means auto-discovery. Entries may be globs." },
           "infra_path": { "type": "string" },
-          "backfill": { "type": "string", "description": "First-poll history window (P19), e.g. \"1d\", \"7d\"." }
+          "backfill": { "type": "string", "description": "First-poll history window, e.g. \"1d\", \"7d\"." }
         }
       },
       "ConfigGitLab": {
@@ -791,7 +791,7 @@
           "poller_enabled": { "type": "boolean" },
           "projects": { "type": "array", "items": { "type": "string" } },
           "infra_path": { "type": "string" },
-          "backfill": { "type": "string", "description": "First-poll history window (P19)." }
+          "backfill": { "type": "string", "description": "First-poll history window." }
         }
       },
       "ConfigScopeMatch": {
@@ -845,7 +845,7 @@
       },
       "ConfigWebhook": {
         "type": "object",
-        "description": "One mapping webhook (P14): auth shape with the secret masked, templates in full.",
+        "description": "One mapping webhook: auth shape with the secret masked, templates in full.",
         "required": ["name", "auth", "dedup_key", "mapping"],
         "properties": {
           "name": { "type": "string" },
@@ -897,7 +897,7 @@
       },
       "ConfigResponse": {
         "type": "object",
-        "description": "Effective config: live-editable normalization (rules/tag_patterns) plus the redacted static snapshot of server/storage/auth/sources/jobs (P17). Secrets are constant \"********\" masks — values never leave the server.",
+        "description": "Effective config: live-editable normalization (rules/tag_patterns) plus the redacted static snapshot of server/storage/auth/sources/jobs. Secrets are constant \"********\" masks — values never leave the server.",
         "required": ["server", "storage", "auth", "sources", "digest", "retention", "metrics", "rules", "tag_patterns", "rules_overridden", "tag_patterns_overridden"],
         "properties": {
           "server": { "$ref": "#/components/schemas/ConfigServer" },

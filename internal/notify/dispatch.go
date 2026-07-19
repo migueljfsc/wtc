@@ -16,8 +16,8 @@ import (
 const queueSize = 256
 
 // defaultBackoff is the wait between delivery attempts: 4 attempts total,
-// then drop. Best-effort in-memory v1 (PLAN P21); a durable outbox is the
-// documented stretch.
+// then drop. Best-effort in-memory delivery; a durable outbox is a future
+// enhancement.
 var defaultBackoff = []time.Duration{time.Second, 4 * time.Second, 16 * time.Second}
 
 type delivery struct {

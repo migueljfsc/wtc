@@ -1,6 +1,6 @@
 # testdata/ — frozen real payloads
 
-**Fixture-first rule** (CLAUDE.md): no normalizer exists without a golden
+**Fixture-first rule:** no normalizer exists without a golden
 test against a real captured payload. These files are the contract between
 the outside world and `internal/ingest/*` — never hand-edit one to make a
 test pass; re-capture instead.
@@ -76,7 +76,7 @@ headers (`raw/` is gitignored). Fixtures here are curated copies:
   `operation.initiatedBy.username`. Needs a sync triggered through an
   authenticated `argocd` CLI/UI session (or Argo's own auto-sync) to pin the
   populated shape.
-- **ArgoCD parser/normalizer** — this stage (P11 stage 1) is capture-only;
+- **ArgoCD parser/normalizer** — this stage is capture-only;
   `/ingest/argocd` authenticates (`X-WTC-Token`, constant-time compare) and
   captures, same posture as `/ingest/github` before its fixtures existed.
 

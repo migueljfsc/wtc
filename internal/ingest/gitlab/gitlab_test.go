@@ -164,7 +164,7 @@ func TestGoldenCommit(t *testing.T) {
 		t.Errorf("dedup = %q", ev.DedupKey)
 	}
 	if !facts.PathsTruncated {
-		t.Error("commit-list push must be paths-truncated (trap #3)")
+		t.Error("commit-list push must be paths-truncated")
 	}
 	if err := ev.Validate(); err != nil {
 		t.Errorf("validate: %v", err)

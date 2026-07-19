@@ -115,7 +115,7 @@ func fullyPopulatedConfig() *Config {
 	}
 }
 
-// TestViewNeverLeaksSecrets is the P17 guard: marshal the view of a config
+// TestViewNeverLeaksSecrets is the secret-exposure guard: marshal the view of a config
 // whose every secret carries the sentinel and assert the sentinel never
 // appears — masks do.
 func TestViewNeverLeaksSecrets(t *testing.T) {
@@ -212,7 +212,7 @@ func TestViewShape(t *testing.T) {
 			grafana.DedupKey, grafana.Mapping)
 	}
 
-	// Notifications (P21): match shown in full, sink URL + token always masked,
+	// Notifications: match shown in full, sink URL + token always masked,
 	// unnamed entries get the metric-label default name.
 	if len(v.Notifications) != 2 {
 		t.Fatalf("notifications = %d, want 2", len(v.Notifications))

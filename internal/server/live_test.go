@@ -43,7 +43,7 @@ func TestConfigEndpoint(t *testing.T) {
 	}
 }
 
-// TestConfigEndpointView: the P17 sections ride the same endpoint, secrets
+// TestConfigEndpointView: the config sections ride the same endpoint, secrets
 // arrive masked, and the raw values never cross the wire.
 func TestConfigEndpointView(t *testing.T) {
 	const secret = "wire-leak-sentinel-77"

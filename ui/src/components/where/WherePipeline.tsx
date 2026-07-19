@@ -38,7 +38,7 @@ function Stage({
     </>
   );
 
-  // P18: a stage with a source URL is a real link — the run, PR/commit, or
+  // A stage with a source URL is a real link — the run, PR/commit, or
   // deploy on the system that produced it. No URL (flux reconciles, most
   // deploys) → the plain card, never a dead link.
   if (event?.url) {

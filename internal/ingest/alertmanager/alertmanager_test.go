@@ -110,7 +110,7 @@ func TestResolvedClosesTheEpisode(t *testing.T) {
 }
 
 func TestCorrelation_AlertFindsPrecedingDeploy(t *testing.T) {
-	// P5 acceptance: the alert correlates to the deploy that preceded it.
+	// Acceptance: the alert correlates to the deploy that preceded it.
 	st, err := store.Open(filepath.Join(t.TempDir(), "wtc.db"))
 	if err != nil {
 		t.Fatal(err)

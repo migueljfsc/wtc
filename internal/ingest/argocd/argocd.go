@@ -3,7 +3,7 @@
 // the operator, and docs/setup/argocd-notifications.yaml ships the canonical
 // template this parser targets. Field semantics are verified against captured
 // fixtures under testdata/argocd/ (Argo CD v3.4.5), never documentation
-// memory (trap #9 applies to Argo exactly as it did to Flux).
+// memory.
 package argocd
 
 import (
@@ -57,12 +57,11 @@ func Parse(raw []byte) (*Notification, error) {
 var shaLike = regexp.MustCompile(`^[0-9a-f]{7,40}$`)
 
 // Normalize maps a notification onto the Event schema + facts, and derives
-// the suppression key (Argo can re-notify on resyncs — same spam trap as
-// Flux's #1 — though its own notified-annotation hash gates some repeats;
-// see docs/setup/argocd.md).
+// the suppression key (Argo can re-notify on resyncs — though its own
+// notified-annotation hash gates some repeats; see docs/setup/argocd.md).
 //
 // The row dedup key is argocd:<app>:<revision>:<startedAt> — one row per
-// sync OPERATION, which is trap #5's "logical change" for Argo: a retry of
+// sync OPERATION, which is the "logical change" for Argo: a retry of
 // the same revision is a new change and the ledger must show both attempts.
 // Keying on (app, revision) alone froze rows live: a Failed sync followed by
 // a Succeeded retry of the same revision could never update the row (equal
@@ -77,9 +76,8 @@ var shaLike = regexp.MustCompile(`^[0-9a-f]{7,40}$`)
 //
 // healthStatus=Degraded wins over operationPhase: on-health-degraded fires
 // carrying the LAST completed sync's phase and startedAt (observed: phase
-// stays Succeeded), so it keys onto that operation's row and — per the
-// operator decision — upserts it to status=degraded rather than creating an
-// alert row.
+// stays Succeeded), so it keys onto that operation's row and upserts it to
+// status=degraded rather than creating an alert row.
 func Normalize(n *Notification, now time.Time) (*model.Event, normalize.Facts, string) {
 	degraded := n.HealthStatus == "Degraded"
 

@@ -15,7 +15,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/model"
 )
 
-// P22 "harden the record" commands: export, backup, explain.
+// "Harden the record" commands: export, backup, explain.
 
 func newExportCmd(flags *clientFlags) *cobra.Command {
 	var env, service, repo, kind, status, source, since, until, format, out string

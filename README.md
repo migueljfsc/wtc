@@ -15,30 +15,31 @@ New Relic, Datadog, and Harness sell change tracking locked inside their
 platforms. wtc is neutral, standalone, CLI-first, and runs happily inside a
 private network — the GitHub poller pulls instead of waiting for webhooks.
 
-## Status
+## Features
 
-**Phases 0–6 complete** (see [docs/PLAN.md](docs/PLAN.md)). Working today,
-each verified against live infrastructure:
+Working today, each verified against live infrastructure:
 
-- **Ingest**: GitHub (API poller primary, HMAC webhooks for public endpoints),
-  Flux notification-controller (generic-hmac), Alertmanager, `/ingest/generic`,
-  `wtc record`, `wtc wrap` (helm/terraform sniffers)
-- **Queries**: `log` (FTS5 `-q`), `where` (build → intent → applied per env,
-  tag↔sha via configurable `tag_patterns`), `diff`, `handoff`, `around`, `doctor`
-- **Engine**: ordered env/service inference rules with globs + templates;
+- **Ingest** — GitHub (API poller primary, HMAC webhooks for public endpoints),
+  GitLab (poller + webhook), Flux notification-controller (generic-hmac),
+  Argo CD notifications, Alertmanager, config-declared mapping webhooks for any
+  JSON source, `/ingest/generic`, `wtc record`, `wtc wrap` (helm/terraform sniffers)
+- **Queries** — `log` (FTS5 `-q`), `where` (build → intent → applied per env,
+  tag↔sha via configurable `tag_patterns`), `diff`, `handoff`, `around`,
+  `blast` (change↔alert correlation), `doctor`, `explain`
+- **Engine** — ordered env/service inference rules with globs + templates;
   strict-outrank dedup upsert (at-least-once ingestion, zero duplicates);
-  PR-diff enrichment; redaction before storage
-- **Surfaces**: embedded timeline UI at `/`, a **rich portal SPA** (dashboard +
-  faceted timeline), Slack digest, `wtc demo` seed
-- **Ops**: opt-in retention prune (`pr-*` ephemeral windows + `incremental_vacuum`)
-- **Packaging**: `ghcr.io/migueljfsc/wtc` multi-arch image (auto-versioned),
+  PR/MR-diff enrichment; redaction before storage
+- **Surfaces** — embedded timeline UI at `/`, a **rich portal SPA** (dashboard +
+  faceted timeline + config), Atom feed, Slack digest, outbound notifications
+  (slack / webhook / grafana-annotation), Prometheus `/metrics`, `wtc demo` seed
+- **Ops** — opt-in retention prune (`pr-*` ephemeral windows + `incremental_vacuum`),
+  `export` / `backup`; SQLite by default with an opt-in Postgres backend for
+  stateless pods
+- **Packaging** — `ghcr.io/migueljfsc/wtc` multi-arch image (auto-versioned),
   goreleaser binaries (linux/darwin × amd64/arm64), Helm chart, docker-compose
 
-The **portal UI** track (separate SPA, alongside the embedded timeline) is
-underway: P7 foundation (app shell, token login, `/api/v1` + CORS + OpenAPI) and
-P8 core views (dashboard + rich timeline) are done; P9–P10 (change-intelligence
-views, live updates, config surfaces) remain. See `ui/` and
-[docs/setup/portal.md](docs/setup/portal.md).
+The portal SPA lives in `ui/` and is built and deployed independently of the Go
+binary — see [docs/setup/portal.md](docs/setup/portal.md).
 
 ## Quickstart (local)
 
@@ -91,8 +92,7 @@ Flux notifications ┼─ (fixture- ─→│ env/service    │──→ one ev
 wtc record/wrap ───┘              └─ + redaction ──┘                          (CLI + JSON API)
 ```
 
-Design pillars (full rationale in [CLAUDE.md](CLAUDE.md), schema/API contract
-in [docs/SPEC.md](docs/SPEC.md)):
+Design pillars (schema/API contract in [docs/SPEC.md](docs/SPEC.md)):
 
 - **One row per logical change** — status transitions upsert in place, keyed
   by a `dedup_key` derived from source-side identifiers. Lost webhooks,
@@ -112,7 +112,7 @@ in [docs/SPEC.md](docs/SPEC.md)):
 | `deploy/` | Helm chart + docker-compose — see [deploy/README.md](deploy/README.md) |
 | `demo/` | three dummy services generating real events end-to-end — see [demo/README.md](demo/README.md) |
 | `testdata/` | frozen real payloads (the normalizer contract) — see [testdata/README.md](testdata/README.md) |
-| `docs/` | SPEC (schema/API), PLAN (phases), setup/ (wiring guides) |
+| `docs/` | SPEC (schema/API), setup/ (wiring guides) |
 | `.github/workflows/` | wtc CI/publish + demo pipelines — see [.github/workflows/README.md](.github/workflows/README.md) |
 
 ## License

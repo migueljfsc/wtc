@@ -16,7 +16,7 @@ const KIND_LABEL: Record<string, string> = {
   manual: "manual",
 };
 
-/** Compact recent-activity feed. Rows link out later (P8 timeline drawer). */
+/** Compact recent-activity feed. Rows open the timeline event drawer. */
 export function RecentChanges({ events }: { events: Event[] }) {
   if (events.length === 0) {
     return <p className="text-sm text-muted-foreground">No recent events.</p>;

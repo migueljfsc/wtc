@@ -1,4 +1,4 @@
--- 0002: per-repo high-water marks for the GitHub API poller (PLAN P1).
+-- 0002: per-repo high-water marks for the GitHub API poller.
 -- Append-only migration — never edit after it has been applied.
 CREATE TABLE github_poll_state (
   repo       TEXT NOT NULL,               -- owner/name

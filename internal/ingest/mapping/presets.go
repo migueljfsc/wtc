@@ -71,7 +71,7 @@ func PresetNames() []string {
 // Resolved returns the webhooks with presets applied — the effective
 // declarations that Compile validates and serves. An unknown preset passes
 // through unchanged: Compile is where that errors, and every caller of
-// Resolved (the P17 config view) runs after Compile has already succeeded.
+// Resolved (the config view) runs after Compile has already succeeded.
 func Resolved(webhooks []Webhook) []Webhook {
 	out := make([]Webhook, len(webhooks))
 	for i, w := range webhooks {

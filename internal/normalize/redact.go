@@ -1,6 +1,6 @@
-// Package normalize hosts the normalization pipeline. Phase 0 ships the
-// redaction pass (CLAUDE.md hard decision: redaction before storage); the
-// env/service/cluster rules engine lands in Phase 1.
+// Package normalize hosts the normalization pipeline: the env/service/cluster
+// inference rules engine, tag→sha extraction, and the redaction pass that
+// scrubs secrets from raw payloads before storage.
 package normalize
 
 import (
@@ -11,7 +11,7 @@ import (
 
 const redacted = "[REDACTED]"
 
-// Regex deny-list per CLAUDE.md: AWS keys, GitHub tokens, bearer tokens,
+// Regex deny-list: AWS keys, GitHub tokens, bearer tokens,
 // password|secret|token key/value pairs. Order matters only for readability.
 var (
 	simplePatterns = []*regexp.Regexp{

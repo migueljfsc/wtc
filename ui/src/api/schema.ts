@@ -605,9 +605,9 @@ export interface components {
             unmapped_samples?: string[];
             clock_skew_24h: number;
             poll?: components["schemas"]["PollState"][];
-            /** @description Mapping-webhook sources with a probable unstable dedup_key (P14 heuristic). */
+            /** @description Mapping-webhook sources with a probable unstable dedup_key. */
             webhook_churn?: components["schemas"]["WebhookChurn"][];
-            /** @description Recent per-source mapping-template eval failures (P14). */
+            /** @description Recent per-source mapping-template eval failures. */
             webhook_mapping_errors?: components["schemas"]["WebhookMappingError"][];
         };
         WebhookChurn: {
@@ -719,7 +719,7 @@ export interface components {
             /** @description Build-stamped binary version ("dev" for unstamped builds). */
             version: string;
         };
-        /** @description Constant "********" when the secret is configured, "" when not. Never the value, never a partial, length-independent (P17). */
+        /** @description Constant "********" when the secret is configured, "" when not. Never the value, never a partial, length-independent. */
         MaskedSecret: string;
         /** @description Serve daemon surface (redacted). */
         ConfigServer: {
@@ -746,10 +746,10 @@ export interface components {
             api_token: components["schemas"]["MaskedSecret"];
             poll_interval: string;
             poller_enabled: boolean;
-            /** @description Poller scope; empty with poller_enabled means auto-discovery. Entries may be globs (P18). */
+            /** @description Poller scope; empty with poller_enabled means auto-discovery. Entries may be globs. */
             repos: string[];
             infra_path: string;
-            /** @description First-poll history window (P19), e.g. "1d", "7d". */
+            /** @description First-poll history window, e.g. "1d", "7d". */
             backfill: string;
         };
         ConfigGitLab: {
@@ -760,7 +760,7 @@ export interface components {
             poller_enabled: boolean;
             projects: string[];
             infra_path: string;
-            /** @description First-poll history window (P19). */
+            /** @description First-poll history window. */
             backfill: string;
         };
         /** @description Ingest allow/deny selector; empty fields are unconstrained, string fields are globs (* one segment, ** any depth). */
@@ -797,7 +797,7 @@ export interface components {
             prefix?: string;
             secret: components["schemas"]["MaskedSecret"];
         };
-        /** @description One mapping webhook (P14): auth shape with the secret masked, templates in full. */
+        /** @description One mapping webhook: auth shape with the secret masked, templates in full. */
         ConfigWebhook: {
             name: string;
             preset?: string;
@@ -835,7 +835,7 @@ export interface components {
             /** @description Separate unauthenticated /metrics listener address; "" = not open. */
             listen: string;
         };
-        /** @description Effective config: live-editable normalization (rules/tag_patterns) plus the redacted static snapshot of server/storage/auth/sources/jobs (P17). Secrets are constant "********" masks — values never leave the server. */
+        /** @description Effective config: live-editable normalization (rules/tag_patterns) plus the redacted static snapshot of server/storage/auth/sources/jobs. Secrets are constant "********" masks — values never leave the server. */
         ConfigResponse: {
             server: components["schemas"]["ConfigServer"];
             storage: components["schemas"]["ConfigStorage"];

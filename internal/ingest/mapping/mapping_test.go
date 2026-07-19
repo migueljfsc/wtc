@@ -15,7 +15,7 @@ var testNow = time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
 // fixtureRoot unmarshals a captured webhook body into the parsed-JSON root the
 // mapper renders against. Fixtures under testdata/webhook were captured live
 // (Grafana 11.3 test contact point; Jenkins Notification Plugin serialized by
-// its own classes) — see CHANGELOG P14 for provenance.
+// its own classes).
 func fixtureRoot(t *testing.T, name string) any {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("../../../testdata/webhook", name))
@@ -101,7 +101,7 @@ func TestGrafanaPresetResolvedEpisode(t *testing.T) {
 }
 
 // TestJenkinsPresetLifecycle asserts STARTED then COMPLETED of the same build
-// share the dedup_key (job:number) and move started → succeeded — trap #5.
+// share the dedup_key (job:number) and move started → succeeded.
 func TestJenkinsPresetLifecycle(t *testing.T) {
 	m := compileOne(t, Webhook{Name: "jenkins", Preset: "jenkins", Auth: Auth{Token: "s"}})
 	started, err := m.Normalize(fixtureRoot(t, "jenkins-started.json"), testNow)

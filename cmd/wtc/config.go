@@ -12,7 +12,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/notify"
 )
 
-// newConfigCmd shows the server's effective configuration (P17): which ingest
+// newConfigCmd shows the server's effective configuration: which ingest
 // paths are wired and with what parameters. Thin client of /api/config —
 // secrets arrive as constant "********" masks, never values.
 func newConfigCmd(flags *clientFlags) *cobra.Command {

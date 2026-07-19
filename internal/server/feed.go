@@ -13,7 +13,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
-// Atom feed (P21 pull-based awareness): a read-only subscription surface for
+// Atom feed (pull-based awareness): a read-only subscription surface for
 // feed readers, no sink or webhook required. Registered at /feed (not under
 // /api — it serves XML and is not part of the JSON contract). Feed readers
 // cannot set headers, so the api_token may arrive as ?token= instead of the

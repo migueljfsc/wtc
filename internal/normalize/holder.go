@@ -7,7 +7,7 @@ import (
 )
 
 // EngineHolder wraps an Engine behind an atomic pointer so the rules can be
-// hot-reloaded (P10) without restarting. Apply always runs the current engine;
+// hot-reloaded without restarting. Apply always runs the current engine;
 // Swap installs a rebuilt one. Safe for concurrent Apply + Swap — every ingest
 // path (webhook handlers + poller) holds the same holder, so an edit re-routes
 // all of them at once.

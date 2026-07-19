@@ -67,7 +67,7 @@ func TestWebhookMRNonMergeDropped(t *testing.T) {
 	}
 }
 
-// Golden + trap #3: a push touching only a root file (FAIL) yields a push
+// Golden: a push touching only a root file (FAIL) yields a push
 // Event with known-but-non-matching paths, so env inference lands at "".
 func TestGoldenWebhookPushUnknownEnv(t *testing.T) {
 	pairs, err := ParseWebhook(readFixture(t, webhookDir, "push_root_only.json"), testNow)

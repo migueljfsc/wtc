@@ -11,7 +11,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
-// Blast (PLAN P20) ranks the changes most likely to have caused an alert —
+// Blast ranks the changes most likely to have caused an alert —
 // or, anchored on a change, the alerts that fired after it. The score is a
 // documented deterministic heuristic (recency/env/service/kind/status),
 // never ML: same inputs, same ranking.
@@ -89,7 +89,7 @@ type BlastReport struct {
 // Blast ranks suspects around the anchor. Direction is inferred: an alert
 // anchor (or a bare timestamp) looks back at changes; a change anchor looks
 // forward at alerts. Env stays a ranking signal, never a hard filter — a
-// mis-inferred alert env must not hide the true cause (trap #2).
+// mis-inferred alert env must not hide the true cause.
 func Blast(ctx context.Context, st *store.Store, in BlastInput) (*BlastReport, error) {
 	window := in.Window
 	if window <= 0 {

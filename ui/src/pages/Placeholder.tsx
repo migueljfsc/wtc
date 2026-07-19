@@ -7,9 +7,8 @@ import {
 } from "@/components/ui/card";
 
 /**
- * Placeholder is the empty view stub used across the P7 shell. Each route
- * ships one until its real view lands in a later phase, so navigation and
- * layout can be exercised now.
+ * Placeholder is the empty view stub for routes whose real view doesn't
+ * exist yet, so navigation and layout can be exercised.
  */
 export function Placeholder({
   title,

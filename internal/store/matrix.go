@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// The env matrix (portal "diff visualized", P9): the current running version of
+// The env matrix (portal "diff visualized"): the current running version of
 // every service across a set of environments. "Current" = latest succeeded
 // deploy, matching the semantics of `wtc diff`.
 

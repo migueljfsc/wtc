@@ -18,7 +18,7 @@ import (
 const (
 	// defaultBackfill bounds the first poll of a repo with no stored
 	// watermark so a fresh install doesn't ingest the repo's whole history.
-	// Overridable via sources.github.backfill (P19) — GitHub retains
+	// Overridable via sources.github.backfill — GitHub retains
 	// workflow runs ~90 days, and a deep window costs pagination + PR
 	// enrichment calls on the first sweep.
 	defaultBackfill = 24 * time.Hour
@@ -38,7 +38,7 @@ type Poller struct {
 	engine     *normalize.EngineHolder
 	repos      []string
 	exact      []string         // scope entries without globs
-	globs      []*regexp.Regexp // compiled glob entries (P18), rules dialect
+	globs      []*regexp.Regexp // compiled glob entries, rules dialect
 	interval   time.Duration
 	backfill   time.Duration // first-poll history window; <=0 = defaultBackfill
 	captureDir string
@@ -46,8 +46,8 @@ type Poller struct {
 }
 
 // NewPoller wires a poller; captureDir "" disables capture. The engine is a
-// holder so a live rule edit re-routes poller events too (P10). repos entries
-// may be globs (P18, validated at config load) — resolved against discovery
+// holder so a live rule edit re-routes poller events too. repos entries
+// may be globs (validated at config load) — resolved against discovery
 // every sweep. backfill bounds the first poll of an unwatermarked repo;
 // <= 0 uses the 24h default.
 func NewPoller(client *Client, st *store.Store, engine *normalize.EngineHolder, repos []string, interval, backfill time.Duration, captureDir string, log *slog.Logger) *Poller {
@@ -95,7 +95,7 @@ func (p *Poller) Run(ctx context.Context) {
 
 // Sweep polls every (repo, resource) pair once. Failures are logged and
 // skipped — the watermark only advances on success, so nothing is lost. When
-// no repos are configured, or entries carry globs (P18), the accessible set
+// no repos are configured, or entries carry globs, the accessible set
 // is (re)discovered each sweep, so repos added to/removed from the token —
 // or newly created ones matching a pattern — are picked up automatically.
 func (p *Poller) Sweep(ctx context.Context) {
@@ -164,7 +164,7 @@ func (p *Poller) pollResource(ctx context.Context, repo, resource string) error 
 	if err != nil {
 		return err
 	}
-	// P16: lag alerts derive from time() minus this gauge.
+	// Lag alerts derive from time() minus this gauge.
 	metrics.PollLastSuccess.WithLabelValues("github", repo, resource).SetToCurrentTime()
 	if stored > 0 {
 		p.log.Info("polled", "repo", repo, "resource", resource, "stored", stored)

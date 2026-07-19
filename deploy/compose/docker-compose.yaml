@@ -18,7 +18,7 @@ services:
       WTC_SERVER_CORS_ALLOWED_ORIGINS: ${WTC_UI_ORIGIN:-http://localhost:8080}
     restart: unless-stopped
 
-  # Portal SPA (P7+). Serves static assets; the browser calls the wtc API
+  # Portal SPA. Serves static assets; the browser calls the wtc API
   # directly (cross-origin, hence the CORS setting above).
   ui:
     build:

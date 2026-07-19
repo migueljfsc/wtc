@@ -254,7 +254,7 @@ func mutateArgoCDBody(t *testing.T, fixture string, overrides map[string]any) []
 // TestArgoCDLifecycleEndToEnd replays one sync operation's Running→Succeeded
 // transition (same startedAt — the running leg is derived from the succeeded
 // fixture, since the captured pair came from different operations): one row,
-// status transitions in place (trap #5), rules applied (env from the app's
+// status transitions in place, rules applied (env from the app's
 // env label), suppression not tripped across distinct phases.
 func TestArgoCDLifecycleEndToEnd(t *testing.T) {
 	ts, st := newArgoCDTestServer(t, "", 10*time.Minute)

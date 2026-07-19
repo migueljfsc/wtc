@@ -104,7 +104,7 @@ func (c *Client) Doctor(ctx context.Context) (store.DoctorReport, error) {
 	return out, err
 }
 
-// Config fetches the effective config: redacted static snapshot (P17) plus
+// Config fetches the effective config: redacted static snapshot plus
 // the live normalization parts. Secrets arrive masked — the server never
 // sends values.
 func (c *Client) Config(ctx context.Context) (server.ConfigResponse, error) {
@@ -144,7 +144,7 @@ func (c *Client) Blast(ctx context.Context, params url.Values) (query.BlastRepor
 	return out, err
 }
 
-// Explain fetches the per-field inference trace for an event (P22).
+// Explain fetches the per-field inference trace for an event.
 func (c *Client) Explain(ctx context.Context, id string) (server.ExplainReport, error) {
 	var out server.ExplainReport
 	err := c.do(ctx, http.MethodGet, "/api/explain/"+url.PathEscape(id), nil, &out)

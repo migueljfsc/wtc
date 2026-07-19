@@ -20,8 +20,8 @@ var errNotFound = errors.New("not found")
 const defaultBase = "https://gitlab.com"
 
 // Client is a minimal hand-rolled GitLab REST (v4) client. A handful of
-// endpoints, one token — a full SDK dependency isn't justified (CLAUDE.md:
-// minimal deps). Mirrors internal/ingest/github.Client.
+// endpoints, one token — a full SDK dependency isn't justified. Mirrors
+// internal/ingest/github.Client.
 type Client struct {
 	base  string
 	token string
@@ -106,7 +106,7 @@ func parseProjectPaths(body []byte) (paths []string, total int, err error) {
 }
 
 // ListNamespaceProjects lists project paths under a namespace, for glob scope
-// resolution (P18). A namespace may be a group (subgroups included — `**`
+// resolution. A namespace may be a group (subgroups included — `**`
 // patterns reach them) or a user; GitLab serves them on different endpoints,
 // so a group 404 falls back to the user endpoint. Pages like the github
 // discovery.

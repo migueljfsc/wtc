@@ -1,5 +1,5 @@
 // Package metrics owns the Prometheus registry and every instrument wtc
-// exports (P16). Package-level on purpose: wtc is a single binary with one
+// exports. Package-level on purpose: wtc is a single binary with one
 // serve process, so threading a metrics struct through every constructor buys
 // nothing — call sites increment the exported instruments directly. Tests
 // assert deltas (counters are process-global and shared across tests).
@@ -41,7 +41,7 @@ var (
 	}, []string{"source"})
 
 	// Suppressed counts events dropped inside a suppression window (flux and
-	// argocd re-notify on every reconcile/resync — trap #1).
+	// argocd re-notify on every reconcile/resync).
 	Suppressed = factory.NewCounterVec(prometheus.CounterOpts{
 		Name: "wtc_suppressed_total",
 		Help: "Events dropped inside a suppression window, by source.",
@@ -55,14 +55,14 @@ var (
 		Help: "Events dropped at ingest by an allow/deny scope, by source.",
 	}, []string{"source"})
 
-	// MappingErrors counts mapping-webhook template failures (P14). The
+	// MappingErrors counts mapping-webhook template failures. The
 	// delivery is rejected so the sender can retry; alert on any increase.
 	MappingErrors = factory.NewCounterVec(prometheus.CounterOpts{
 		Name: "wtc_mapping_errors_total",
 		Help: "Mapping-webhook template/normalization failures, by source.",
 	}, []string{"source"})
 
-	// NotifySent counts notification deliveries accepted by a sink (P21), by
+	// NotifySent counts notification deliveries accepted by a sink, by
 	// subscription name and sink type.
 	NotifySent = factory.NewCounterVec(prometheus.CounterOpts{
 		Name: "wtc_notify_sent_total",

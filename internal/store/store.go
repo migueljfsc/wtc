@@ -1,7 +1,7 @@
 // Package store owns database access: open/pragmas, embedded migrations, a
 // single-writer goroutine consuming an ingest channel, and a read pool for
 // queries. Backends: embedded SQLite (default — nothing outside `wtc serve`
-// opens the DB file) and opt-in Postgres (P15, stateless-pod deployments).
+// opens the DB file) and opt-in Postgres (stateless-pod deployments).
 package store
 
 import (
@@ -44,7 +44,7 @@ type Store struct {
 	broadcast *broadcaster // fans newly-stored events to SSE subscribers
 
 	// notifyFn, when set, is called from the Ingest funnel for every stored
-	// NEW row and every status-changing upsert (P21) — never for a
+	// NEW row and every status-changing upsert — never for a
 	// rank-suppressed redelivery, which is what makes notifications naturally
 	// idempotent on (event id, status). It receives the post-merge row
 	// (payload/facts omitted) and must not block: the dispatcher behind it
@@ -135,7 +135,7 @@ func Open(path string) (*Store, error) {
 	return open(dialectSQLite, "sqlite", dsn(path, false), dsn(path, true))
 }
 
-// OpenPostgres connects to the Postgres database at connString (P15 opt-in
+// OpenPostgres connects to the Postgres database at connString (the opt-in
 // backend), applies migrations, and starts the writer. The write pool stays
 // capped at one connection so ordering semantics are identical to sqlite.
 func OpenPostgres(connString string) (*Store, error) {
@@ -223,7 +223,7 @@ func (s *Store) Close() error {
 	return nil
 }
 
-// SetNotifyFunc installs the P21 notification hook. Call before any Ingest
+// SetNotifyFunc installs the notification hook. Call before any Ingest
 // runs (serve.go wires it ahead of the HTTP listener and pollers); fn must be
 // non-blocking. A nil fn disables notifications.
 func (s *Store) SetNotifyFunc(fn func(ev model.Event, transitioned bool)) {
@@ -269,7 +269,7 @@ func (s *Store) Ingest(ctx context.Context, ev *model.Event) (id string, deduped
 			s.broadcast.publish(*ev)
 		}
 		// Every ingest path (webhooks, pollers, generic) funnels through here,
-		// so this is the one place the P16 counters stay complete.
+		// so this is the one place the ingest/dedup counters stay complete.
 		if r.err == nil {
 			if r.deduped {
 				metrics.Deduped.WithLabelValues(string(ev.Source)).Inc()
@@ -277,7 +277,7 @@ func (s *Store) Ingest(ctx context.Context, ev *model.Event) (id string, deduped
 				metrics.Ingested.WithLabelValues(string(ev.Source)).Inc()
 			}
 		}
-		// P21 awareness hook: new rows and status transitions only — a
+		// Awareness hook: new rows and status transitions only — a
 		// rank-suppressed redelivery (deduped, no update) never re-notifies.
 		if r.err == nil && s.notifyFn != nil && (!r.deduped || r.transitioned) {
 			s.notifyFn(r.merged, r.transitioned)

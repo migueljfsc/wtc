@@ -6,7 +6,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/capture"
 )
 
-// Capture mode (CLAUDE.md fixture-first workflow): when a capture directory
+// Capture mode (the fixture-first workflow): when a capture directory
 // is configured, every raw ingest body plus its headers is dumped to disk so
 // real payloads can be frozen into testdata/ fixtures. Dev-only by design.
 

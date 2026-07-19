@@ -12,7 +12,7 @@ import (
 // TestBlastE2E replays an incident through the real HTTP surface: events
 // ingested via /ingest/generic, then /api/v1/blast anchored on the alert must
 // rank the same-env deploy above an unrelated merge, and the reverse anchor
-// (the deploy) must surface the alert that followed it (PLAN P20 acceptance).
+// (the deploy) must surface the alert that followed it.
 func TestBlastE2E(t *testing.T) {
 	ts := newTestServer(t)
 

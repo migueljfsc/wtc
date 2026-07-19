@@ -1,4 +1,4 @@
-# Postgres-backed wtc (P15): compose overlay making the wtc container
+# Postgres-backed wtc: compose overlay making the wtc container
 # stateless — the ledger lives in the postgres service's volume instead of the
 # wtc-data volume. Usage (next to a wtc.yaml, same as the base file):
 #

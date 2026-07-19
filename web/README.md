@@ -1,8 +1,8 @@
 # web/ — embedded timeline UI
 
-The phase-5 UI, served at `/` from the single binary. **Toolchain-free by
-hard decision** (CLAUDE.md): hand-written HTML/CSS/vanilla JS, no node, no
-npm, no bundler. If a change seems to need a framework, it's out of scope.
+The embedded timeline UI, served at `/` from the single binary. **Toolchain-free
+by design:** hand-written HTML/CSS/vanilla JS, no node, no npm, no bundler. If a
+change seems to need a framework, it's out of scope.
 
 | File | What |
 |---|---|

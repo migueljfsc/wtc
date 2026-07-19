@@ -123,7 +123,7 @@ func TestWebhookHMACAuth(t *testing.T) {
 }
 
 // TestWebhookLifecycleUpsert drives a build STARTED then COMPLETED through the
-// endpoint and asserts one row whose status advanced to succeeded (trap #5).
+// endpoint and asserts one row whose status advanced to succeeded.
 func TestWebhookLifecycleUpsert(t *testing.T) {
 	ts, st := webhookTestServer(t, []mapping.Webhook{jenkinsWebhook()})
 

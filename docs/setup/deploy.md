@@ -1,7 +1,7 @@
 # Deploying wtc
 
 One binary; the ledger is an embedded SQLite file by default, or an external
-Postgres for a stateless pod ([postgres.md](postgres.md), P15). Never scale
+Postgres for a stateless pod ([postgres.md](postgres.md)). Never scale
 horizontally — single writer, per-pod pollers.
 Images: `ghcr.io/migueljfsc/wtc` (`latest` + `sha-<sha7>`, published by CI).
 

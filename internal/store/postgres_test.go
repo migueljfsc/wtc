@@ -11,7 +11,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/model"
 )
 
-// Postgres parity suite (P15). Gated behind WTC_TEST_PG_DSN — sqlite tests
+// Postgres parity suite. Gated behind WTC_TEST_PG_DSN — sqlite tests
 // always run; these re-exercise the dialect-divergent paths (upsert, search,
 // doctor, retain, watermarks, overrides, stats, matrix, ledger migration)
 // against a real postgres. CI provides a postgres service container; locally:
@@ -45,7 +45,7 @@ func openTestPG(t *testing.T) *Store {
 	return s
 }
 
-// TestPGUpsertLifecycle exercises the status-rank upsert (trap #5) — the most
+// TestPGUpsertLifecycle exercises the status-rank upsert — the most
 // intricate shared query — on postgres: started→succeeded updates in place,
 // a stale started never regresses, and non-empty-wins enrichment holds.
 func TestPGUpsertLifecycle(t *testing.T) {
@@ -366,7 +366,7 @@ func filterKey(prefix string, i int) string {
 	return prefix + ":" + string(rune('a'+i))
 }
 
-// TestPGNotifyFuncTransitions is the postgres parity check for the P21 hook:
+// TestPGNotifyFuncTransitions is the postgres parity check for the notify hook:
 // the multi-column RETURNING (merged row) and transition detection must
 // behave identically to sqlite.
 func TestPGNotifyFuncTransitions(t *testing.T) {

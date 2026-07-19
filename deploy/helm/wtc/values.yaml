@@ -7,7 +7,7 @@ service:
   type: ClusterIP
   port: 8484
 
-# Storage backend (P15). sqlite (default) keeps the ledger on the PVC below —
+# Storage backend. sqlite (default) keeps the ledger on the PVC below —
 # single replica + Recreate strategy. postgres makes the wtc pod STATELESS:
 # the PVC is dropped and upgrades roll. Either bundle a postgres pod
 # (postgresql.enabled below) or point externalDatabase.url at your own
@@ -103,7 +103,7 @@ resources:
   limits:
     memory: 256Mi
 
-# Prometheus metrics (P16). /metrics is always served on the main port,
+# Prometheus metrics. /metrics is always served on the main port,
 # bearer-authed with api_tokens. Two scrape models:
 #   1. port: 0 — scrape the MAIN port with bearer auth. The ServiceMonitor
 #      pulls credentials from existingSecret key WTC_API_TOKEN (required for
@@ -149,7 +149,7 @@ config:
   #     hmac_key: ${WTC_FLUX_HMAC_KEY}
   #     suppression_window: 10m
 
-# Portal SPA (P7+). Deployed by default alongside the API. With the bundled
+# Portal SPA. Deployed by default alongside the API. With the bundled
 # ingress below, the browser loads the SPA and calls the API on the SAME origin
 # (the ingress routes /api to wtc), so apiBaseUrl stays empty and no CORS is
 # needed. To instead serve the SPA on a DIFFERENT origin from the API, set

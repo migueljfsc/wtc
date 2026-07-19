@@ -94,7 +94,7 @@ func runStatus(status, conclusion string) model.Status {
 
 // NormalizeWorkflowRun maps one REST workflow run onto an Event + facts.
 // dedup gh:run:<repo>:<id>:<attempt> — one row per attempt, status upserted
-// across queued→in_progress→completed (trap #5).
+// across queued→in_progress→completed.
 func NormalizeWorkflowRun(run restWorkflowRun, now time.Time) (*model.Event, normalize.Facts) {
 	status := runStatus(run.Status, run.Conclusion)
 	repo := run.Repository.FullName
@@ -155,7 +155,7 @@ var revertTitle = regexp.MustCompile(`(?i)^revert\b`)
 // NormalizeMergedPR maps a merged pull request onto an Event + facts. Returns
 // nil for unmerged PRs (closed-without-merge is not a change intent).
 // repo comes from the poller scope; list payloads carry it in base.repo too.
-// Revert PRs land as kind=rollback (PLAN P4 heuristic).
+// Revert PRs land as kind=rollback via revert-title detection.
 func NormalizeMergedPR(pr restPullRequest, repo string, now time.Time) (*model.Event, normalize.Facts) {
 	if pr.MergedAt == nil {
 		return nil, normalize.Facts{}
@@ -188,7 +188,7 @@ func NormalizeMergedPR(pr restPullRequest, repo string, now time.Time) (*model.E
 		Branch: pr.Base.Ref,
 		Event:  "pull_request",
 		Actor:  pr.User.Login,
-		// Changed files need the PR-files API (P3 enrichment) — unknown here.
+		// Changed files need the PR-files API — unknown here.
 		PathsTruncated: true,
 	}
 	return ev, facts
@@ -207,8 +207,8 @@ func NormalizeCommit(c restCommit, repo string, now time.Time) (*model.Event, no
 	if ts.IsZero() {
 		ts = c.Commit.Author.Date
 	}
-	// Commit-list payloads carry no files[]; per-commit detail fetch is
-	// P3/P4 enrichment. Unknown ≠ no match (trap #3).
+	// Commit-list payloads carry no files[]; per-commit detail fetch is a
+	// separate enrichment step. Unknown ≠ no match.
 	return pushEvent(repo, c.SHA, title, c.HTMLURL, actor, nil, true, ts, now)
 }
 

@@ -1,6 +1,6 @@
 // Package flux normalizes notification-controller events. Payload structs are
-// verified against captured fixtures under testdata/flux/ (trap #9: never
-// trust documentation memory for this shape).
+// verified against captured fixtures under testdata/flux/, never documentation
+// memory for this shape.
 package flux
 
 import (
@@ -117,9 +117,9 @@ func mustPayload(message, revision string) string {
 	return string(b)
 }
 
-// Suppressor drops repeats of the same dedup key inside a window (trap #1:
+// Suppressor drops repeats of the same dedup key inside a window:
 // notification-controller re-emits on every reconcile; without this the
-// write path is hammered with no-ops). The store's strict-rank upsert already
+// write path is hammered with no-ops. The store's strict-rank upsert already
 // guarantees one row — this is load shedding, not correctness.
 type Suppressor struct {
 	mu     sync.Mutex

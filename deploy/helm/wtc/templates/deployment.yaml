@@ -10,7 +10,7 @@ spec:
   replicas: 1                # single writer + per-pod pollers — never scale this
   strategy:
     {{- if $pg }}
-    type: RollingUpdate      # stateless pod (P15): no volume pins the rollout
+    type: RollingUpdate      # stateless pod: no volume pins the rollout
     {{- else }}
     type: Recreate           # RWO volume + single writer: no rolling overlap
     {{- end }}

@@ -7,7 +7,7 @@
 // poller doubles as the webhook-loss sweeper (idempotent by design), exactly
 // like GitHub. Parsers are written against captured fixtures under
 // testdata/gitlab/ (gitlab.com free project, GitLab 19.x), never documentation
-// memory — see CLAUDE.md fixture-first workflow.
+// memory.
 //
 // The project's `path_with_namespace` (e.g. "group/service") plays the role
 // GitHub's "owner/repo" does: it is the human-readable, stable identifier in
@@ -59,7 +59,7 @@ func pipelineStatus(status string) model.Status {
 // produce byte-identical Events and dedup keys (convergence is what lets the
 // poller sweep webhook losses). dedup gl:pipeline:<project>:<id> — the GitLab
 // pipeline id is stable across queued→running→completed, so one row is
-// upserted across the lifecycle (trap #5); a *retried* pipeline gets a fresh
+// upserted across the lifecycle; a *retried* pipeline gets a fresh
 // id and is a truthful second row.
 func pipelineEvent(project string, id int64, sha, ref, status, url string, created, finished time.Time, durationSec *int, actor string, now time.Time) (*model.Event, normalize.Facts) {
 	st := pipelineStatus(status)
@@ -149,7 +149,7 @@ func mergedMREvent(project string, iid int, title, mergeCommitSHA, targetBranch,
 // gl:push:<project>:<sha>, so webhook pushes and polled commits coalesce.
 // paths (when known, from the webhook commit's added/modified/removed) drive
 // path-based env inference; the poller's commit-list carries none, so it
-// passes truncated=true (unknown ≠ no match, trap #3).
+// passes truncated=true (unknown ≠ no match).
 func pushEvent(project, sha, title, url, actor string, paths []string, truncated bool, ts, now time.Time) (*model.Event, normalize.Facts) {
 	if ts.IsZero() {
 		ts = now

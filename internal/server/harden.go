@@ -17,7 +17,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
-// P22 "harden the record": explain (inference audit), export (take the
+// "Harden the record" handlers: explain (inference audit), export (take the
 // record with you), backup (keep the record safe). All read-side.
 
 // ExplainReport is the /explain/{id} reply: the per-field first-writer-wins
@@ -34,7 +34,7 @@ type ExplainReport struct {
 	Notes    []string               `json:"notes,omitempty"`
 }
 
-// handleExplain replays the CURRENT rules (P17 DB overrides included) over an
+// handleExplain replays the CURRENT rules (DB overrides included) over an
 // event's recorded ingest-time facts and reports which rule set each field.
 func (s *Server) handleExplain(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")

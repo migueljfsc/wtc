@@ -15,8 +15,8 @@ const (
 )
 
 // ConfigResponse is the effective config surface: the live-editable
-// normalization parts (rules/tag_patterns + override flags, P10) plus the
-// redacted static snapshot of everything else (config.View, P17). Secrets
+// normalization parts (rules/tag_patterns + override flags) plus the
+// redacted static snapshot of everything else (config.View). Secrets
 // never appear here — the view masks them as a constant "********" and the
 // sentinel guard test in internal/config proves it.
 type ConfigResponse struct {

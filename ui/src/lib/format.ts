@@ -1,5 +1,5 @@
-// The API emits UTC ISO-8601; the UI renders local time (CLAUDE.md: timelines
-// sort by ts, CLI/UI render local).
+// The API emits UTC ISO-8601; the UI renders local time (timelines
+// sort by ts; CLI/UI render local).
 
 const DAY = 86_400_000;
 

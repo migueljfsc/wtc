@@ -1,7 +1,6 @@
 // Package github implements the GitHub ingest paths: the API poller (primary
 // for private deployments) and, together with internal/server, the webhook
-// normalizers. Parsers are written against captured fixtures only —
-// see CLAUDE.md fixture-first workflow.
+// normalizers. Parsers are written against captured fixtures only.
 package github
 
 import (
@@ -18,7 +17,7 @@ import (
 const apiBase = "https://api.github.com"
 
 // Client is a minimal hand-rolled GitHub REST client. Three endpoints, one
-// token — a full SDK dependency isn't justified (CLAUDE.md: minimal deps).
+// token — a full SDK dependency isn't justified.
 type Client struct {
 	base  string
 	token string

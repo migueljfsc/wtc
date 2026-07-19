@@ -23,7 +23,7 @@ import (
 )
 
 // mappingErrorTracker records the most recent per-source mapping-template
-// failure so doctor can surface it (P14 guardrail). In-memory and reset on
+// failure so doctor can surface it. In-memory and reset on
 // restart: it is a "recent health" signal, not an audit log. A template that
 // fails to render must never silently drop a delivery unnoticed — the delivery
 // is rejected (the sender can retry) AND the failure is counted here.
@@ -71,7 +71,7 @@ type webhookIngestResponse struct {
 	Deduped  int `json:"deduped"`
 }
 
-// handleIngestWebhook is the config-declared mapping webhook (P14). It resolves
+// handleIngestWebhook is the config-declared mapping webhook. It resolves
 // the source by path name, authenticates (static token or HMAC per the source's
 // config), captures the raw body, then maps payload→Event via the operator's
 // templates and runs the standard pipeline (rules → redaction → upsert).

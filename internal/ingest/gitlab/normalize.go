@@ -91,6 +91,6 @@ func NormalizeCommit(c restCommit, project string, now time.Time) (*model.Event,
 	if title == "" {
 		title, _, _ = strings.Cut(c.Message, "\n")
 	}
-	// List payloads carry no files[]; unknown ≠ no match (trap #3).
+	// List payloads carry no files[]; unknown ≠ no match.
 	return pushEvent(project, c.ID, title, c.WebURL, c.AuthorName, nil, true, c.CommittedDate, now)
 }

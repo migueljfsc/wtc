@@ -135,7 +135,7 @@ func TestFluxIngestEndToEnd(t *testing.T) {
 	if len(events) != 1 {
 		t.Fatalf("after replay: %d rows, want 1", len(events))
 	}
-	// P16: the shed replay must move the suppression counter (delta — the
+	// The shed replay must move the suppression counter (delta — the
 	// counter is process-global).
 	if got := testutil.ToFloat64(metrics.Suppressed.WithLabelValues("flux")) - suppressedBefore; got != 1 {
 		t.Errorf("wtc_suppressed_total{source=\"flux\"} moved by %v, want 1", got)
@@ -144,7 +144,7 @@ func TestFluxIngestEndToEnd(t *testing.T) {
 
 func TestFluxSuppressionDisabledStillDedups(t *testing.T) {
 	// Even with the window off (0), N identical events store exactly 1 row —
-	// the strict-rank upsert is the correctness backstop (trap #1).
+	// the strict-rank upsert is the correctness backstop.
 	ts, st := newFluxTestServer(t, 0)
 	body := fluxFixture(t, "kustomization_artifact_failed.json")
 

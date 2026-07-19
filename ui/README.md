@@ -1,6 +1,6 @@
 # wtc portal (`ui/`)
 
-The rich SPA client of the wtc query API (UI Platform track, P7–P10). Built and
+The rich SPA client of the wtc query API. Built and
 deployed independently of the Go binary — its own toolchain, never touches
 `go build`. The Go server stays the single backend; this is a client of
 `/api/v1/*`.

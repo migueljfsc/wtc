@@ -12,7 +12,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
-// Seeded timeline reproducing the operator's real flow (PLAN P3 acceptance):
+// Seeded timeline reproducing the operator's real flow:
 // build → push (dev, monorepo flux) → PR bump merged (staging) → reconcile →
 // later PR bump (prod) → reconcile. Plus a service present in one env only
 // and an artifact-carrying pair for in-sync comparison.

@@ -11,7 +11,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # Postgres service backs the P15 parity suite (TestPG* in internal/store,
+    # Postgres service backs the parity suite (TestPG* in internal/store,
     # gated on WTC_TEST_PG_DSN). SQLite tests run regardless.
     services:
       postgres:

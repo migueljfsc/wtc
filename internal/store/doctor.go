@@ -24,7 +24,7 @@ type PollState struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// WebhookChurn flags a likely-unstable mapping-webhook dedup_key (P14): rows
+// WebhookChurn flags a likely-unstable mapping-webhook dedup_key: rows
 // sharing (source, title, kind, status) that landed inside a tight window but
 // under DISTINCT dedup_keys — the signature of a sender retrying with a key
 // that varies per delivery (e.g. embeds a timestamp). Legitimate distinct
@@ -37,7 +37,7 @@ type WebhookChurn struct {
 }
 
 // WebhookMappingError is a per-source count of recent mapping-template eval
-// failures (P14 guardrail). Populated by the server (in-memory), merged into
+// failures. Populated by the server (in-memory), merged into
 // the doctor report — a mapping error must surface, never be guessed at.
 type WebhookMappingError struct {
 	Source    string    `json:"source"`
@@ -58,12 +58,12 @@ type DoctorReport struct {
 	UnmappedSamples      []string              `json:"unmapped_samples,omitempty"`
 	ClockSkew24h         int                   `json:"clock_skew_24h"`
 	Poll                 []PollState           `json:"poll,omitempty"`
-	WebhookChurn         []WebhookChurn        `json:"webhook_churn,omitempty"`          // P14 unstable dedup_key heuristic
-	WebhookMappingErrors []WebhookMappingError `json:"webhook_mapping_errors,omitempty"` // P14 recent template eval failures
+	WebhookChurn         []WebhookChurn        `json:"webhook_churn,omitempty"`          // unstable dedup_key heuristic
+	WebhookMappingErrors []WebhookMappingError `json:"webhook_mapping_errors,omitempty"` // recent template eval failures
 }
 
 // SizeBytes returns the database size in bytes (per-dialect query). Shared by
-// the doctor report and the wtc_db_size_bytes metric collector (P16).
+// the doctor report and the wtc_db_size_bytes metric collector.
 func (s *Store) SizeBytes(ctx context.Context) (int64, error) {
 	sizeSQL := `SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()`
 	if s.dialect == dialectPostgres {
@@ -137,7 +137,7 @@ FROM events GROUP BY source ORDER BY source`, dayAgo)
 		return nil, fmt.Errorf("doctor: sources: %w", err)
 	}
 
-	// Unmapped: env inference failed (trap #2) — surfaced, never guessed.
+	// Unmapped: env inference failed — surfaced, never guessed.
 	if err := s.readDB.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM events WHERE env = '' AND ts >= ?`, dayAgo,
 	).Scan(&r.Unmapped24h); err != nil {
@@ -162,7 +162,7 @@ FROM events GROUP BY source ORDER BY source`, dayAgo)
 		}
 	}
 
-	// |ts - ingested_at| > 10m flags out-of-order arrival / clock skew (trap #6).
+	// |ts - ingested_at| > 10m flags out-of-order arrival / clock skew.
 	skewSQL := `
 SELECT COUNT(*) FROM events
 WHERE ts >= ? AND ABS(julianday(ts) - julianday(ingested_at)) > 10.0/1440.0`
@@ -219,7 +219,7 @@ const (
 // dedup_keys number >= churnMinRows within a churnWindow span — rows that
 // SHOULD have collapsed onto one row but did not. Runs over all sources (the
 // signal is meaningful for any parser), but the footgun it targets is the
-// operator-authored P14 dedup_key template.
+// operator-authored mapping-webhook dedup_key template.
 func (s *Store) webhookChurn(ctx context.Context, r *DoctorReport, dayAgo string) error {
 	churnSQL := `
 SELECT source, title, COUNT(DISTINCT dedup_key) AS keys,

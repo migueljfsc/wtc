@@ -8,7 +8,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/model"
 )
 
-// P22 `wtc explain`: which rule set each inferred field of an event. The
+// Backs `wtc explain`: which rule set each inferred field of an event. The
 // engine matches ingest-time Facts, which are not reconstructible from stored
 // payloads — so Apply persists them (plus the pre-rules field snapshot) on
 // the event, and Explain replays the CURRENT rules over that record with a
@@ -141,7 +141,7 @@ func (e *Engine) Explain(f Facts, preset map[string]string) ([]FieldTrace, error
 	return out, nil
 }
 
-// Explain on the holder runs the current engine (P17 DB overrides included).
+// Explain on the holder runs the current engine (DB overrides included).
 func (h *EngineHolder) Explain(f Facts, preset map[string]string) ([]FieldTrace, error) {
 	return h.p.Load().Explain(f, preset)
 }

@@ -39,7 +39,7 @@ type Options struct {
 	// webhook bodies — same auth shape as argocd.
 	GitLabWebhookToken string
 	// FluxSuppression drops repeats of the same flux dedup key inside this
-	// window (trap #1). <= 0 disables.
+	// window. <= 0 disables.
 	FluxSuppression time.Duration
 	// ArgoCDSuppression drops repeats of the same argocd suppression key
 	// (app+revision+phase|health) inside this window — Argo re-notifies on
@@ -51,7 +51,7 @@ type Options struct {
 	FluxScope   *normalize.CompiledScope
 	ArgoCDScope *normalize.CompiledScope
 	// Engine runs the normalization rules on webhook-ingested events; nil
-	// means an empty rule set. A holder so rules can be hot-reloaded (P10) —
+	// means an empty rule set. A holder so rules can be hot-reloaded —
 	// the same holder must be shared with the poller.
 	Engine *normalize.EngineHolder
 	// Tags resolves image tags to shas for /api/where; nil means defaults.
@@ -65,11 +65,11 @@ type Options struct {
 	// config viewer). Display copies of what the engine/resolver were built from.
 	Rules       []normalize.Rule
 	TagPatterns []string
-	// Mappers are the compiled mapping webhooks (P14), keyed by source name;
+	// Mappers are the compiled mapping webhooks, keyed by source name;
 	// nil/empty means /ingest/webhook/<name> 404s for every name.
 	Mappers map[string]*mapping.Mapper
 	// ConfigView is the redacted effective-config snapshot served at
-	// /api/v1/config (P17). Built by the caller (serve.go — the only holder
+	// /api/v1/config. Built by the caller (serve.go — the only holder
 	// of the full config) via config.NewView, so the server never receives
 	// raw secrets it doesn't already need. Static: sources config cannot
 	// change without a restart.
@@ -100,7 +100,7 @@ type Server struct {
 	log                *slog.Logger
 	mux                *http.ServeMux
 
-	// Editable normalization config (P10). fileRules/fileTags are the YAML
+	// Editable normalization config. fileRules/fileTags are the YAML
 	// baseline; cfg* is the effective, possibly DB-overridden, snapshot served
 	// at /config and mutated by the edit endpoints. cfgMu serializes edits.
 	fileRules   []normalize.Rule
@@ -111,7 +111,7 @@ type Server struct {
 	rulesFromDB bool
 	tagsFromDB  bool
 
-	// configView is the pre-redacted effective-config snapshot (P17);
+	// configView is the pre-redacted effective-config snapshot;
 	// immutable after New.
 	configView config.View
 	version    string
@@ -162,7 +162,7 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 		s.version = "dev"
 	}
 
-	// Apply any DB-backed config overrides (P10), rebuilding + swapping the
+	// Apply any DB-backed config overrides, rebuilding + swapping the
 	// engine/resolver holders before ingest starts. Failures fall back to the
 	// YAML baseline (already installed) and are logged.
 	s.loadConfigOverrides()
@@ -173,15 +173,15 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 	s.mux.Handle("GET /", http.FileServerFS(web.FS()))
 
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
-	// Atom feed (P21): pull-based awareness for feed readers. Not under
+	// Atom feed: pull-based awareness for feed readers. Not under
 	// /api (XML, not part of the JSON contract); token auth inside the
 	// handler — readers can't set headers, so ?token= is accepted too.
 	s.mux.HandleFunc("GET /feed", s.handleFeed)
 	// OpenAPI document for the portal's typed client generator. Public, like
 	// healthz — it describes the (bearer-authed) API but leaks no data.
 	s.mux.HandleFunc("GET /api/openapi.json", s.handleOpenAPI)
-	// Prometheus exposition (P16). Bearer-authed: wtc may be public (P13
-	// posture) and /metrics leaks source names and activity levels. For
+	// Prometheus exposition. Bearer-authed: wtc may be publicly reachable
+	// and /metrics leaks source names and activity levels. For
 	// in-cluster scrapes without an api_token, serve config offers a separate
 	// unauthenticated metrics listener instead.
 	s.mux.Handle("GET /metrics", s.requireBearer(metrics.Handler()))
@@ -192,7 +192,7 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 	s.mux.HandleFunc("POST /ingest/flux", s.handleIngestFlux)     // HMAC-verified inside
 	s.mux.HandleFunc("POST /ingest/argocd", s.handleIngestArgoCD) // token-verified inside
 	s.mux.HandleFunc("POST /ingest/gitlab", s.handleIngestGitLab) // token-verified inside
-	// Mapping webhooks (P14): one handler, per-name lookup + per-source auth.
+	// Mapping webhooks: one handler, per-name lookup + per-source auth.
 	s.mux.HandleFunc("POST /ingest/webhook/{name}", s.handleIngestWebhook)
 
 	// Query API. Every route is registered under both the legacy /api prefix

@@ -8,9 +8,9 @@ import (
 	"github.com/migueljfsc/wtc/internal/normalize"
 )
 
-// Subscription is one config `notifications:` entry (P21): a glob match over
+// Subscription is one config `notifications:` entry: a glob match over
 // stored-event fields plus the sink deliveries go to. The schema lives here
-// (not in config) following the P14 mapping.Webhook pattern — config embeds
+// (not in config), mirroring the mapping.Webhook pattern — config embeds
 // it and validates via Compile at load.
 type Subscription struct {
 	// Name identifies the entry in logs and the wtc_notify_* metric labels.

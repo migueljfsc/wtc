@@ -61,13 +61,11 @@ data:
   # guarded so pre-first-sync events (e.g. an early health transition) still
   # produce valid JSON instead of a template execution error.
   #
-  # `envLabel` is ONE ADDITION beyond the originally specified field list
-  # (app/project/revision/.../triggeredBy): the env-inference matrix
-  # (CLAUDE.md/PLAN.md P11) ranks "env app label" above destination-namespace
-  # and name-suffix, but no field in the original list carries Application
-  # labels — without this the label tier is untestable from the webhook body
-  # alone. Flagged for operator confirmation before the parser stage; easy to
-  # drop or rename if a different shape is preferred.
+  # `envLabel` carries the Application's `env` label. wtc's env-inference for
+  # argocd ranks the env app label above destination-namespace and name-suffix,
+  # and no other field in the body carries Application labels — without this the
+  # label tier can't be resolved from the webhook body alone. Easy to drop or
+  # rename if a different shape is preferred.
   #
   # Guarded with `{{if .app.metadata.labels}}`: an Application with NO labels
   # at all doesn't get an empty map in the unstructured object, it gets a

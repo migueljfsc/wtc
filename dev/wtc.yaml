@@ -61,7 +61,7 @@ rules:
 #metrics:
 #  listen: ":9091"
 
-# Notifications (P21) — push events matching a glob filter to a sink; fires on
+# Notifications — push events matching a glob filter to a sink; fires on
 # new events AND status transitions (started→failed fires `status: failed`).
 # See docs/setup/notifications.md. Pull-based alternative: GET /feed (Atom).
 #notifications:

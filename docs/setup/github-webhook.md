@@ -2,7 +2,7 @@
 
 `/ingest/github` authenticates deliveries (HMAC) and normalizes `workflow_run`,
 `push`, and `pull_request` events into the same Events + dedup keys the poller
-produces (P13). Webhook and poller are **peer modes**: run the webhook for
+produces. Webhook and poller are **peer modes**: run the webhook for
 latency, the poller as the loss-recovery sweeper, or either alone.
 
 If wtc is not reachable from the internet, skip this page — the

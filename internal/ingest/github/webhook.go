@@ -10,7 +10,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/normalize"
 )
 
-// Webhook envelope parsing (P13). GitHub delivers the same resource objects the
+// Webhook envelope parsing. GitHub delivers the same resource objects the
 // REST API returns, wrapped in an event envelope and dispatched by the
 // X-GitHub-Event header. The nested `workflow_run` and `pull_request` objects
 // are field-identical to the poller's restWorkflowRun/restPullRequest, so the
@@ -112,7 +112,7 @@ func ParseWebhook(event string, raw []byte, now time.Time) ([]EventFacts, error)
 			// known (not truncated). GitHub caps commits[] at ~20 per push and
 			// omits file arrays on very large commits; the poller sweeps any
 			// commit the webhook missed (idempotent by dedup key), so a capped
-			// push under-reports at worst, never misroutes (trap #3).
+			// push under-reports at worst, never misroutes.
 			ev, facts := pushEvent(repo, c.ID, title, c.URL, actor, paths, false, c.Timestamp, now)
 			out = append(out, EventFacts{ev, facts})
 		}

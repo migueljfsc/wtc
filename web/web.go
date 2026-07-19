@@ -1,5 +1,5 @@
-// Package web embeds the phase-5 timeline UI. Toolchain-free by hard
-// decision: hand-written HTML/CSS/vanilla JS, no node, no bundler.
+// Package web embeds the timeline UI. Toolchain-free by design:
+// hand-written HTML/CSS/vanilla JS, no node, no bundler.
 package web
 
 import (

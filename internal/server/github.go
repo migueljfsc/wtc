@@ -24,7 +24,7 @@ type githubIngestResponse struct {
 
 // handleIngestGitHub verifies X-Hub-Signature-256, captures the raw delivery,
 // then parses the event envelope and runs the full pipeline: normalize → rules
-// → ingest. Webhook and poller converge on the same Events + dedup keys (P13),
+// → ingest. Webhook and poller converge on the same Events + dedup keys,
 // so both modes can run simultaneously — the webhook gives latency, the poller
 // remains the idempotent loss-recovery sweeper.
 func (s *Server) handleIngestGitHub(w http.ResponseWriter, r *http.Request) {

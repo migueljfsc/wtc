@@ -193,7 +193,7 @@ func (s *Server) handleAround(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleBlast ranks the changes most likely to have caused an alert — or,
-// anchored on a change, lists the alerts that fired after it (PLAN P20). The
+// anchored on a change, lists the alerts that fired after it. The
 // score is a deterministic documented heuristic; see query.Blast.
 func (s *Server) handleBlast(w http.ResponseWriter, r *http.Request) {
 	anchorTS, anchorEv, ok := s.resolveAnchor(w, r)
@@ -237,7 +237,7 @@ func (s *Server) handleDoctor(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusInternalServerError, "doctor query error")
 		return
 	}
-	// Merge in-memory mapping-webhook eval errors (P14) — they live on the
+	// Merge in-memory mapping-webhook eval errors — they live on the
 	// server, not the DB, since they concern deliveries that never became rows.
 	report.WebhookMappingErrors = s.mapErrs.snapshot()
 	s.writeJSON(w, http.StatusOK, report)

@@ -9,7 +9,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
-// newMigrateCmd is the one-shot sqlite→postgres ledger migration (P15). It is
+// newMigrateCmd is the one-shot sqlite→postgres ledger migration. It is
 // the deliberate exception to "the CLI never opens the DB file": an offline
 // admin operation run with serve stopped, like serve itself.
 func newMigrateCmd() *cobra.Command {

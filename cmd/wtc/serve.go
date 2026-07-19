@@ -62,7 +62,7 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 	var st *store.Store
 	switch cfg.Storage.Backend {
 	case "postgres":
-		// P15: external database — the serve pod is stateless.
+		// External database — the serve pod is stateless.
 		st, err = store.OpenPostgres(cfg.Storage.DSN)
 		log.Info("storage backend", "backend", "postgres")
 	default: // "sqlite" (validated by config.Load)
@@ -98,7 +98,7 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 		effectiveTagPatterns = normalize.DefaultTagPatterns
 	}
 
-	// Mapping webhooks (P14) — compile config-declared sources; template/config
+	// Mapping webhooks — compile config-declared sources; template/config
 	// errors surface at startup. Each name is registered as a first-class source
 	// so it appears under its real name in log/facets/doctor.
 	mappers, err := mapping.Compile(cfg.Sources.Webhooks)
@@ -113,7 +113,7 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 		log.Info("mapping webhooks enabled", "count", len(mappers))
 	}
 
-	// Hot-reloadable holders (P10) — shared by the server AND the poller so a
+	// Hot-reloadable holders — shared by the server AND the poller so a
 	// live rule edit re-routes every ingest path. server.New applies any DB
 	// overrides on top, swapping these before ingest starts.
 	engineHolder := normalize.NewEngineHolder(engine)
@@ -152,7 +152,7 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// Notification dispatcher (P21) — nil when no notifications configured.
+	// Notification dispatcher — nil when no notifications configured.
 	// Wired before the listener and pollers start so no ingest can slip past
 	// the hook; Enqueue is non-blocking (bounded queue, dropped counter).
 	subs, err := notify.Compile(cfg.Notifications) // validated at config.Load; cannot fail here
@@ -212,7 +212,7 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 		errCh <- httpSrv.ListenAndServe()
 	}()
 
-	// Optional separate UNAUTHENTICATED metrics listener (P16) — for
+	// Optional separate UNAUTHENTICATED metrics listener — for
 	// in-cluster scrapes where an api_token would be over-privileged. A
 	// configured listener that cannot bind is fatal, same as the main one:
 	// silently running without metrics defeats the point of configuring them.

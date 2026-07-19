@@ -12,7 +12,7 @@ type Event = components["schemas"]["Event"];
 const WINDOWS = ["30m", "2h", "6h", "24h"];
 
 /**
- * Likely causes (P20): the changes in the window before an alert, ranked by
+ * Likely causes: the changes in the window before an alert, ranked by
  * the deterministic blast score (recency, same env/service, kind, failed
  * state) — best suspect first. Rows with a ref link into Where. The window
  * mirrors `wtc blast --window`.

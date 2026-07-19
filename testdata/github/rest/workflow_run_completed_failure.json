@@ -74,7 +74,7 @@
   "head_commit": {
     "id": "f0da9accbb7ad4206a9a231863a36c659bade658",
     "tree_id": "bf8e0292c5706b130ae2bfb32b876ea8cda1ef0d",
-    "message": "chore: add README and dependabot config\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>",
+    "message": "chore: add README and dependabot config",
     "timestamp": "2026-07-12T22:36:20Z",
     "author": {
       "name": "Miguel Cardoso",

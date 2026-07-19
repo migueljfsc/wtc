@@ -120,7 +120,7 @@ func TestGoldenHealthDegraded(t *testing.T) {
 	}
 	// The degraded body carries the previous completed sync's startedAt
 	// (10:18:53), so it keys onto THAT operation's row and upserts it in
-	// place per the operator decision — no separate alert row.
+	// place — no separate alert row.
 	if ev.DedupKey != "argocd:demo-api-staging:"+fixtureSha+":2026-07-16T10:18:53Z" {
 		t.Errorf("dedup = %q", ev.DedupKey)
 	}
@@ -185,7 +185,7 @@ func defaultArgoRules(t *testing.T) *normalize.Engine {
 
 // TestEnvInferenceMatrix drives the shipped default rules with the captured
 // fixtures: one tier per fixture, plus the precedence collision and the
-// unmatched → env="" contract (trap #2: never guess).
+// unmatched → env="" contract (never guess).
 func TestEnvInferenceMatrix(t *testing.T) {
 	eng := defaultArgoRules(t)
 
@@ -255,8 +255,8 @@ func TestEnvInferenceMatrix(t *testing.T) {
 }
 
 // TestOneOperationOneRow: within a single sync operation (same startedAt),
-// the Running→Succeeded transition shares the row key (upserts in place,
-// trap #5) while the suppression keys differ so the transition is not shed.
+// the Running→Succeeded transition shares the row key (upserts in place)
+// while the suppression keys differ so the transition is not shed.
 // The captured running/succeeded fixtures are from different operations, so
 // the running leg is derived from the succeeded fixture (fixture-mutation
 // precedent: flux TestProgressingDropped).

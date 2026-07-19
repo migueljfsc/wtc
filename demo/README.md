@@ -2,8 +2,8 @@
 
 Three dummy microservices (`api`, `web`, `worker`) whose only job is to
 generate real change events for wtc, continuously. This is the live test bed
-that validated Phase 3: a real promotion PR was traced by `wtc where` from
-build → merge → reconcile across three envs with 37s lag.
+that exercises wtc end-to-end: a real promotion PR traced by `wtc where` from
+build → merge → reconcile across three envs.
 
 Each service is shaped like a production microservice: its own Go module
 (invisible to the root build), its own commitizen version lifecycle

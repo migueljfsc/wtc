@@ -117,7 +117,7 @@ func TestGoldenWorkflowRuns(t *testing.T) {
 	}
 
 	// queued and in_progress share the dedup key with each other AND with
-	// the eventual completed event — one row per attempt (trap #5).
+	// the eventual completed event — one row per attempt.
 	var q, p restWorkflowRun
 	loadFixture(t, "workflow_run_queued.json", &q)
 	loadFixture(t, "workflow_run_in_progress.json", &p)

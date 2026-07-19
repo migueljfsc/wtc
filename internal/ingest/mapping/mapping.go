@@ -1,4 +1,4 @@
-// Package mapping implements the config-declared "mapping webhook" (P14):
+// Package mapping implements the config-declared "mapping webhook":
 // POST /ingest/webhook/<name> where an operator turns any tool that emits JSON
 // into a wtc source through configuration, not code. A Webhook declares auth, a
 // payload→Event field mapping (go-templates over the parsed JSON body — the

@@ -1,6 +1,6 @@
 # wtc — Technical Specification (v1)
 
-Lives at `docs/SPEC.md`. Authoritative for schema, config, API, and query semantics. Change via PR only.
+Authoritative for schema, config, API, and query semantics.
 
 ## 1. Event model
 
@@ -38,7 +38,7 @@ CREATE INDEX idx_events_kind_ts    ON events(kind, ts);
 
 Full-text search: FTS5 external-content table over `(title, service, actor, artifact)` maintained by triggers; backs `wtc log -q <text>`.
 
-Upsert rule: `INSERT ... ON CONFLICT(dedup_key) DO UPDATE` — only when the incoming status **strictly outranks** the stored one (`unknown < started < succeeded|failed < degraded`; equal rank never overwrites, so a stale terminal replay cannot flip `succeeded↔failed` or move `ts` backward). `degraded` (argocd on-health-degraded, P11) outranks the terminal pair by design: a health regression is observed AFTER the sync operation's row already completed and must win the upsert; a fix arrives as a new revision (or a retry — a new operation, hence a new row), so recovery stays visible. On update: `status`, `ts`, `title` always; `duration_ms`, `payload`, `url`, and identity fields (`env`, `cluster`, `namespace`, `service`, `repo`, `actor`, `ref`, `artifact`) follow **non-empty-wins merge** — a later event enriches the row but never blanks what an earlier event recorded. `kind` and `source` are set by the first event and never updated.
+Upsert rule: `INSERT ... ON CONFLICT(dedup_key) DO UPDATE` — only when the incoming status **strictly outranks** the stored one (`unknown < started < succeeded|failed < degraded`; equal rank never overwrites, so a stale terminal replay cannot flip `succeeded↔failed` or move `ts` backward). `degraded` (argocd on-health-degraded) outranks the terminal pair by design: a health regression is observed AFTER the sync operation's row already completed and must win the upsert; a fix arrives as a new revision (or a retry — a new operation, hence a new row), so recovery stays visible. On update: `status`, `ts`, `title` always; `duration_ms`, `payload`, `url`, and identity fields (`env`, `cluster`, `namespace`, `service`, `repo`, `actor`, `ref`, `artifact`) follow **non-empty-wins merge** — a later event enriches the row but never blanks what an earlier event recorded. `kind` and `source` are set by the first event and never updated.
 
 ### kind semantics
 
@@ -51,7 +51,7 @@ Upsert rule: `INSERT ... ON CONFLICT(dedup_key) DO UPDATE` — only when the inc
 | config_change | non-image config edit reaching an env | manifests-repo changes not matching a tag bump |
 | infra_change | cloud/infra mutation | `wtc wrap -- terraform apply`; Crossplane-related manifests |
 | rollback | explicit revert | detected revert PRs (phase ≥4) or manual |
-| alert | monitoring signal (correlation only) | Alertmanager webhook (phase 5) |
+| alert | monitoring signal (correlation only) | Alertmanager webhook |
 | manual | anything a human records | `wtc record` |
 
 ### dedup_key derivation (stable, source-side)
@@ -59,11 +59,11 @@ Upsert rule: `INSERT ... ON CONFLICT(dedup_key) DO UPDATE` — only when the inc
 - github workflow_run → `gh:run:<repo>:<run_id>:<run_attempt>`
 - github pull_request merged → `gh:pr:<repo>:<number>:merged`
 - github push → `gh:push:<repo>:<after_sha>`
-- gitlab pipeline → `gl:pipeline:<project>:<pipeline_id>` — the pipeline id is stable across queued→running→completed, so one row is upserted through the lifecycle (trap #5). A *retried* pipeline gets a new id from GitLab and is a truthful second row (a job-retry keeps the id and upserts the one row). `<project>` is the `path_with_namespace`.
+- gitlab pipeline → `gl:pipeline:<project>:<pipeline_id>` — the pipeline id is stable across queued→running→completed, so one row is upserted through the lifecycle. A *retried* pipeline gets a new id from GitLab and is a truthful second row (a job-retry keeps the id and upserts the one row). `<project>` is the `path_with_namespace`.
 - gitlab merge_request merged → `gl:mr:<project>:<iid>:merged`
 - gitlab push → `gl:push:<project>:<commit_sha>` — one event per commit, so a push webhook and the poller's commit list coalesce on the same key.
 - flux → `flux:<cluster>:<kind>/<ns>/<name>:<revision>:<reason>`
-- argocd → `argocd:<app>:<revision>:<startedAt>` (RFC3339 UTC) — one row per sync **operation**, which is trap #5's "logical change" for Argo: a retry of the same revision IS a new change and the ledger shows both attempts. Keying on (app, revision) alone freezes rows — a Failed sync followed by a Succeeded retry of the same revision can never update (equal terminal ranks never overwrite; found live). Within one operation startedAt is constant, so Running→Succeeded/Error still upserts a single row; health-degraded carries the previous operation's startedAt and lands on that row. A zero startedAt (pre-first-sync health events) omits the segment. The suppression-window key appends `:<phase|Degraded>`; the window plus Argo's own trigger-hash gating (`notified.notifications.argoproj.io` annotation) bound beyond-window resync rows.
+- argocd → `argocd:<app>:<revision>:<startedAt>` (RFC3339 UTC) — one row per sync **operation**, which is the "logical change" for Argo: a retry of the same revision IS a new change and the ledger shows both attempts. Keying on (app, revision) alone freezes rows — a Failed sync followed by a Succeeded retry of the same revision can never update (equal terminal ranks never overwrite; found live). Within one operation startedAt is constant, so Running→Succeeded/Error still upserts a single row; health-degraded carries the previous operation's startedAt and lands on that row. A zero startedAt (pre-first-sync health events) omits the segment. The suppression-window key appends `:<phase|Degraded>`; the window plus Argo's own trigger-hash gating (`notified.notifications.argoproj.io` annotation) bound beyond-window resync rows.
 - wrap/record → `local:<ulid>` generated at start, reused for the completion update (a `wtc record` retry without an explicit `--dedup-key` is a NEW event)
 - alertmanager → `am:<fingerprint>:<startsAt>`
 
@@ -93,7 +93,7 @@ sources:
       - org/app-web
     infra_path: infrastructure/          # per-repo manifests dir (microservices layout)
 
-  gitlab:                                # SCM/CI-axis peer of github (P12)
+  gitlab:                                # SCM/CI-axis peer of github
     base_url: https://gitlab.com         # instance root; set for self-managed GitLab
     webhook_secret: ${WTC_GITLAB_WEBHOOK_SECRET}  # static X-Gitlab-Token (GitLab can't HMAC-sign bodies) — same shape as argocd
     api_token: ${WTC_GITLAB_API_TOKEN}   # PRIVATE-TOKEN; enables the poller (primary when private) + MR-diff enrichment
@@ -132,7 +132,7 @@ rules:                                   # ordered; see §3
     set:   { env: dev, service: "{{ trimPrefix .Repo \"org/\" }}" }
   - match: { source: flux, object_kind: HelmRelease }
     set:   { service: "{{ .ObjectName }}" }
-  # ArgoCD (P11): env label > destination namespace > app-name suffix — NEVER
+  # ArgoCD: env label > destination namespace > app-name suffix — NEVER
   # cluster=env (one Argo instance manages many clusters; destServer is a URL).
   - match: { source: argocd }
     set:   { env: "{{ .EnvLabel }}" }    # no label → empty render → tier falls through
@@ -156,7 +156,7 @@ retention:
   ephemeral_env_pattern: "pr-*"
   ephemeral_keep: 30d
 
-digest:                                  # optional serve-side Slack digest (phase 5)
+digest:                                  # optional serve-side Slack digest
   interval: 24h                          # 0/unset disables
   window: 24h                            # lookback per digest (default = interval)
   slack_webhook: ${WTC_SLACK_WEBHOOK}
@@ -220,7 +220,7 @@ title/service/actor/artifact; `actor=` is an exact-match facet. Stats windows
 are inclusive of `until`. Cross-origin access for a separately-served portal is
 off by default (`server.cors.allowed_origins`, §2).
 
-**Editable config (P10).** `rules` and `tag_patterns` may be edited from the
+**Editable config.** `rules` and `tag_patterns` may be edited from the
 portal. Edits are validated (compiled), persisted to a `config_overrides` DB
 table, and hot-reloaded by atomically swapping the engine/resolver — every
 ingest path (webhook handlers + poller) re-routes at once, no restart, and it
@@ -271,7 +271,7 @@ Output: staged tree grouped BUILD → per-env (INTENT ts, APPLIED ts/status), wi
 Per service present in either env: latest `deploy` with status=succeeded in each; compare `artifact` (fallback `ref`). Columns: service, a-artifact, b-artifact, drift age (ts delta), last actor. Flag services deployed in exactly one env. Explicit caveat in output when an env's latest deploy lacks artifact data ("revision-only comparison").
 
 ### `wtc handoff --since 7d`
-Digest: deploys per env (count, failures list), infra_changes, rollbacks, unmapped-event count, top actors, first-seen services, alerts (once phase 5). Markdown to stdout (pipeable to Slack later).
+Digest: deploys per env (count, failures list), infra_changes, rollbacks, unmapped-event count, top actors, first-seen services, alerts. Markdown to stdout (pipeable to Slack later).
 
 ### `wtc doctor`
 Per source: last event age, 24h counts, dedup-drop counts, unmapped (`env=""`) counts with 3 sample titles, clock-skew flags, db size, retention stats. Exit non-zero if any source silent > threshold.
@@ -282,11 +282,11 @@ Per source: last event age, 24h counts, dedup-drop counts, unmapped (`env=""`) c
 
 **PR-diff enrichment.** On merged PRs touching `infra_path`: fetch changed files, extract image-tag bumps via configurable regexes (defaults: `tag:\s*["']?(?P<new>\S+)` on YAML, `newTag:\s*(?P<new>\S+)` for kustomize), store old→new tags in payload. This creates the tag↔manifest-revision link that `where` step 2/3 depends on. Diff bodies beyond matched lines are not stored.
 
-**Webhook parity (P13).** `/ingest/github` normalizes `workflow_run`/`push`/`pull_request` deliveries through the *same* normalizers as the poller — the nested resource objects are field-identical to the REST structs — so both modes converge on identical Events + dedup keys. Webhook and poller are peer modes: run the webhook for latency and the poller as the idempotent loss-recovery sweeper, or either alone (posture is per-installation; see docs/setup/onboarding.md). Auth is `X-Hub-Signature-256` (HMAC-SHA256 over the raw body), constant-time.
+**Webhook parity.** `/ingest/github` normalizes `workflow_run`/`push`/`pull_request` deliveries through the *same* normalizers as the poller — the nested resource objects are field-identical to the REST structs — so both modes converge on identical Events + dedup keys. Webhook and poller are peer modes: run the webhook for latency and the poller as the idempotent loss-recovery sweeper, or either alone (posture is per-installation; see docs/setup/onboarding.md). Auth is `X-Hub-Signature-256` (HMAC-SHA256 over the raw body), constant-time.
 
 ### 7a. GitLab API integration (requires `sources.gitlab.api_token`)
 
-Parity with the GitHub poller on the SCM/CI axis (P12). Every `poll_interval`, for each configured project (`group/service` path): list pipelines, merged MRs, and default-branch commits since the per-project high-water mark; normalize through the same parsers + rules pipeline as the `/ingest/gitlab` webhook, so the two modes converge on identical Events + dedup keys and the poller doubles as the webhook-loss sweeper. First run backfills 24h; each poll re-reads a 1h overlap. Pipeline list items are sparse, so each in-window pipeline gets one detail fetch (finished_at/duration/actor). Auth is `PRIVATE-TOKEN`; `base_url` targets self-managed instances. **MR-diff enrichment** uses the MR *changes* API (same bump regexes as GitHub) to attach real paths + image bumps to the merge event.
+Parity with the GitHub poller on the SCM/CI axis. Every `poll_interval`, for each configured project (`group/service` path): list pipelines, merged MRs, and default-branch commits since the per-project high-water mark; normalize through the same parsers + rules pipeline as the `/ingest/gitlab` webhook, so the two modes converge on identical Events + dedup keys and the poller doubles as the webhook-loss sweeper. First run backfills 24h; each poll re-reads a 1h overlap. Pipeline list items are sparse, so each in-window pipeline gets one detail fetch (finished_at/duration/actor). Auth is `PRIVATE-TOKEN`; `base_url` targets self-managed instances. **MR-diff enrichment** uses the MR *changes* API (same bump regexes as GitHub) to attach real paths + image bumps to the merge event.
 
 ## 8. Retention
 

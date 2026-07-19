@@ -164,7 +164,7 @@ func TestUpsertMergePreservesPayload(t *testing.T) {
 	}
 
 	// Completion carries no payload: the artifact list must survive (the
-	// tag↔sha join for `wtc where` depends on it — CLAUDE.md trap #8).
+	// tag↔sha join for `wtc where` depends on it).
 	completed := testEvent("gh:run:org/app:2:1", base.Add(time.Minute), func(e *model.Event) {
 		e.Status = model.StatusSucceeded
 	})
@@ -480,7 +480,7 @@ func TestMigrationsIdempotent(t *testing.T) {
 	}
 }
 
-// TestNotifyFuncTransitions exercises the P21 hook contract: fire on new rows
+// TestNotifyFuncTransitions exercises the notify hook contract: fire on new rows
 // and status-changing upserts with the post-merge row; stay silent on
 // rank-suppressed redeliveries.
 func TestNotifyFuncTransitions(t *testing.T) {

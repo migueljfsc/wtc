@@ -15,7 +15,7 @@ var DefaultTagPatterns = []string{
 
 // TagResolver extracts git shas from image tags via an ordered pattern list.
 // This is the tag↔sha join `wtc where` traverses — configurable so no single
-// tagging convention is hardcoded (CLAUDE.md trap #8).
+// tagging convention is hardcoded.
 type TagResolver struct {
 	patterns []*regexp.Regexp
 }

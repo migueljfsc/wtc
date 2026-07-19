@@ -17,7 +17,7 @@ import (
 )
 
 // TestNotifyE2E replays a deploy lifecycle through the full HTTP surface with
-// the P21 dispatcher wired the way serve.go wires it, and asserts the accept
+// the notification dispatcher wired the way serve.go wires it, and asserts the accept
 // criteria: a `status: failed` subscription fires when the row UPSERTS to
 // failed (not on the started row), exactly once even when the failed payload
 // is redelivered.

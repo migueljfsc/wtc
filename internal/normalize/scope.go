@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Poller scope-glob helpers (P18). They live next to CompileGlob because they
+// Poller scope-glob helpers. They live next to CompileGlob because they
 // are the same dialect: `*` matches one path segment, `**` any depth. Both
 // pollers and config validation share these — one glob behavior product-wide.
 

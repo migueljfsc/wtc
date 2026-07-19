@@ -12,7 +12,7 @@ import (
 )
 
 // TestMetricsRequiresAuth: /metrics leaks source names and activity levels, so
-// it must be bearer-authed on the main listener (P13 posture).
+// it must be bearer-authed on the main listener (public-reachable posture).
 func TestMetricsRequiresAuth(t *testing.T) {
 	ts := newTestServer(t)
 	resp, _ := doRequest(t, http.MethodGet, ts.URL+"/metrics", "", nil)
@@ -21,7 +21,7 @@ func TestMetricsRequiresAuth(t *testing.T) {
 	}
 }
 
-// TestMetricsIngestCounters is the P16 accept criterion: N events ingested →
+// TestMetricsIngestCounters is the accept criterion: N events ingested →
 // counter moves by N; replaying them → the deduped counter moves instead.
 // Counters are process-global (shared across tests), so every assertion is a
 // delta.

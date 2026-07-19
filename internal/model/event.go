@@ -30,8 +30,8 @@ var validSources = map[Source]bool{
 	SourceTerraform: true, SourceManual: true, SourceGeneric: true, SourceAlertmanager: true,
 }
 
-// registeredSources holds operator-declared mapping-webhook source names
-// (P14). Each configured `sources.webhooks[].name` becomes a first-class source
+// registeredSources holds operator-declared mapping-webhook source names.
+// Each configured `sources.webhooks[].name` becomes a first-class source
 // so it appears under its real name in `wtc log --source <name>`, facets, and
 // doctor per-source health — the vendor-neutral UX. Populated once at config
 // load, before serving; the RWMutex keeps ValidSource race-safe if a future
@@ -153,7 +153,7 @@ type Event struct {
 	DurationMS *int64    `json:"duration_ms,omitempty"`
 	DedupKey   string    `json:"dedup_key"`
 	Payload    string    `json:"payload,omitempty"` // redacted raw JSON
-	Facts      string    `json:"facts,omitempty"`   // redacted ingest-time rule facts + pre-rules snapshot (P22 explain); "" = not recorded
+	Facts      string    `json:"facts,omitempty"`   // redacted ingest-time rule facts + pre-rules snapshot (for `wtc explain`); "" = not recorded
 }
 
 // Validate checks the invariants every event must satisfy before storage.

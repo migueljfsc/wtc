@@ -18,7 +18,7 @@ const Mask = "********"
 
 // View is the redacted, operator-facing snapshot of the effective config
 // (post ${VAR} expansion and WTC_* overrides), served by /api/v1/config and
-// rendered by the portal Configuration tab and `wtc config` (P17).
+// rendered by the portal Configuration tab and `wtc config`.
 //
 // SECURITY INVARIANT: this is an ALLOWLIST — every field is copied
 // individually by NewView, secrets pass through mask(), and config.Config is
@@ -119,9 +119,9 @@ type ScopeView struct {
 	Deny  []normalize.ScopeMatch `json:"deny"`
 }
 
-// WebhookView is one mapping webhook (P14). Templates are shown in full
-// (operator decision 2026-07-18) — they are operator-authored config-as-code,
-// the same exposure class as rules. Only the auth secret is masked.
+// WebhookView is one mapping webhook. Templates are shown in full — they are
+// operator-authored config-as-code, the same exposure class as rules. Only the
+// auth secret is masked.
 type WebhookView struct {
 	Name     string            `json:"name"`
 	Preset   string            `json:"preset,omitempty"`
@@ -160,12 +160,12 @@ type RetentionView struct {
 }
 
 // MetricsView shows whether the separate unauthenticated metrics listener
-// (P16) is open; the address is topology, not a secret.
+// is open; the address is topology, not a secret.
 type MetricsView struct {
 	Listen string `json:"listen"`
 }
 
-// NotificationView is one P21 subscription. The match is operator-authored
+// NotificationView is one notification subscription. The match is operator-authored
 // config-as-code (shown in full, same exposure class as rules); the sink URL
 // and token are ALWAYS masked — a Slack incoming-webhook URL is
 // capability-bearing and webhook URLs may embed credentials, so the view

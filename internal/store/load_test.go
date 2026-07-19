@@ -10,7 +10,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/model"
 )
 
-// TestLoadSanity is the P6 load check: with 10k events on disk, the queries
+// TestLoadSanity is the load check: with 10k events on disk, the queries
 // behind `wtc log` and `wtc diff` must stay well under the 100ms SPEC budget.
 // We take the median of several runs so one GC pause can't flake the gate.
 func TestLoadSanity(t *testing.T) {

@@ -1,4 +1,4 @@
-# Notifications — push, don't just store (P21)
+# Notifications — push, don't just store
 
 wtc can push change events out as they land: one subscription engine, three
 sink types, plus a pull-based Atom feed. Notifications fire on **new events**
