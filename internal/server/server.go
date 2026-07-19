@@ -173,6 +173,10 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 	s.mux.Handle("GET /", http.FileServerFS(web.FS()))
 
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
+	// Atom feed (P21): pull-based awareness for feed readers. Not under
+	// /api (XML, not part of the JSON contract); token auth inside the
+	// handler — readers can't set headers, so ?token= is accepted too.
+	s.mux.HandleFunc("GET /feed", s.handleFeed)
 	// OpenAPI document for the portal's typed client generator. Public, like
 	// healthz — it describes the (bearer-authed) API but leaks no data.
 	s.mux.HandleFunc("GET /api/openapi.json", s.handleOpenAPI)

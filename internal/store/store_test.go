@@ -479,3 +479,68 @@ func TestMigrationsIdempotent(t *testing.T) {
 		t.Fatalf("got %d events after re-open, want 1", len(events))
 	}
 }
+
+// TestNotifyFuncTransitions exercises the P21 hook contract: fire on new rows
+// and status-changing upserts with the post-merge row; stay silent on
+// rank-suppressed redeliveries.
+func TestNotifyFuncTransitions(t *testing.T) {
+	s := openTestStore(t)
+	ctx := context.Background()
+	base := time.Now().UTC()
+
+	type call struct {
+		ev           model.Event
+		transitioned bool
+	}
+	var calls []call
+	s.SetNotifyFunc(func(ev model.Event, transitioned bool) {
+		calls = append(calls, call{ev: ev, transitioned: transitioned})
+	})
+
+	started := testEvent("gh:run:org/app:9:1", base, func(e *model.Event) {
+		e.Status = model.StatusStarted
+		e.Payload = `{"raw":"body"}`
+	})
+	if _, _, err := s.Ingest(ctx, started); err != nil {
+		t.Fatalf("started: %v", err)
+	}
+	if len(calls) != 1 || calls[0].transitioned {
+		t.Fatalf("after new row: calls=%d transitioned=%v, want 1 new-row call", len(calls), calls[0].transitioned)
+	}
+	if calls[0].ev.Status != model.StatusStarted || calls[0].ev.ID != started.ID {
+		t.Fatalf("new-row call = %+v, want started/%s", calls[0].ev, started.ID)
+	}
+	if calls[0].ev.Payload != "" {
+		t.Fatal("notify payload must be omitted (bounded queue carries no raw bodies)")
+	}
+
+	// Completion transitions the SAME row; it omits env, so the notified
+	// event must carry the merged env from the started row.
+	completed := testEvent("gh:run:org/app:9:1", base.Add(time.Minute), func(e *model.Event) {
+		e.Status = model.StatusFailed
+		e.Env = ""
+	})
+	if _, _, err := s.Ingest(ctx, completed); err != nil {
+		t.Fatalf("completed: %v", err)
+	}
+	if len(calls) != 2 || !calls[1].transitioned {
+		t.Fatalf("after transition: calls=%d, want a transitioned call", len(calls))
+	}
+	if calls[1].ev.Status != model.StatusFailed || calls[1].ev.ID != started.ID {
+		t.Fatalf("transition call = status %s id %s, want failed/%s", calls[1].ev.Status, calls[1].ev.ID, started.ID)
+	}
+	if calls[1].ev.Env != "dev" {
+		t.Fatalf("transition env = %q, want merged %q", calls[1].ev.Env, "dev")
+	}
+
+	// Redelivery of the failed payload: rank-suppressed, must NOT re-notify.
+	redelivered := testEvent("gh:run:org/app:9:1", base.Add(time.Minute), func(e *model.Event) {
+		e.Status = model.StatusFailed
+	})
+	if _, deduped, err := s.Ingest(ctx, redelivered); err != nil || !deduped {
+		t.Fatalf("redelivery: err=%v deduped=%v", err, deduped)
+	}
+	if len(calls) != 2 {
+		t.Fatalf("redelivery re-notified: %d calls, want 2", len(calls))
+	}
+}

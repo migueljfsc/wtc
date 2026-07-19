@@ -20,6 +20,7 @@ import (
 	"github.com/migueljfsc/wtc/internal/metrics"
 	"github.com/migueljfsc/wtc/internal/model"
 	"github.com/migueljfsc/wtc/internal/normalize"
+	"github.com/migueljfsc/wtc/internal/notify"
 	"github.com/migueljfsc/wtc/internal/server"
 	"github.com/migueljfsc/wtc/internal/store"
 )
@@ -150,6 +151,19 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Notification dispatcher (P21) — nil when no notifications configured.
+	// Wired before the listener and pollers start so no ingest can slip past
+	// the hook; Enqueue is non-blocking (bounded queue, dropped counter).
+	subs, err := notify.Compile(cfg.Notifications) // validated at config.Load; cannot fail here
+	if err != nil {
+		_ = st.Close()
+		return fmt.Errorf("notifications: %w", err)
+	}
+	if d := notify.NewDispatcher(subs, log); d != nil {
+		st.SetNotifyFunc(d.Enqueue)
+		go d.Run(ctx)
+	}
 
 	// GitHub API poller — primary GitHub ingest for private deployments.
 	// repos may be empty — the poller then auto-discovers every repo the token

@@ -42,6 +42,14 @@ type Store struct {
 	idByDedupStmt *sql.Stmt
 
 	broadcast *broadcaster // fans newly-stored events to SSE subscribers
+
+	// notifyFn, when set, is called from the Ingest funnel for every stored
+	// NEW row and every status-changing upsert (P21) — never for a
+	// rank-suppressed redelivery, which is what makes notifications naturally
+	// idempotent on (event id, status). It receives the post-merge row
+	// (payload/facts omitted) and must not block: the dispatcher behind it
+	// owns a bounded queue. Set via SetNotifyFunc before serving starts.
+	notifyFn func(ev model.Event, transitioned bool)
 }
 
 type writeReq struct {
@@ -52,7 +60,16 @@ type writeReq struct {
 type writeResp struct {
 	id      string
 	deduped bool
-	err     error
+	// transitioned is true when the upsert's UPDATE arm applied to an existing
+	// row. The rank guard makes that equivalent to "status changed": an update
+	// runs only on a strict rank increase, and equal statuses have equal rank.
+	transitioned bool
+	// merged is the post-upsert row (payload/facts omitted) — identity fields
+	// follow the non-empty-wins merge, so subscribers match what the ledger
+	// now says, not just what the triggering delivery carried. Valid only when
+	// the statement returned a row (new insert or applied update).
+	merged model.Event
+	err    error
 }
 
 func dsn(path string, readOnly bool) string {
@@ -103,7 +120,8 @@ ON CONFLICT(dedup_key) DO UPDATE SET
   ref         = coalesce(nullif(excluded.ref, ''), events.ref),
   artifact    = coalesce(nullif(excluded.artifact, ''), events.artifact)
 WHERE ? > (CASE events.status WHEN 'degraded' THEN 3 WHEN 'succeeded' THEN 2 WHEN 'failed' THEN 2 WHEN 'started' THEN 1 ELSE 0 END)
-RETURNING id`
+RETURNING id, ts, ingested_at, source, kind, status, env, cluster, namespace,
+          service, repo, actor, ref, artifact, title, url, duration_ms, dedup_key`
 
 // Open opens (creating if needed) the SQLite database at path, applies
 // pragmas and migrations, prepares the hot-path statements, and starts the
@@ -205,11 +223,17 @@ func (s *Store) Close() error {
 	return nil
 }
 
+// SetNotifyFunc installs the P21 notification hook. Call before any Ingest
+// runs (serve.go wires it ahead of the HTTP listener and pollers); fn must be
+// non-blocking. A nil fn disables notifications.
+func (s *Store) SetNotifyFunc(fn func(ev model.Event, transitioned bool)) {
+	s.notifyFn = fn
+}
+
 func (s *Store) writer() {
 	defer s.wg.Done()
 	for req := range s.writeCh {
-		id, deduped, err := s.upsert(req.ev)
-		req.resp <- writeResp{id: id, deduped: deduped, err: err}
+		req.resp <- s.upsert(req.ev)
 	}
 }
 
@@ -253,13 +277,18 @@ func (s *Store) Ingest(ctx context.Context, ev *model.Event) (id string, deduped
 				metrics.Ingested.WithLabelValues(string(ev.Source)).Inc()
 			}
 		}
+		// P21 awareness hook: new rows and status transitions only — a
+		// rank-suppressed redelivery (deduped, no update) never re-notifies.
+		if r.err == nil && s.notifyFn != nil && (!r.deduped || r.transitioned) {
+			s.notifyFn(r.merged, r.transitioned)
+		}
 		return r.id, r.deduped, r.err
 	case <-ctx.Done():
 		return "", false, fmt.Errorf("ingest wait: %w", ctx.Err())
 	}
 }
 
-func (s *Store) upsert(ev *model.Event) (string, bool, error) {
+func (s *Store) upsert(ev *model.Event) writeResp {
 	var payload, facts any
 	if ev.Payload != "" {
 		payload = ev.Payload
@@ -268,7 +297,11 @@ func (s *Store) upsert(ev *model.Event) (string, bool, error) {
 		facts = ev.Facts
 	}
 
-	var storedID string
+	var (
+		merged         model.Event
+		ts, ingestedAt string
+		durationMS     sql.NullInt64
+	)
 	err := s.upsertStmt.QueryRow(
 		ev.ID, model.FormatTS(ev.TS), model.FormatTS(ev.IngestedAt),
 		string(ev.Source), string(ev.Kind), string(ev.Status),
@@ -276,19 +309,35 @@ func (s *Store) upsert(ev *model.Event) (string, bool, error) {
 		ev.Ref, ev.Artifact, ev.Title, ev.URL,
 		ev.DurationMS, ev.DedupKey, payload, facts,
 		model.StatusRank(ev.Status), // strict-outrank guard on the update arm
-	).Scan(&storedID)
+	).Scan(
+		&merged.ID, &ts, &ingestedAt, &merged.Source, &merged.Kind, &merged.Status,
+		&merged.Env, &merged.Cluster, &merged.Namespace, &merged.Service,
+		&merged.Repo, &merged.Actor, &merged.Ref, &merged.Artifact,
+		&merged.Title, &merged.URL, &durationMS, &merged.DedupKey,
+	)
 
 	switch {
 	case err == nil:
-		return storedID, storedID != ev.ID, nil
+		if merged.TS, err = model.ParseTS(ts); err != nil {
+			return writeResp{err: err}
+		}
+		if merged.IngestedAt, err = model.ParseTS(ingestedAt); err != nil {
+			return writeResp{err: err}
+		}
+		if durationMS.Valid {
+			merged.DurationMS = &durationMS.Int64
+		}
+		deduped := merged.ID != ev.ID
+		return writeResp{id: merged.ID, deduped: deduped, transitioned: deduped, merged: merged}
 	case errors.Is(err, sql.ErrNoRows):
 		// Conflict, and the rank guard suppressed the update: the stored row
 		// is authoritative. Fetch its id to report the dedup.
+		var storedID string
 		if err := s.idByDedupStmt.QueryRow(ev.DedupKey).Scan(&storedID); err != nil {
-			return "", false, fmt.Errorf("read back event id: %w", err)
+			return writeResp{err: fmt.Errorf("read back event id: %w", err)}
 		}
-		return storedID, true, nil
+		return writeResp{id: storedID, deduped: true}
 	default:
-		return "", false, fmt.Errorf("upsert event: %w", err)
+		return writeResp{err: fmt.Errorf("upsert event: %w", err)}
 	}
 }

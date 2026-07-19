@@ -61,6 +61,17 @@ rules:
 #metrics:
 #  listen: ":9091"
 
+# Notifications (P21) — push events matching a glob filter to a sink; fires on
+# new events AND status transitions (started→failed fires `status: failed`).
+# See docs/setup/notifications.md. Pull-based alternative: GET /feed (Atom).
+#notifications:
+#  - name: failures
+#    match: { status: failed }
+#    sink:  { type: slack, url: "${WTC_NOTIFY_SLACK}" }
+#  - name: grafana-overlay
+#    match: { kind: deploy }
+#    sink:  { type: grafana-annotation, url: "http://localhost:3300", token: "${WTC_GRAFANA_SA_TOKEN}" }
+
 # Try it without wiring anything real:
 #   wtc demo            # seeds a synthetic week via /ingest/generic
 #   wtc log --since 7d ; wtc diff staging prod

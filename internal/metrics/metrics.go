@@ -62,6 +62,29 @@ var (
 		Help: "Mapping-webhook template/normalization failures, by source.",
 	}, []string{"source"})
 
+	// NotifySent counts notification deliveries accepted by a sink (P21), by
+	// subscription name and sink type.
+	NotifySent = factory.NewCounterVec(prometheus.CounterOpts{
+		Name: "wtc_notify_sent_total",
+		Help: "Notification deliveries accepted by the sink, by subscription and sink type.",
+	}, []string{"notification", "sink"})
+
+	// NotifyFailed counts failed delivery ATTEMPTS (each retry that fails
+	// increments); a delivery that eventually succeeds still leaves its failed
+	// attempts counted. Alert on sustained rate, not any single increment.
+	NotifyFailed = factory.NewCounterVec(prometheus.CounterOpts{
+		Name: "wtc_notify_failed_total",
+		Help: "Failed notification delivery attempts, by subscription and sink type.",
+	}, []string{"notification", "sink"})
+
+	// NotifyDropped counts deliveries abandoned entirely — queue_full (bounded
+	// queue overflow at enqueue) or retries_exhausted. Any increase means a
+	// notification the operator subscribed to was lost.
+	NotifyDropped = factory.NewCounterVec(prometheus.CounterOpts{
+		Name: "wtc_notify_dropped_total",
+		Help: "Notification deliveries dropped (queue_full | retries_exhausted), by subscription and sink type.",
+	}, []string{"notification", "sink", "reason"})
+
 	// PollLastSuccess is the unix time of the last successful poll per
 	// (source, repo, resource). Lag is derived in PromQL:
 	// time() - wtc_poll_last_success_timestamp_seconds.

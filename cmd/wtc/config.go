@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/migueljfsc/wtc/internal/config"
+	"github.com/migueljfsc/wtc/internal/notify"
 )
 
 // newConfigCmd shows the server's effective configuration (P17): which ingest
@@ -85,6 +86,14 @@ func newConfigCmd(flags *clientFlags) *cobra.Command {
 			} else {
 				_, _ = fmt.Fprintln(out, "retention      off (nothing is pruned)")
 			}
+			if len(r.Notifications) == 0 {
+				_, _ = fmt.Fprintln(out, "notifications  off")
+			} else {
+				_, _ = fmt.Fprintf(out, "notifications  %d subscription(s)\n", len(r.Notifications))
+				for _, n := range r.Notifications {
+					_, _ = fmt.Fprintf(out, "  %s: %s → %s\n", n.Name, matchSummary(n.Match), n.Sink.Type)
+				}
+			}
 			return nil
 		},
 	}
@@ -151,6 +160,24 @@ func gitlabDetails(gl config.GitLabView) string {
 		d += " · " + gl.BaseURL
 	}
 	return d
+}
+
+// matchSummary renders a notification match as "field=glob" pairs; an empty
+// match subscribes to everything.
+func matchSummary(m notify.Match) string {
+	var parts []string
+	for _, p := range []struct{ k, v string }{
+		{"env", m.Env}, {"service", m.Service}, {"repo", m.Repo},
+		{"kind", m.Kind}, {"status", m.Status},
+	} {
+		if p.v != "" {
+			parts = append(parts, p.k+"="+p.v)
+		}
+	}
+	if len(parts) == 0 {
+		return "(all events)"
+	}
+	return strings.Join(parts, " ")
 }
 
 // overridden marks a normalization part that comes from a DB override.

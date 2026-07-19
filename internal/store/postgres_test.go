@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -363,4 +364,47 @@ func TestPGMigrateLedger(t *testing.T) {
 // filterKey builds distinct dedup keys in loops.
 func filterKey(prefix string, i int) string {
 	return prefix + ":" + string(rune('a'+i))
+}
+
+// TestPGNotifyFuncTransitions is the postgres parity check for the P21 hook:
+// the multi-column RETURNING (merged row) and transition detection must
+// behave identically to sqlite.
+func TestPGNotifyFuncTransitions(t *testing.T) {
+	s := openTestPG(t)
+	ctx := context.Background()
+	base := time.Now().UTC()
+
+	var events []model.Event
+	var transitions []bool
+	s.SetNotifyFunc(func(ev model.Event, transitioned bool) {
+		events = append(events, ev)
+		transitions = append(transitions, transitioned)
+	})
+
+	key := fmt.Sprintf("pg:notify:%d", base.UnixNano())
+	started := testEvent(key, base, func(e *model.Event) { e.Status = model.StatusStarted })
+	if _, _, err := s.Ingest(ctx, started); err != nil {
+		t.Fatalf("started: %v", err)
+	}
+	failed := testEvent(key, base.Add(time.Minute), func(e *model.Event) {
+		e.Status = model.StatusFailed
+		e.Env = "" // merged row must carry env from the started row
+	})
+	if _, _, err := s.Ingest(ctx, failed); err != nil {
+		t.Fatalf("failed: %v", err)
+	}
+	redelivered := testEvent(key, base.Add(time.Minute), func(e *model.Event) { e.Status = model.StatusFailed })
+	if _, _, err := s.Ingest(ctx, redelivered); err != nil {
+		t.Fatalf("redelivery: %v", err)
+	}
+
+	if len(events) != 2 {
+		t.Fatalf("notify calls = %d, want 2 (new row + transition, no redelivery)", len(events))
+	}
+	if transitions[0] || !transitions[1] {
+		t.Fatalf("transitions = %v, want [false true]", transitions)
+	}
+	if events[1].Status != model.StatusFailed || events[1].Env != "dev" || events[1].ID != started.ID {
+		t.Fatalf("merged transition event = %+v", events[1])
+	}
 }

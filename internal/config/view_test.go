@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/ingest/mapping"
+	"github.com/migueljfsc/wtc/internal/notify"
 )
 
 // sentinel marks a secret value; if any View JSON ever contains it, a secret
@@ -95,6 +96,22 @@ func fullyPopulatedConfig() *Config {
 			Interval:            Duration(24 * time.Hour),
 		},
 		Metrics: Metrics{Listen: ":9091"},
+		Notifications: []notify.Subscription{
+			{
+				Name:  "prod-deploys",
+				Match: notify.Match{Env: "prod", Kind: "deploy"},
+				Sink:  notify.Sink{Type: "slack", URL: "https://hooks.slack.com/services/" + sentinel + "-notify-slack"},
+			},
+			{
+				Match: notify.Match{Status: "failed"},
+				Sink: notify.Sink{
+					Type:  "grafana-annotation",
+					URL:   "https://grafana.example.com/" + sentinel + "-notify-url",
+					Token: sentinel + "-notify-grafana-token",
+					Tags:  []string{"deploys"},
+				},
+			},
+		},
 	}
 }
 
@@ -193,6 +210,29 @@ func TestViewShape(t *testing.T) {
 	if grafana.Preset != "grafana" || grafana.DedupKey == "" || len(grafana.Mapping) == 0 {
 		t.Errorf("grafana preset not resolved in view: dedup=%q mapping=%v",
 			grafana.DedupKey, grafana.Mapping)
+	}
+
+	// Notifications (P21): match shown in full, sink URL + token always masked,
+	// unnamed entries get the metric-label default name.
+	if len(v.Notifications) != 2 {
+		t.Fatalf("notifications = %d, want 2", len(v.Notifications))
+	}
+	slack := v.Notifications[0]
+	if slack.Name != "prod-deploys" || slack.Match.Env != "prod" || slack.Sink.Type != "slack" {
+		t.Errorf("slack notification view = %+v", slack)
+	}
+	if slack.Sink.URL != Mask {
+		t.Errorf("slack sink url = %q, want mask", slack.Sink.URL)
+	}
+	graf := v.Notifications[1]
+	if graf.Name != "notifications[1]" {
+		t.Errorf("unnamed notification = %q, want notifications[1]", graf.Name)
+	}
+	if graf.Sink.URL != Mask || graf.Sink.Token != Mask {
+		t.Errorf("grafana sink = %+v, want masked url+token", graf.Sink)
+	}
+	if len(graf.Sink.Tags) != 1 || graf.Sink.Tags[0] != "deploys" {
+		t.Errorf("grafana sink tags = %v", graf.Sink.Tags)
 	}
 }
 

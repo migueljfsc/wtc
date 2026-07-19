@@ -8,6 +8,7 @@ import (
 
 	"github.com/migueljfsc/wtc/internal/ingest/mapping"
 	"github.com/migueljfsc/wtc/internal/normalize"
+	"github.com/migueljfsc/wtc/internal/notify"
 )
 
 // Mask is the constant placeholder for every configured secret in a View.
@@ -25,13 +26,14 @@ const Mask = "********"
 // exposed (fail safe). The sentinel test in view_test.go proves no secret
 // value survives into the JSON; extend it when adding any secret field.
 type View struct {
-	Server    ServerView    `json:"server"`
-	Storage   StorageView   `json:"storage"`
-	Auth      AuthView      `json:"auth"`
-	Sources   SourcesView   `json:"sources"`
-	Digest    DigestView    `json:"digest"`
-	Retention RetentionView `json:"retention"`
-	Metrics   MetricsView   `json:"metrics"`
+	Server        ServerView         `json:"server"`
+	Storage       StorageView        `json:"storage"`
+	Auth          AuthView           `json:"auth"`
+	Sources       SourcesView        `json:"sources"`
+	Digest        DigestView         `json:"digest"`
+	Retention     RetentionView      `json:"retention"`
+	Metrics       MetricsView        `json:"metrics"`
+	Notifications []NotificationView `json:"notifications"`
 }
 
 // ServerView is the serve daemon surface. CaptureEnabled is a data-exposure
@@ -163,6 +165,25 @@ type MetricsView struct {
 	Listen string `json:"listen"`
 }
 
+// NotificationView is one P21 subscription. The match is operator-authored
+// config-as-code (shown in full, same exposure class as rules); the sink URL
+// and token are ALWAYS masked — a Slack incoming-webhook URL is
+// capability-bearing and webhook URLs may embed credentials, so the view
+// never distinguishes.
+type NotificationView struct {
+	Name  string               `json:"name"`
+	Match notify.Match         `json:"match"`
+	Sink  NotificationSinkView `json:"sink"`
+}
+
+// NotificationSinkView shows the sink shape with URL and token masked.
+type NotificationSinkView struct {
+	Type  string   `json:"type"`
+	URL   string   `json:"url"`
+	Token string   `json:"token"`
+	Tags  []string `json:"tags,omitempty"`
+}
+
 // scopeView copies the ingest allow/deny lists, normalizing nil to empty so
 // the JSON is always an array. ScopeMatch is a value type, so copy is a deep
 // copy — the view never aliases the loaded config.
@@ -253,9 +274,29 @@ func NewView(cfg *Config) View {
 			},
 			Webhooks: make([]WebhookView, 0, len(cfg.Sources.Webhooks)),
 		},
-		Digest:    digestView(cfg.Digest),
-		Retention: retentionView(cfg.Retention),
-		Metrics:   MetricsView{Listen: cfg.Metrics.Listen},
+		Digest:        digestView(cfg.Digest),
+		Retention:     retentionView(cfg.Retention),
+		Metrics:       MetricsView{Listen: cfg.Metrics.Listen},
+		Notifications: make([]NotificationView, 0, len(cfg.Notifications)),
+	}
+
+	for i, n := range cfg.Notifications {
+		name := n.Name
+		if name == "" {
+			// Mirror notify.Compile's defaulting so the view names match the
+			// wtc_notify_* metric labels.
+			name = fmt.Sprintf("notifications[%d]", i)
+		}
+		v.Notifications = append(v.Notifications, NotificationView{
+			Name:  name,
+			Match: n.Match,
+			Sink: NotificationSinkView{
+				Type:  n.Sink.Type,
+				URL:   mask(n.Sink.URL),
+				Token: mask(n.Sink.Token),
+				Tags:  copyList(n.Sink.Tags),
+			},
+		})
 	}
 
 	for i := range v.Auth.APITokens {

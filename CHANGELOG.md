@@ -4,6 +4,31 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — awareness: notifications + Atom feed (P21)
+
+- **`notifications:` config** — subscriptions over the ledger:
+  `match: {env, service, repo, kind, status}` globs (the `rules[].match`
+  dialect) → `sink: {type: slack | webhook | grafana-annotation}`. Fires on
+  **new events** and on **status transitions** — a deploy's row upserting
+  `started → failed` fires a `status: failed` subscription — and never on a
+  redelivery that changes nothing: the rank-guarded upsert makes
+  (event id, status) naturally idempotent. Matching runs against the
+  post-merge row, so a completion that omits env still matches `env: prod`.
+- **Sinks** — `slack` (mrkdwn line per event), generic `webhook`
+  (JSON `{notification, transition, event}`, optional bearer token), and
+  `grafana-annotation` (POST `/api/annotations` so deploys overlay
+  dashboards; round-trip captured live against Grafana 11.3.0, fixtures in
+  `testdata/grafana/`). Sink URLs/tokens masked in `wtc config`.
+- **Delivery** — bounded queue off the ingest path (ingest never blocks),
+  at-least-once with 4 attempts (1s/4s/16s backoff) then drop;
+  `wtc_notify_{sent,failed,dropped}_total` counters
+  (`reason=queue_full|retries_exhausted`). Best-effort in-memory v1; durable
+  outbox is the documented stretch.
+- **`GET /feed`** — read-only Atom feed for pull-based subscribers
+  (env/service/repo/kind/status/source/limit filters). api_token accepted as
+  `?token=` (feed readers can't set headers); entry ids carry the status so
+  transitions surface as new entries. New `docs/setup/notifications.md`.
+
 ### Added — harden the record: `wtc export` / `wtc backup` / `wtc explain` (P22)
 
 - **`wtc export`** — stream the filtered ledger for audit/analysis ("every

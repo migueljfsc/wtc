@@ -17,6 +17,7 @@ import (
 
 	"github.com/migueljfsc/wtc/internal/ingest/mapping"
 	"github.com/migueljfsc/wtc/internal/normalize"
+	"github.com/migueljfsc/wtc/internal/notify"
 )
 
 // Duration wraps time.Duration with YAML support for "60s"/"10m" strings.
@@ -187,6 +188,10 @@ type Config struct {
 	Digest      Digest           `yaml:"digest"`       // optional scheduled Slack digest
 	Retention   Retention        `yaml:"retention"`    // optional prune job (SPEC §8)
 	Metrics     Metrics          `yaml:"metrics"`      // Prometheus exposition (P16)
+	// Notifications are the P21 outbound subscriptions: glob match over stored
+	// events → sink (slack | webhook | grafana-annotation). Schema lives in
+	// internal/notify (the P14 mapping.Webhook pattern).
+	Notifications []notify.Subscription `yaml:"notifications"`
 }
 
 // Default returns the config used when no file or overrides are present.
@@ -360,6 +365,12 @@ func Load(path string, optional bool) (*Config, error) {
 		if _, ok := normalize.ScopeNamespace(pr); !ok {
 			return nil, fmt.Errorf("config %s: sources.gitlab.projects glob %q needs a static namespace prefix (e.g. my-group/*) — unscoped discovery is not supported on gitlab", path, pr)
 		}
+	}
+
+	// Notifications (P21): compile up front — a bad sink shape or glob must
+	// fail startup, never a delivery.
+	if _, err := notify.Compile(cfg.Notifications); err != nil {
+		return nil, fmt.Errorf("config %s: %w", path, err)
 	}
 
 	// Flux/ArgoCD ingest scope (allow/deny): compile the globs up front so a
