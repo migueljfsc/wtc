@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 import { useWhere } from "@/lib/queries";
@@ -11,7 +11,13 @@ export function Where() {
   const [params, setParams] = useSearchParams();
   const ref = params.get("ref");
   const [input, setInput] = useState(ref ?? "");
-  useEffect(() => setInput(ref ?? ""), [ref]);
+  // Resync the box when the URL ref changes under us (Diff deep-links here).
+  // Adjusting during render rather than in an effect avoids a cascading pass.
+  const [lastRef, setLastRef] = useState(ref);
+  if (ref !== lastRef) {
+    setLastRef(ref);
+    setInput(ref ?? "");
+  }
 
   const where = useWhere(ref);
 
