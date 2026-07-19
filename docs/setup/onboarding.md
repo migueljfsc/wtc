@@ -294,6 +294,23 @@ saved rules are validated and hot-reloaded, and the **next** ingested event is
 routed by them — no restart, and it works even though the chart mounts the
 config read-only (the edit is stored in the DB).
 
+When a value looks wrong (or you're not sure which rule won), ask the event:
+
+```bash
+wtc explain <event-id>        # id from wtc log --json
+#   FIELD    VALUE    ORIGIN
+#   env      dev      rule 0: source=flux cluster=dev
+#   service  podinfo  rule 1: object_kind=Kustomization
+#   kind     deploy   normalizer
+#   actor    -        unmatched
+```
+
+The trace replays the **current** rules over the event's recorded ingest-time
+facts (first-writer-wins, exactly like ingest) — after a rules edit the output
+flags any field where today's rules disagree with the stored row. Events
+ingested before the facts column existed, or via `generic`/`record`/`wrap`
+(which set fields directly), honestly report "facts not recorded".
+
 ## Multi-cluster (cluster-per-env)
 
 The operator model is one cluster per env (`dev`/`staging`/`prod`), wtc deployed
@@ -327,5 +344,7 @@ prod` and the portal's env matrix then compare what's actually running per env.
 - [argocd.md](argocd.md) · [argocd-notifications.yaml](argocd-notifications.yaml)
 - [multi-cluster.md](multi-cluster.md) (one central hub for N clusters)
 - [portal.md](portal.md) (portal deploy + auth) · [deploy.md](deploy.md)
+- [backup.md](backup.md) (snapshots + litestream) · [export.md](export.md)
+  (audit CSV/NDJSON)
 - [retention.md](retention.md) · [alertmanager.md](alertmanager.md) (alert
   correlation) · [slack-digest.md](slack-digest.md)

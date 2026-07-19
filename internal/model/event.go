@@ -153,6 +153,7 @@ type Event struct {
 	DurationMS *int64    `json:"duration_ms,omitempty"`
 	DedupKey   string    `json:"dedup_key"`
 	Payload    string    `json:"payload,omitempty"` // redacted raw JSON
+	Facts      string    `json:"facts,omitempty"`   // redacted ingest-time rule facts + pre-rules snapshot (P22 explain); "" = not recorded
 }
 
 // Validate checks the invariants every event must satisfy before storage.

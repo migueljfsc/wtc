@@ -160,6 +160,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/explain/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Report which rule set each inferred field of an event.
+         * @description Replays the CURRENT rules (DB overrides included) over the event's recorded ingest-time facts with a first-writer-wins trace: per field, the winning rule (index + match spec), 'normalizer' when the source parser pre-filled it, or 'unmatched'. Rows without recorded facts (pre-migration, or generic/record/wrap sources) report facts_recorded=false — never a guess.
+         */
+        get: operations["explain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream the filtered ledger as CSV, NDJSON or a JSON array.
+         * @description Audit/compliance export — 'every prod change in Q3'. Filters mirror /events; ordering is ts DESC. CSV carries the flat columns in a stable append-only order; ndjson and json carry full events including payload and facts. Streams page-by-page, so large ranges never buffer server-side.
+         */
+        get: operations["export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/backup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream a consistent snapshot of the sqlite ledger.
+         * @description A point-in-time VACUUM INTO snapshot taken while serving (WAL-safe, compacted), streamed as a sqlite database file. The postgres backend answers 501 — back it up with pg_dump instead (docs/setup/backup.md).
+         */
+        get: operations["backup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/doctor": {
         parameters: {
             query?: never;
@@ -363,6 +423,8 @@ export interface components {
             dedup_key: string;
             /** @description Redacted raw JSON; may be omitted. */
             payload?: string;
+            /** @description Redacted ingest-time rule facts + pre-rules snapshot (JSON, for /explain); absent when not recorded. */
+            facts?: string;
         };
         EventsResponse: {
             events: components["schemas"]["Event"][];
@@ -395,6 +457,51 @@ export interface components {
             suspects: components["schemas"]["BlastSuspect"][];
             /** @description Explicit caveats — disabled signals, truncation, empty windows. */
             notes?: string[];
+        };
+        FieldTrace: {
+            /** @description env | cluster | namespace | service | kind | actor. */
+            field: string;
+            value?: string;
+            /**
+             * @description rule: a rules-engine entry set it. normalizer: the source parser pre-filled it. unmatched: nothing set it.
+             * @enum {string}
+             */
+            origin: "rule" | "normalizer" | "unmatched";
+            /** @description Zero-based index into the effective rules list; present when origin=rule. */
+            rule_index?: number;
+            /** @description Compact match spec of the winning rule, e.g. 'source=flux namespace=prod-*'. */
+            rule_match?: string;
+        };
+        ExplainReport: {
+            event_id: string;
+            title: string;
+            source: string;
+            /** @description False for rows ingested before the facts migration or via sources that set fields directly; traces are then absent. */
+            facts_recorded: boolean;
+            facts?: components["schemas"]["RuleFacts"];
+            traces?: components["schemas"]["FieldTrace"][];
+            /** @description Caveats — unrecorded facts, rules drift since ingest. */
+            notes?: string[];
+        };
+        /** @description The ingest-time facts the rules engine matched against (recorded, redacted). */
+        RuleFacts: {
+            source?: string;
+            repo?: string;
+            branch?: string;
+            event?: string;
+            workflow?: string;
+            actor?: string;
+            cluster?: string;
+            object_kind?: string;
+            object_name?: string;
+            namespace?: string;
+            reason?: string;
+            project?: string;
+            dest_server?: string;
+            source_path?: string;
+            env_label?: string;
+            paths?: string[];
+            paths_truncated?: boolean;
         };
         WhereEnv: {
             env: string;
@@ -1030,6 +1137,108 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    explain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Inference trace. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExplainReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    export: {
+        parameters: {
+            query?: {
+                /** @description Source(s), comma-separated. */
+                source?: string;
+                /** @description Env(s), comma-separated. */
+                env?: string;
+                /** @description Service(s), comma-separated. */
+                service?: string;
+                /** @description Repo(s), comma-separated. */
+                repo?: string;
+                /** @description Kind(s), comma-separated. */
+                kind?: string;
+                /** @description Status(es), comma-separated. */
+                status?: string;
+                /** @description Actor(s), comma-separated. */
+                actor?: string;
+                /** @description Free-text search over title/service/actor/artifact. */
+                q?: string;
+                /** @description Window start. */
+                since?: string;
+                /** @description Window end. */
+                until?: string;
+                /** @description csv (default), ndjson or json. */
+                format?: "csv" | "ndjson" | "json";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The export stream. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                    "application/x-ndjson": string;
+                    "application/json": components["schemas"]["Event"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    backup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sqlite snapshot. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not supported by the postgres backend. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     doctor: {

@@ -144,6 +144,44 @@ func (c *Client) Blast(ctx context.Context, params url.Values) (query.BlastRepor
 	return out, err
 }
 
+// Explain fetches the per-field inference trace for an event (P22).
+func (c *Client) Explain(ctx context.Context, id string) (server.ExplainReport, error) {
+	var out server.ExplainReport
+	err := c.do(ctx, http.MethodGet, "/api/explain/"+url.PathEscape(id), nil, &out)
+	return out, err
+}
+
+// Download streams a raw GET endpoint (export, backup) into w and returns
+// the bytes written. Unlike do() it uses a client without an overall timeout
+// — a large ledger streams for as long as it needs; cancel via ctx.
+func (c *Client) Download(ctx context.Context, path string, w io.Writer) (int64, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+path, nil)
+	if err != nil {
+		return 0, fmt.Errorf("build request: %w", err)
+	}
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	resp, err := (&http.Client{}).Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("wtc server unreachable at %s: %w", c.base, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode >= 400 {
+		var apiErr server.ErrorResponse
+		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		if json.Unmarshal(data, &apiErr) == nil && apiErr.Error != "" {
+			return 0, fmt.Errorf("server: %s (HTTP %d)", apiErr.Error, resp.StatusCode)
+		}
+		return 0, fmt.Errorf("server: HTTP %d", resp.StatusCode)
+	}
+	n, err := io.Copy(w, resp.Body)
+	if err != nil {
+		return n, fmt.Errorf("stream response: %w", err)
+	}
+	return n, nil
+}
+
 // Handoff fetches the activity digest since the given instant.
 func (c *Client) Handoff(ctx context.Context, since string) (query.HandoffReport, error) {
 	var out query.HandoffReport

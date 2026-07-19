@@ -4,6 +4,33 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — harden the record: `wtc export` / `wtc backup` / `wtc explain` (P22)
+
+- **`wtc export`** — stream the filtered ledger for audit/analysis ("every
+  prod change in Q3"): `--env/--service/--repo/--kind/--status/--source/
+  --since/--until`, formats **csv** (flat columns, stable append-only order),
+  **ndjson** (full events incl. payload + facts) and **json** (array).
+  Streaming `GET /api/export` pages internally — large ranges never buffer.
+- **`wtc backup <path>`** — consistent point-in-time snapshot of the sqlite
+  ledger, taken with `VACUUM INTO` while serving (WAL-safe, compacted),
+  streamed over `GET /api/backup` and written atomically client-side; works
+  against a remote server (the CLI still never opens the DB). Postgres
+  answers 501 — use `pg_dump` (documented). New `docs/setup/backup.md`
+  (cron → object store, litestream sidecar, restore semantics) and
+  `docs/setup/export.md`.
+- **`wtc explain <event-id>`** — which rule set each of
+  env/cluster/namespace/service/kind/actor: a first-writer-wins trace (rule
+  index + match spec, "normalizer", or "unmatched") from replaying the
+  **current** rules over the event's recorded ingest-time facts; divergence
+  from the stored row (rules edited since ingest) is flagged, never hidden.
+- **New `facts` column** (sqlite `0006` / postgres `0005`, nullable):
+  `Engine.Apply` now records the redacted rule facts plus the pre-rules field
+  snapshot on every engine-ingested event — facts are not reconstructible
+  from stored payloads, so this is what makes explain honest. Rows ingested
+  before the migration (or via generic/record/wrap, which never run the
+  engine) report **"facts not recorded"** — no guessing. `wtc migrate`
+  carries the column to postgres.
+
 ### Added — `wtc blast`: incident correlation (P20)
 
 - **`wtc blast <alert-id|ts>`** ranks the changes in the window before an

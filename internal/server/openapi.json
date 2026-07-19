@@ -158,6 +158,65 @@
         }
       }
     },
+    "/api/v1/explain/{id}": {
+      "get": {
+        "operationId": "explain",
+        "summary": "Report which rule set each inferred field of an event.",
+        "description": "Replays the CURRENT rules (DB overrides included) over the event's recorded ingest-time facts with a first-writer-wins trace: per field, the winning rule (index + match spec), 'normalizer' when the source parser pre-filled it, or 'unmatched'. Rows without recorded facts (pre-migration, or generic/record/wrap sources) report facts_recorded=false — never a guess.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "description": "Event id.", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Inference trace.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExplainReport" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/export": {
+      "get": {
+        "operationId": "export",
+        "summary": "Stream the filtered ledger as CSV, NDJSON or a JSON array.",
+        "description": "Audit/compliance export — 'every prod change in Q3'. Filters mirror /events; ordering is ts DESC. CSV carries the flat columns in a stable append-only order; ndjson and json carry full events including payload and facts. Streams page-by-page, so large ranges never buffer server-side.",
+        "parameters": [
+          { "name": "source", "in": "query", "description": "Source(s), comma-separated.", "schema": { "type": "string" } },
+          { "name": "env", "in": "query", "description": "Env(s), comma-separated.", "schema": { "type": "string" } },
+          { "name": "service", "in": "query", "description": "Service(s), comma-separated.", "schema": { "type": "string" } },
+          { "name": "repo", "in": "query", "description": "Repo(s), comma-separated.", "schema": { "type": "string" } },
+          { "name": "kind", "in": "query", "description": "Kind(s), comma-separated.", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "description": "Status(es), comma-separated.", "schema": { "type": "string" } },
+          { "name": "actor", "in": "query", "description": "Actor(s), comma-separated.", "schema": { "type": "string" } },
+          { "name": "q", "in": "query", "description": "Free-text search over title/service/actor/artifact.", "schema": { "type": "string" } },
+          { "name": "since", "in": "query", "description": "Window start.", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "until", "in": "query", "description": "Window end.", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "format", "in": "query", "description": "csv (default), ndjson or json.", "schema": { "type": "string", "enum": ["csv", "ndjson", "json"] } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The export stream.",
+            "content": {
+              "text/csv": { "schema": { "type": "string" } },
+              "application/x-ndjson": { "schema": { "type": "string" } },
+              "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Event" } } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/backup": {
+      "get": {
+        "operationId": "backup",
+        "summary": "Stream a consistent snapshot of the sqlite ledger.",
+        "description": "A point-in-time VACUUM INTO snapshot taken while serving (WAL-safe, compacted), streamed as a sqlite database file. The postgres backend answers 501 — back it up with pg_dump instead (docs/setup/backup.md).",
+        "responses": {
+          "200": { "description": "The sqlite snapshot.", "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "501": { "description": "Not supported by the postgres backend.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
     "/api/v1/doctor": {
       "get": {
         "operationId": "doctor",
@@ -336,7 +395,8 @@
           "url": { "type": "string" },
           "duration_ms": { "type": "integer", "format": "int64", "nullable": true },
           "dedup_key": { "type": "string" },
-          "payload": { "type": "string", "description": "Redacted raw JSON; may be omitted." }
+          "payload": { "type": "string", "description": "Redacted raw JSON; may be omitted." },
+          "facts": { "type": "string", "description": "Redacted ingest-time rule facts + pre-rules snapshot (JSON, for /explain); absent when not recorded." }
         }
       },
       "EventsResponse": {
@@ -368,6 +428,53 @@
           "window_ms": { "type": "integer", "format": "int64" },
           "suspects": { "type": "array", "items": { "$ref": "#/components/schemas/BlastSuspect" }, "description": "Ranked best-first. Always an array, never null." },
           "notes": { "type": "array", "items": { "type": "string" }, "description": "Explicit caveats — disabled signals, truncation, empty windows." }
+        }
+      },
+      "FieldTrace": {
+        "type": "object",
+        "required": ["field", "origin"],
+        "properties": {
+          "field": { "type": "string", "description": "env | cluster | namespace | service | kind | actor." },
+          "value": { "type": "string" },
+          "origin": { "type": "string", "enum": ["rule", "normalizer", "unmatched"], "description": "rule: a rules-engine entry set it. normalizer: the source parser pre-filled it. unmatched: nothing set it." },
+          "rule_index": { "type": "integer", "description": "Zero-based index into the effective rules list; present when origin=rule." },
+          "rule_match": { "type": "string", "description": "Compact match spec of the winning rule, e.g. 'source=flux namespace=prod-*'." }
+        }
+      },
+      "ExplainReport": {
+        "type": "object",
+        "required": ["event_id", "title", "source", "facts_recorded"],
+        "properties": {
+          "event_id": { "type": "string" },
+          "title": { "type": "string" },
+          "source": { "type": "string" },
+          "facts_recorded": { "type": "boolean", "description": "False for rows ingested before the facts migration or via sources that set fields directly; traces are then absent." },
+          "facts": { "$ref": "#/components/schemas/RuleFacts" },
+          "traces": { "type": "array", "items": { "$ref": "#/components/schemas/FieldTrace" } },
+          "notes": { "type": "array", "items": { "type": "string" }, "description": "Caveats — unrecorded facts, rules drift since ingest." }
+        }
+      },
+      "RuleFacts": {
+        "type": "object",
+        "description": "The ingest-time facts the rules engine matched against (recorded, redacted).",
+        "properties": {
+          "source": { "type": "string" },
+          "repo": { "type": "string" },
+          "branch": { "type": "string" },
+          "event": { "type": "string" },
+          "workflow": { "type": "string" },
+          "actor": { "type": "string" },
+          "cluster": { "type": "string" },
+          "object_kind": { "type": "string" },
+          "object_name": { "type": "string" },
+          "namespace": { "type": "string" },
+          "reason": { "type": "string" },
+          "project": { "type": "string" },
+          "dest_server": { "type": "string" },
+          "source_path": { "type": "string" },
+          "env_label": { "type": "string" },
+          "paths": { "type": "array", "items": { "type": "string" } },
+          "paths_truncated": { "type": "boolean" }
         }
       },
       "WhereEnv": {

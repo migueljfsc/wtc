@@ -84,14 +84,15 @@ func dsn(path string, readOnly bool) string {
 const upsertSQL = `
 INSERT INTO events (id, ts, ingested_at, source, kind, status, env, cluster,
                     namespace, service, repo, actor, ref, artifact, title, url,
-                    duration_ms, dedup_key, payload)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    duration_ms, dedup_key, payload, facts)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(dedup_key) DO UPDATE SET
   status      = excluded.status,
   ts          = excluded.ts,
   title       = excluded.title,
   duration_ms = coalesce(excluded.duration_ms, events.duration_ms),
   payload     = coalesce(excluded.payload, events.payload),
+  facts       = coalesce(nullif(excluded.facts, ''), events.facts),
   url         = coalesce(nullif(excluded.url, ''), events.url),
   env         = coalesce(nullif(excluded.env, ''), events.env),
   cluster     = coalesce(nullif(excluded.cluster, ''), events.cluster),
@@ -259,9 +260,12 @@ func (s *Store) Ingest(ctx context.Context, ev *model.Event) (id string, deduped
 }
 
 func (s *Store) upsert(ev *model.Event) (string, bool, error) {
-	var payload any
+	var payload, facts any
 	if ev.Payload != "" {
 		payload = ev.Payload
+	}
+	if ev.Facts != "" {
+		facts = ev.Facts
 	}
 
 	var storedID string
@@ -270,7 +274,7 @@ func (s *Store) upsert(ev *model.Event) (string, bool, error) {
 		string(ev.Source), string(ev.Kind), string(ev.Status),
 		ev.Env, ev.Cluster, ev.Namespace, ev.Service, ev.Repo, ev.Actor,
 		ev.Ref, ev.Artifact, ev.Title, ev.URL,
-		ev.DurationMS, ev.DedupKey, payload,
+		ev.DurationMS, ev.DedupKey, payload, facts,
 		model.StatusRank(ev.Status), // strict-outrank guard on the update arm
 	).Scan(&storedID)
 

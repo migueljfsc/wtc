@@ -40,4 +40,5 @@ func Redact(s string) string {
 func RedactEvent(ev *model.Event) {
 	ev.Title = Redact(ev.Title)
 	ev.Payload = Redact(ev.Payload)
+	ev.Facts = Redact(ev.Facts)
 }

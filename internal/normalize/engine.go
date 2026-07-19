@@ -13,29 +13,29 @@ import (
 // templates render from (SPEC §3). Parsers fill what they know; empty means
 // unknown.
 type Facts struct {
-	Source     string
-	Repo       string
-	Branch     string
-	Event      string
-	Workflow   string // CI workflow name — the service signal in monorepos
-	Actor      string
-	Cluster    string
-	ObjectKind string
-	ObjectName string
-	Namespace  string
-	Reason     string
+	Source     string `json:"source,omitempty"`
+	Repo       string `json:"repo,omitempty"`
+	Branch     string `json:"branch,omitempty"`
+	Event      string `json:"event,omitempty"`
+	Workflow   string `json:"workflow,omitempty"` // CI workflow name — the service signal in monorepos
+	Actor      string `json:"actor,omitempty"`
+	Cluster    string `json:"cluster,omitempty"`
+	ObjectKind string `json:"object_kind,omitempty"`
+	ObjectName string `json:"object_name,omitempty"`
+	Namespace  string `json:"namespace,omitempty"`
+	Reason     string `json:"reason,omitempty"`
 	// ArgoCD facts (P11). One Argo instance manages many clusters and its
 	// "cluster" is a destination server URL — env inference for argocd runs
 	// off EnvLabel/Namespace/ObjectName, never cluster=env.
-	Project    string
-	DestServer string
-	SourcePath string
-	EnvLabel   string // the Application's `env` label; "" when absent
-	Paths      []string
+	Project    string   `json:"project,omitempty"`
+	DestServer string   `json:"dest_server,omitempty"`
+	SourcePath string   `json:"source_path,omitempty"`
+	EnvLabel   string   `json:"env_label,omitempty"` // the Application's `env` label; "" when absent
+	Paths      []string `json:"paths,omitempty"`
 	// PathsTruncated marks an unknown/truncated changed-file list (GitHub
 	// caps push payloads; list APIs omit files). Path-based rules are then
 	// SKIPPED — never treated as "no match" (CLAUDE.md trap #3).
-	PathsTruncated bool
+	PathsTruncated bool `json:"paths_truncated,omitempty"`
 }
 
 // RuleMatch selects events. Empty fields are unconstrained; strings support
@@ -169,7 +169,10 @@ func NewEngine(rules []Rule) (*Engine, error) {
 
 // Apply runs the rules over ev, filling unset fields, then redacts. Env stays
 // "" when nothing matched — surfaced by doctor, never guessed (trap #2).
+// It also records the facts + the pre-rules field snapshot on ev.Facts so
+// `wtc explain` can later replay the inference (P22).
 func (e *Engine) Apply(ev *model.Event, f Facts) error {
+	preset := presetFields(ev)
 	for i := range e.rules {
 		r := &e.rules[i]
 		if !r.matches(f) {
@@ -192,6 +195,7 @@ func (e *Engine) Apply(ev *model.Event, f Facts) error {
 	if ev.Repo == "" {
 		ev.Repo = f.Repo
 	}
+	ev.Facts = EncodeFactsRecord(f, preset)
 	RedactEvent(ev)
 	return nil
 }
