@@ -1,6 +1,35 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+/* Tailwind 4 drops the JS config: dark mode, theme colours and radii are
+   declared here instead. `.dark` on an ancestor still drives the dark theme. */
+@custom-variant dark (&:is(.dark *));
+
+/* `inline` keeps the utilities referencing the vars below rather than
+   snapshotting their light-mode values, so the .dark overrides apply. */
+@theme inline {
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
 
 @layer base {
   :root {
@@ -45,9 +74,21 @@
   }
 }
 
+/* Tailwind 4's Preflight dropped three v3 defaults this UI relied on. */
 @layer base {
   * {
+    /* v4 defaults border-color to currentColor. */
     @apply border-border;
+  }
+  button,
+  [role="button"] {
+    /* v4 no longer sets this, so every button fell back to the arrow cursor. */
+    cursor: pointer;
+  }
+  ::placeholder {
+    /* v4 defaults to currentColor at 50%; inputs that don't set
+       placeholder:text-muted-foreground themselves need this. */
+    color: hsl(var(--muted-foreground));
   }
   body {
     @apply bg-background text-foreground;

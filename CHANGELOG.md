@@ -104,6 +104,23 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
   Configuration tab. Labels are intentionally out of scope — Flux events carry
   none and Argo's template exposes only `envLabel`.
 
+### Changed — portal toolchain: React 19, Router 7, Tailwind 4, ESLint 10
+
+- **Tailwind 3 → 4.** `tailwind.config.js` is gone; theme colours, radii and
+  the `.dark` variant are declared CSS-first in `src/index.css` (`@theme
+  inline`, `@custom-variant`), and the PostCSS plugin moved to the new
+  `@tailwindcss/postcss` dep (`autoprefixer` dropped — v4 handles it). v4's
+  Preflight no longer sets `button { cursor: pointer }`, `::placeholder`
+  colour, or a default `border-color`, so `index.css` restores all three
+  explicitly. Generated-utility diff against the v3 build is clean.
+- **React 18 → 19, react-router-dom 6 → 7** — no source changes needed; the
+  entry point already used `createRoot` and routing is all declarative.
+- **eslint-plugin-react-hooks 5 → 7** added `set-state-in-effect`, which
+  flagged the Where page resyncing its input from `?ref=` inside an effect.
+  Now adjusted during render (previous-value compare), dropping a render pass.
+- Go build and the embedded `web/` UI are untouched — `ui/` has its own
+  toolchain by design.
+
 ### Changed — portal layout: service list, page width, filter comboboxes
 
 - **Services tab** now uses a searchable master-detail layout (filter box +
