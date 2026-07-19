@@ -136,6 +136,14 @@ func (c *Client) Around(ctx context.Context, params url.Values) (server.EventsRe
 	return out, err
 }
 
+// Blast fetches the ranked suspect changes for an alert anchor (id or ts) —
+// or, anchored on a change, the alerts that fired after it.
+func (c *Client) Blast(ctx context.Context, params url.Values) (query.BlastReport, error) {
+	var out query.BlastReport
+	err := c.do(ctx, http.MethodGet, "/api/blast?"+params.Encode(), nil, &out)
+	return out, err
+}
+
 // Handoff fetches the activity digest since the given instant.
 func (c *Client) Handoff(ctx context.Context, since string) (query.HandoffReport, error) {
 	var out query.HandoffReport

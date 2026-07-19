@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import type { components } from "@/api/schema";
 import { StatusDot } from "@/components/StatusBadge";
-import { useAround } from "@/lib/queries";
+import { useBlast } from "@/lib/queries";
 import { duration } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -11,22 +12,20 @@ type Event = components["schemas"]["Event"];
 const WINDOWS = ["30m", "2h", "6h", "24h"];
 
 /**
- * Alert correlation: a compact timeline centred on an alert, listing the
- * changes in the preceding window (closest to the alert first, subtly
- * highlighted — the likeliest culprit). The window mirrors `wtc around --window`.
+ * Likely causes (P20): the changes in the window before an alert, ranked by
+ * the deterministic blast score (recency, same env/service, kind, failed
+ * state) — best suspect first. Rows with a ref link into Where. The window
+ * mirrors `wtc blast --window`.
  */
-export function AroundPanel({ alert }: { alert: Event }) {
+export function AroundPanel({ alert, onNavigate }: { alert: Event; onNavigate?: () => void }) {
   const [window, setWindow] = useState("6h");
-  const around = useAround(alert.id, window);
-  const anchor = new Date(alert.ts).getTime();
-
-  // The window includes the alert itself; drop it from the "changes" list.
-  const changes = (around.data ?? []).filter((e) => e.id !== alert.id);
+  const blast = useBlast(alert.id, window);
+  const suspects = blast.data?.suspects ?? [];
 
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Preceding changes</h3>
+        <h3 className="text-sm font-semibold">Likely causes</h3>
         <div className="flex gap-0.5 rounded-md border p-0.5">
           {WINDOWS.map((w) => (
             <button
@@ -43,29 +42,51 @@ export function AroundPanel({ alert }: { alert: Event }) {
         </div>
       </div>
 
-      {around.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
-      {around.error && <p className="text-sm text-muted-foreground">Couldn’t correlate changes.</p>}
-      {around.data && (
+      {blast.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {blast.error && <p className="text-sm text-muted-foreground">Couldn’t rank suspects.</p>}
+      {blast.data && (
         <div>
-          {changes.length === 0 ? (
+          {suspects.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No changes in the {window} before this alert.
             </p>
           ) : (
             <ul className="border-l pl-3">
-              {changes.map((e, i) => {
-                const before = anchor - new Date(e.ts).getTime();
+              {suspects.map((s, i) => {
+                const e = s.event;
+                const before = new Date(alert.ts).getTime() - new Date(e.ts).getTime();
+                const title = e.ref ? (
+                  <Link
+                    to={`/where?ref=${encodeURIComponent(e.ref)}`}
+                    onClick={onNavigate}
+                    title="Trace this change in Where"
+                    className="underline-offset-4 hover:underline"
+                  >
+                    {e.title}
+                  </Link>
+                ) : (
+                  e.title
+                );
                 return (
                   <li
                     key={e.id}
+                    title={s.reasons.join(" · ")}
                     className={cn(
                       "relative flex items-center gap-2 py-1.5 text-sm",
                       i === 0 && "font-medium",
                     )}
                   >
                     <span className="absolute -left-[17px] size-2 rounded-full bg-border" />
+                    <span
+                      className={cn(
+                        "w-8 shrink-0 rounded bg-secondary px-1 py-0.5 text-center font-mono text-xs",
+                        i === 0 && "bg-primary text-primary-foreground",
+                      )}
+                    >
+                      {s.score}
+                    </span>
                     <StatusDot status={e.status} />
-                    <span className="min-w-0 flex-1 truncate">{e.title}</span>
+                    <span className="min-w-0 flex-1 truncate">{title}</span>
                     {e.env && (
                       <span className="shrink-0 rounded bg-secondary px-1.5 py-0.5 font-mono text-xs">
                         {e.env}
@@ -83,6 +104,11 @@ export function AroundPanel({ alert }: { alert: Event }) {
             <AlertTriangle className="size-4" />
             <span className="font-medium">alert fired</span>
           </div>
+          {(blast.data.notes ?? []).map((n) => (
+            <p key={n} className="mt-1 text-xs italic text-muted-foreground">
+              {n}
+            </p>
+          ))}
         </div>
       )}
     </div>

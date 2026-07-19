@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -174,6 +175,99 @@ func newAroundCmd(flags *clientFlags) *cobra.Command {
 		},
 	}
 	cmd.Flags().DurationVar(&window, "window", 30*time.Minute, "how far back to look")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
+	return cmd
+}
+
+func newBlastCmd(flags *clientFlags) *cobra.Command {
+	var window time.Duration
+	var env, service string
+	var limit int
+	var asJSON bool
+	cmd := &cobra.Command{
+		Use:   "blast <ts|event-id>",
+		Short: "Rank the changes most likely to have caused an alert",
+		Long: `Rank the changes most likely to have caused an alert ("blast radius").
+
+Anchor on an alert's event id (or a bare instant) to score the changes in the
+preceding window as suspects. Anchor on a deploy (any non-alert change) and
+the direction flips: it lists the alerts that fired after it — "did my change
+cause noise?".
+
+Scoring is a fixed, documented heuristic — deterministic, never ML:
+  recency        0–30  linear within the window (closer to the anchor = higher)
+  same env       +30   the hard signal (disabled when the anchor has no env)
+  same service   +20   booster only — alerts often lack a clean service
+  kind           +15   deploy / rollback / config_change
+                 +12   infra_change   +10 manual   +5 merge/push   +2 build
+  failed state   +10   a failed/degraded change right before the alert`,
+		Args: cobra.ExactArgs(1),
+		Example: `  wtc blast 01KXGA0ZP6QQ9M129XYAR1KTSY          # an alert's event id
+  wtc blast 2026-07-18T12:00:00Z --env prod   # a bare instant needs --env
+  wtc blast <deploy-event-id> --window 1h     # alerts after my deploy`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			params := url.Values{"window": {window.String()}}
+			if ulidLike.MatchString(args[0]) {
+				params.Set("id", args[0])
+			} else {
+				ts, err := parseTimeRef(args[0], time.Now())
+				if err != nil {
+					return fmt.Errorf("anchor: %w", err)
+				}
+				params.Set("ts", model.FormatTS(ts))
+			}
+			if env != "" {
+				params.Set("env", env)
+			}
+			if service != "" {
+				params.Set("service", service)
+			}
+			if limit > 0 {
+				params.Set("limit", fmt.Sprint(limit))
+			}
+			r, err := flags.resolve().Blast(cmd.Context(), params)
+			if err != nil {
+				return err
+			}
+			if asJSON {
+				return jsonOut(cmd, r)
+			}
+			out := cmd.OutOrStdout()
+
+			what := "Likely causes"
+			if r.Direction == "effects" {
+				what = "Alerts after"
+			}
+			anchor := r.AnchorTS.Local().Format("2006-01-02 15:04:05")
+			if r.Anchor != nil {
+				anchor = fmt.Sprintf("%s (%s)", r.Anchor.Title, anchor)
+			}
+			_, _ = fmt.Fprintf(out, "%s %s — window %s\n", what, anchor, time.Duration(r.WindowMS)*time.Millisecond)
+
+			if len(r.Suspects) > 0 {
+				w := tabwriter.NewWriter(out, 2, 4, 2, ' ', 0)
+				_, _ = fmt.Fprintln(w, "SCORE\tTIME\tENV\tKIND\tSTATUS\tSERVICE\tTITLE\tWHY")
+				for _, sp := range r.Suspects {
+					e := sp.Event
+					_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+						sp.Score, e.TS.Local().Format("15:04:05"),
+						cmp.Or(e.Env, "-"), e.Kind, e.Status, cmp.Or(e.Service, "-"),
+						e.Title, strings.Join(sp.Reasons, " · "))
+				}
+				if err := w.Flush(); err != nil {
+					return err
+				}
+			}
+			for _, n := range r.Notes {
+				_, _ = fmt.Fprintf(out, "  note: %s\n", n)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().DurationVar(&window, "window", 2*time.Hour, "how far to look (back for causes, forward for effects)")
+	cmd.Flags().StringVar(&env, "env", "", "env scoring context (overrides the anchor event's)")
+	cmd.Flags().StringVar(&service, "service", "", "service scoring context (overrides the anchor event's)")
+	cmd.Flags().IntVar(&limit, "limit", 0, "maximum suspects (default 20, capped at 100)")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
 	return cmd
 }

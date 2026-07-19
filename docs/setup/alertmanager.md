@@ -40,3 +40,32 @@ route:
 wtc around <alert-event-id> --window 30m     # id from `wtc log --kind alert`
 wtc around 2026-07-14T13:41:34Z --window 1h  # or an explicit instant
 ```
+
+## Incident forensics: from alert to cause
+
+`wtc around` lists time-neighbors; `wtc blast` ranks them. Anchored on an
+alert it scores every change in the preceding window as a suspect — a fixed,
+documented heuristic (recency, same env as the hard signal, same service,
+kind weight, a bump for failed/degraded changes), deterministic and never ML:
+
+```bash
+# 1. the alert fires — find it
+wtc log --kind alert --since 2h
+
+# 2. rank what likely caused it (id from step 1)
+wtc blast <alert-event-id>                  # default --window 2h
+#   SCORE  TIME      ENV   KIND    STATUS     SERVICE  TITLE            WHY
+#   69     01:20:34  prod  deploy  succeeded  api      deploy api ...   30m before · same env (prod) · same service (api) · deploy
+
+# 3. trace the top suspect end to end
+wtc where <suspect-sha-or-tag>
+
+# the reverse question — "did my deploy cause noise?"
+wtc blast <deploy-event-id> --window 1h     # alerts that fired after it
+```
+
+An alert whose `env` was never inferred (check `wtc doctor`) disables the
+same-env signal — the output says so; pass `--env` to restore it. A bare
+RFC3339 instant works as the anchor too (`wtc blast 2026-07-18T12:00:00Z
+--env prod`). The portal shows the same ranking in the alert drawer's
+"Likely causes" panel.

@@ -4,6 +4,28 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — `wtc blast`: incident correlation (P20)
+
+- **`wtc blast <alert-id|ts>`** ranks the changes in the window before an
+  alert as suspects — "what changed before this broke?". The score is a
+  fixed, documented, deterministic heuristic (never ML): recency 0–30 within
+  the window, same env +30 (the hard signal), same service +20 (booster —
+  alerts often lack a clean service, so it ranks, never filters), kind
+  weight (+15 deploy/rollback/config_change … +2 build), +10 for a
+  failed/degraded change right before the anchor. Each suspect carries a
+  human-readable `why` breakdown.
+- **Direction flips on the anchor**: `wtc blast <deploy-id>` lists the alerts
+  that fired in the window *after* a change — "did my deploy cause noise?".
+- Anchors: an event id or a bare RFC3339 instant; `--env`/`--service` set the
+  scoring context for bare instants (without them the same-env signal is
+  disabled — reported, never silently guessed). `--window` (default 2h),
+  `--limit`, `--json`.
+- New `GET /api/v1/blast` (in the OpenAPI contract); `/around` is unchanged.
+- **Portal:** the alert drawer's panel is now **Likely causes** — the blast
+  ranking with score chips and reasons on hover; suspects with a ref link
+  into Where.
+- Pure query layer: no schema change, no new dependencies.
+
 ### Added — `repo` dimension & timeline facet (monorepo support)
 
 - **Events now carry a `repo` (owner/name)** — persisted and facetable. Filter

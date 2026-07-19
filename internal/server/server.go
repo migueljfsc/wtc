@@ -222,6 +222,7 @@ func (s *Server) apiRoutes() []apiRoute {
 		{"GET", "/doctor", http.HandlerFunc(s.handleDoctor)},
 		{"GET", "/where/{ref}", http.HandlerFunc(s.handleWhere)},
 		{"GET", "/around", http.HandlerFunc(s.handleAround)},
+		{"GET", "/blast", http.HandlerFunc(s.handleBlast)},
 		{"GET", "/diff", http.HandlerFunc(s.handleDiff)},
 		{"GET", "/handoff", http.HandlerFunc(s.handleHandoff)},
 		{"GET", "/stats/activity", http.HandlerFunc(s.handleStatsActivity)},

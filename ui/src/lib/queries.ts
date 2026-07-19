@@ -186,17 +186,17 @@ export function useServiceDeploys(service: string | null) {
   });
 }
 
-/** Changes in the window before an event (alert correlation). */
-export function useAround(id: string | null, window: string) {
+/** Ranked suspect changes for an alert (or alerts following a change). */
+export function useBlast(id: string | null, window: string) {
   return useQuery({
-    queryKey: ["around", id, window],
+    queryKey: ["blast", id, window],
     enabled: !!id,
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/v1/around", {
+      const { data, error } = await api.GET("/api/v1/blast", {
         params: { query: { id: id!, window } },
       });
-      if (error) throw new Error("around request failed");
-      return data.events ?? [];
+      if (error) throw new Error("blast request failed");
+      return data;
     },
   });
 }

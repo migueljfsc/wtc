@@ -128,41 +128,56 @@ func (s *Server) handleHandoff(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusOK, report)
 }
 
-// handleAround returns the changes in a window BEFORE an instant — the
-// "what changed right before this alert fired" question. Anchor by ts= or by
-// an event id= (typically an alert's).
-func (s *Server) handleAround(w http.ResponseWriter, r *http.Request) {
+// resolveAnchor resolves the ?id=/?ts= anchor pair shared by /around and
+// /blast: the anchor instant, plus the anchor event when id-anchored (nil for
+// a bare ts). On failure it writes the error response and returns ok=false.
+func (s *Server) resolveAnchor(w http.ResponseWriter, r *http.Request) (anchor time.Time, ev *model.Event, ok bool) {
 	q := r.URL.Query()
-
-	var anchor time.Time
 	switch {
 	case q.Get("id") != "":
 		ev, err := s.store.EventByID(r.Context(), q.Get("id"))
 		if err != nil {
 			s.writeError(w, http.StatusNotFound, "no event with id "+q.Get("id"))
-			return
+			return time.Time{}, nil, false
 		}
-		anchor = ev.TS
+		return ev.TS, ev, true
 	case q.Get("ts") != "":
 		ts, err := model.ParseTS(q.Get("ts"))
 		if err != nil {
 			s.writeError(w, http.StatusBadRequest, "ts: "+err.Error())
-			return
+			return time.Time{}, nil, false
 		}
-		anchor = ts
+		return ts, nil, true
 	default:
-		s.writeError(w, http.StatusBadRequest, "around needs ?ts= or ?id=")
+		s.writeError(w, http.StatusBadRequest, "anchor needs ?ts= or ?id=")
+		return time.Time{}, nil, false
+	}
+}
+
+// parseWindow reads a ?window= duration, writing a 400 on a bad value.
+func (s *Server) parseWindow(w http.ResponseWriter, q string, def time.Duration) (time.Duration, bool) {
+	if q == "" {
+		return def, true
+	}
+	d, err := time.ParseDuration(q)
+	if err != nil || d <= 0 {
+		s.writeError(w, http.StatusBadRequest, "window must be a positive duration")
+		return 0, false
+	}
+	return d, true
+}
+
+// handleAround returns the changes in a window BEFORE an instant — the
+// "what changed right before this alert fired" question. Anchor by ts= or by
+// an event id= (typically an alert's).
+func (s *Server) handleAround(w http.ResponseWriter, r *http.Request) {
+	anchor, _, ok := s.resolveAnchor(w, r)
+	if !ok {
 		return
 	}
-
-	window := 30 * time.Minute
-	if v := q.Get("window"); v != "" {
-		d, err := time.ParseDuration(v)
-		if err != nil || d <= 0 {
-			s.writeError(w, http.StatusBadRequest, "window must be a positive duration")
-			return
-		}
-		window = d
+	window, ok := s.parseWindow(w, r.URL.Query().Get("window"), 30*time.Minute)
+	if !ok {
+		return
 	}
 
 	events, next, err := s.store.ListEvents(r.Context(), store.Filter{
@@ -175,6 +190,44 @@ func (s *Server) handleAround(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeJSON(w, http.StatusOK, EventsResponse{Events: events, NextCursor: next})
+}
+
+// handleBlast ranks the changes most likely to have caused an alert — or,
+// anchored on a change, lists the alerts that fired after it (PLAN P20). The
+// score is a deterministic documented heuristic; see query.Blast.
+func (s *Server) handleBlast(w http.ResponseWriter, r *http.Request) {
+	anchorTS, anchorEv, ok := s.resolveAnchor(w, r)
+	if !ok {
+		return
+	}
+	q := r.URL.Query()
+	window, ok := s.parseWindow(w, q.Get("window"), 2*time.Hour)
+	if !ok {
+		return
+	}
+	limit := 0
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			s.writeError(w, http.StatusBadRequest, "limit must be a positive integer")
+			return
+		}
+		limit = n
+	}
+	report, err := query.Blast(r.Context(), s.store, query.BlastInput{
+		Anchor:  anchorEv,
+		TS:      anchorTS,
+		Env:     q.Get("env"),
+		Service: q.Get("service"),
+		Window:  window,
+		Limit:   limit,
+	})
+	if err != nil {
+		s.log.Error("blast", "error", err)
+		s.writeError(w, http.StatusInternalServerError, "query error")
+		return
+	}
+	s.writeJSON(w, http.StatusOK, report)
 }
 
 func (s *Server) handleDoctor(w http.ResponseWriter, r *http.Request) {

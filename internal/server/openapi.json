@@ -137,6 +137,27 @@
         }
       }
     },
+    "/api/v1/blast": {
+      "get": {
+        "operationId": "blast",
+        "summary": "Rank the changes most likely to have caused an alert (or list the alerts following a change).",
+        "description": "Anchored on an alert event or a bare instant, scores the changes in the preceding window as suspects — a deterministic documented heuristic: recency, same env (hard signal), same service, kind weight, failed/degraded bump. Anchored on a non-alert change the direction flips: it lists the alerts that fired in the window after it.",
+        "parameters": [
+          { "name": "ts", "in": "query", "description": "Anchor instant. One of ts or id is required.", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "id", "in": "query", "description": "Anchor on an event id (an alert for causes; a change for effects). One of ts or id is required.", "schema": { "type": "string" } },
+          { "name": "env", "in": "query", "description": "Scoring env context; overrides the anchor event's env. Required with a bare ts anchor to enable the same-env signal.", "schema": { "type": "string" } },
+          { "name": "service", "in": "query", "description": "Scoring service context; overrides the anchor event's service.", "schema": { "type": "string" } },
+          { "name": "window", "in": "query", "description": "Lookback (causes) / lookahead (effects) duration (Go format, e.g. 2h). Default 2h.", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "description": "Maximum suspects returned. Default 20, capped at 100.", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Ranked suspects.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BlastReport" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
     "/api/v1/doctor": {
       "get": {
         "operationId": "doctor",
@@ -324,6 +345,29 @@
         "properties": {
           "events": { "type": "array", "items": { "$ref": "#/components/schemas/Event" } },
           "next_cursor": { "type": "string", "description": "Pass as ?cursor= to fetch the next page; absent on the last page." }
+        }
+      },
+      "BlastSuspect": {
+        "type": "object",
+        "required": ["event", "score", "reasons"],
+        "properties": {
+          "event": { "$ref": "#/components/schemas/Event" },
+          "score": { "type": "integer", "description": "Deterministic suspicion score; higher = likelier. Relative within one report." },
+          "reasons": { "type": "array", "items": { "type": "string" }, "description": "Human-readable score breakdown (recency, same env/service, kind, status)." }
+        }
+      },
+      "BlastReport": {
+        "type": "object",
+        "required": ["anchor_ts", "direction", "window_ms", "suspects"],
+        "properties": {
+          "anchor": { "$ref": "#/components/schemas/Event" },
+          "anchor_ts": { "type": "string", "format": "date-time" },
+          "direction": { "type": "string", "enum": ["causes", "effects"], "description": "causes: changes before an alert/instant. effects: alerts after a change." },
+          "env": { "type": "string", "description": "Env used for the same-env signal; absent when unknown (signal disabled, noted)." },
+          "service": { "type": "string", "description": "Service used for the same-service signal." },
+          "window_ms": { "type": "integer", "format": "int64" },
+          "suspects": { "type": "array", "items": { "$ref": "#/components/schemas/BlastSuspect" }, "description": "Ranked best-first. Always an array, never null." },
+          "notes": { "type": "array", "items": { "type": "string" }, "description": "Explicit caveats — disabled signals, truncation, empty windows." }
         }
       },
       "WhereEnv": {

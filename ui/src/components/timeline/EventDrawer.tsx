@@ -73,7 +73,7 @@ export function EventDrawer({ event, onClose }: { event: Event | null; onClose: 
             </dl>
           </section>
 
-          {event.kind === "alert" && <AroundPanel alert={event} />}
+          {event.kind === "alert" && <AroundPanel alert={event} onNavigate={onClose} />}
 
           {ref && event.kind !== "alert" && (
             <section>

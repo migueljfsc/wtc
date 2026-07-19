@@ -26,9 +26,9 @@ Lives at `docs/PLAN.md`. Each phase ≈ 1–3 Claude Code sessions. A phase is d
 | **P17 Configuration tab** | ✅ 2026-07-18 | `/api/v1/config` extended with the redacted effective config (allowlist DTO built in serve.go — the server gains no new raw secrets; constant `"********"` masks; DSN → pgx-parsed host/port/db, creds stripped; sentinel guard test). Portal Settings → Configuration (source cards + doctor health chips, capture-mode warning, `/settings` redirect); mapping templates shown preset-resolved; `wtc config` CLI renders the same endpoint with the schedulers' effective defaults |
 | **P18 Poller globs + Where links** | ✅ 2026-07-18 | Glob entries in `repos`/`projects` — shared dialect via exported `normalize.CompileGlob` + scope helpers (`SplitScope`/`ResolveScope`/`ScopeNamespace`), resolved every sweep; github filters its affiliation-bounded discovery (any glob form ok), gitlab gains scoped namespace discovery (`ListNamespaceProjects`, group→user 404 fallback — the rig project lives in a user namespace; fixture-captured live) with unscoped patterns fatal at config load. Where-page stage cards + drawer applied rows link to `event.url` (new tab, hover affordance, no dead links) |
 | **Backfill window + multi-cluster docs** | ✅ 2026-07-18 | `sources.{github,gitlab}.backfill` overrides the first-poll history window (default 24h, unchanged); shown in Configuration tab + `wtc config`. `docs/setup/multi-cluster.md`: one central hub ingesting Flux/Argo from N clusters (per-spoke Provider/Alert → hub, `eventMetadata.cluster` identity, cluster→env rules, central SCM poller) — documents the flagship topology; no new code |
-| **P20 incident correlation** | 📋 planned | `wtc blast <alert-id\|ts>` + portal "likely causes": rank recent changes as suspects for an alert (deterministic score — recency/env/service/kind/status; **not** AI). Pure query, no schema change. Reuses the P5 alert anchors + inference |
-| **P21 awareness (outbound)** | 📋 planned | Subscriptions: config `notifications[]` (rules-match → sink) emit on new-row ingest; sinks slack/webhook/**grafana annotations**; async off the write path, at-least-once + retry + metric. Optional Atom feed. Largest lift; build last |
-| **P22 harden the record** | 📋 planned | `wtc export` (range → CSV/NDJSON, `/api/export`), `wtc backup` (WAL-safe SQLite snapshot + litestream docs), `wtc explain <id>` (which rule set env/service). Trust/compliance; pure read-side |
+| **P20 incident correlation** | ✅ 2026-07-19 | `wtc blast <alert-id\|ts>` + portal "Likely causes": deterministic suspect ranking (recency 0–30, same-env +30 hard signal, same-service +20, kind weight, failed bump; **not** AI), direction flips on a change anchor (alerts after a deploy). New `/api/v1/blast` (`/around` shape didn't fit — cursor-paginated bare events); pure query, no schema change. Verified on the demo seed: prod api deploy top suspect at 69 ahead of same-service wrong-env (59) and the unrelated merge (16); reverse direction returns the alert |
+| **P21 awareness (outbound)** | 📋 planned | Subscriptions: config `notifications[]` (glob-match → sink) emit on new rows **and status-changing upserts** (notify key = event id+status; new-row-only would never fire `status: failed` — trap #5); sinks slack/webhook/**grafana annotations**; own bounded queue off the write path (not the SSE broadcaster), at-least-once + retry + metric. Optional Atom feed. Largest lift; build last |
+| **P22 harden the record** | 📋 planned | `wtc export` (range → CSV/NDJSON, streaming `/api/export`), `wtc backup` (server-side `VACUUM INTO` streamed over `/api/backup` + litestream docs), `wtc explain <id>` (per-field rule trace; needs a nullable `facts` column captured at ingest — Facts are not reconstructible from stored payloads). Trust/compliance |
 
 Unplanned addition: `demo/` — three dummy services + fake three-cluster Flux
 wiring generating real events continuously (operator-requested test bed;
@@ -693,8 +693,14 @@ time-neighbors; P20 upgrades that to a **ranked suspect list** — given an aler
 - **Forward direction too** (cheap once the engine exists): `wtc blast` on a
   *deploy* lists alerts that fired after it — "did my change cause noise?".
 - **Portal:** the alert drawer's existing `AroundPanel` becomes a "Likely
-  causes" ranked list (score chips, each row → Where). No new endpoint shape if
-  it reuses `/around` extended with scoring; otherwise a small `/api/blast`.
+  causes" ranked list (score chips, each row → Where). Endpoint checked
+  2026-07-19: `/around` returns the cursor-paginated bare `EventsResponse` —
+  scored suspects don't fit that shape. So: a small new `/blast` (+ `/api/v1`
+  alias) sharing `handleAround`'s anchor resolution; `/around` stays untouched;
+  `/blast` joins `openapi.json` (P7 drift test).
+- **Anchor context:** an alert-id anchor supplies `ts`+`env`+`service` for
+  scoring; a bare-ts anchor without `--env` disables the same-env signal —
+  say so in the output rather than scoring blind.
 - **Pure query layer — no schema change, no new deps.** Reuses events +
   inference. Table-driven tests on seeded fixtures (alert + N candidate deploys
   → asserted ranking); an E2E replay proving the alert→cause link end to end.
@@ -704,8 +710,9 @@ it in the same env as the top suspect, ahead of an unrelated merge; the reverse
 (`wtc blast <deploy>`) lists the subsequent alert; `--json` stable; docs snippet
 shows the incident-forensics workflow.
 
-**Decisions:** fixed weights v1 vs config-tunable (rec: fixed, documented);
-`/around`-extended vs new `/api/blast` (rec: extend if the shape fits).
+**Decisions (resolved 2026-07-19):** fixed weights v1, documented in the query
+help (config-tunable deferred until someone asks); new `/blast` endpoint — the
+`/around` shape doesn't fit (see Portal bullet).
 
 ## Phase 21 — Awareness (push, don't just store)
 
@@ -713,26 +720,38 @@ Today wtc only emits a scheduled Slack digest. P21 makes it *active*: one
 subscription engine, several sink types. Largest lift of the track — a new
 outbound subsystem — so it lands last.
 
-- **Subscriptions:** config `notifications: [{ match: {env,service,kind,status
-  globs}, sink: {...} }]`. On a **new-row** ingest (not a dedup/upsert — the
-  idempotency anchor) that matches, emit. Reuse the `rules[].match` glob
-  dialect for the filter and P17 secret-masking for sink URLs/keys.
+- **Subscriptions:** config `notifications: [{ match: {env,service,repo,kind,
+  status globs}, sink: {...} }]`. Emit on a **new row** OR a **dedup-upsert
+  that changes `status`** — new-row-only would break status matching:
+  lifecycle sources (trap #5) create the row as `pending`/`started` and reach
+  `succeeded`/`failed` via upsert, so `status: failed` would never fire.
+  Notification idempotency key = (event id, status): a redelivery that changes
+  nothing never re-notifies. Detect the transition in the single-writer path
+  (prior-status read is race-free there). Reuse the `rules[].match` glob
+  dialect (`normalize.CompileGlob`) for the filter and P17 secret-masking for
+  sink URLs/keys.
 - **Sinks:** `slack` (reuse `internal/notify`), generic `webhook`, and
   **`grafana-annotation`** — POST deploys to Grafana's annotation API so "what
   changed" overlays dashboards (wtc already ingests *from* Grafana; this closes
   the loop; best effort-to-wow ratio).
 - **Delivery:** an async worker off the single-writer path (never block ingest),
-  at-least-once with bounded exponential retry, a `wtc_notify_{sent,failed}`
-  counter, drop-after-N logged. Best-effort in-memory queue v1; a durable
-  outbox table (survives restart, no double/drop) is the stretch.
+  at-least-once with bounded exponential retry, `wtc_notify_{sent,failed,dropped}`
+  counters, drop-after-N logged. Do **not** feed it from the SSE broadcaster —
+  that silently drops to slow subscribers and only sees new rows; use a
+  dedicated bounded channel fed from the `Ingest` funnel (where the
+  deduped/status-transition facts already live), queue-full increments the
+  dropped counter. Best-effort in-memory queue v1; a durable outbox table
+  (survives restart, no double/drop) is the stretch.
 - **Optional bonus:** a read-only Atom/RSS feed (`/feed?env=prod`) for
   pull-based subscribers — cheap, neutral, no auth-state.
 - **Fixture-first:** capture a real Grafana annotation API round-trip against a
   local Grafana before writing that sink (same discipline as the P14 preset).
 
 **Accept:** a `notifications` entry matching `env: prod` fires a Slack message
-and a Grafana annotation on the next prod deploy; a re-ingested (deduped) event
-does **not** re-notify; a failing sink retries then drops with a moved counter,
+and a Grafana annotation on the next prod deploy; a `status: failed` entry
+fires when a deploy's row upserts to `failed` — once, even if the failed
+payload is redelivered; a re-ingested (deduped, same-status) event does
+**not** re-notify; a failing sink retries then drops with a moved counter,
 never blocking ingest; sink secrets masked in `wtc config`; `docs/setup`
 snippet per sink.
 
@@ -742,34 +761,57 @@ retry, outbox stretch); ship B1 slack/webhook then B2 grafana as sub-phases
 
 ## Phase 22 — Harden the record (trust / compliance)
 
-Make wtc trustworthy *as* a system-of-record. All read-side, self-contained,
-low risk — good to slot second.
+Make wtc trustworthy *as* a system-of-record. Export/backup are read-side;
+`explain` needs one nullable ingest-time column (below). Still self-contained
+and low risk — good to slot second.
 
 - **`wtc export --env --service --since --until --format csv|json|ndjson`**
   (+ streaming `/api/export`): "every prod change in Q3." Audit/compliance is a
   real selling angle and there is no export today. NDJSON streams large ranges
   without buffering.
-- **`wtc backup <path>`:** WAL-safe consistent SQLite snapshot (`VACUUM INTO`)
-  taken while serving — the single-binary durability story — plus a
-  `docs/setup/backup.md` recipe (cron → object store; litestream for continuous
-  replication). Postgres: document managed/`pg_dump` backups (out of wtc's hands).
-- **`wtc explain <event-id>`:** re-run the rules engine over the stored event
-  and report *which rule* set each of env/service/cluster (first-writer-wins
-  trace). Builds trust in the product's hardest problem; no schema change.
+- **`wtc backup <path>`:** WAL-safe consistent SQLite snapshot taken while
+  serving — the single-binary durability story. Transport respects the process
+  model (the CLI never opens the DB, and the server may be remote): `GET
+  /api/backup` runs `VACUUM INTO` a server-side temp file (fine on the read
+  pool under WAL), streams it to the client, deletes the temp; `wtc backup
+  <path>` writes the stream locally. Plus a `docs/setup/backup.md` recipe
+  (cron → object store; litestream for continuous replication). Postgres
+  backend: `/api/backup` returns a clear "use pg_dump" error; docs cover
+  managed/`pg_dump` backups (out of wtc's hands).
+- **`wtc explain <event-id>`:** report *which rule* set each of
+  env/service/cluster/kind (first-writer-wins trace) — trust in the product's
+  hardest problem. Verified 2026-07-19: the engine matches ingest-time
+  `normalize.Facts`, which are never persisted and are NOT reconstructible
+  from stored payloads (the github poller synthesizes `Payload` via
+  enrichment; flux stores message+revision only; webhook headers aren't kept).
+  So: add a nullable `facts` JSON column (redacted, per-dialect append-only
+  migration), populated at ingest; `explain` re-runs the **current** engine
+  (incl. P17 DB-override rules — "what would happen now" is the useful
+  semantics; say when the trace may differ from ingest-time) over stored facts
+  via a trace-collecting `Engine.Explain`, reporting per field: rule index +
+  matched pattern, "set by normalizer" (parser pre-filled, rules never ran),
+  or "unmatched". Rows ingested before the column get a clear "facts not
+  recorded" message, never a guess.
 
 **Accept:** `wtc export` round-trips a known window to CSV/NDJSON with correct
-filters and stable column order; `wtc backup` produces a snapshot that opens as
-a valid DB with identical `log` output while the server keeps serving; `wtc
-explain` names the matching rule for a demo event's env; docs cover the backup
-cron/litestream recipe.
+filters and stable column order; `wtc backup` against a live (remote) server
+produces a snapshot that opens as a valid DB with identical `log` output while
+the server keeps serving; `wtc explain` names the matching rule for a demo
+event's env, and reports "facts not recorded" for a pre-migration row; docs
+cover the backup cron/litestream recipe.
 
 **Decisions:** built-in `wtc backup` + litestream docs vs docs-only (rec: both);
-export formats (rec: CSV + NDJSON, JSON array optional).
+export formats (rec: CSV + NDJSON, JSON array optional); facts column vs a
+zero-schema `wtc explain --facts '{...}'` rules debugger (rec: the column — it
+keeps the "explain THIS event" promise; **needs operator sign-off**, it drops
+the track's original no-schema-change claim).
 
 ### Sequencing (P20–P22)
 
-Build **P20 → P22 → P21**. P20 and P22 are pure read-side (no schema, no deps,
-low risk) and deliver the most per unit effort; P21 introduces the outbound
-worker/sinks and is the only one that can affect the ingest path, so it goes
-last once the query surface is settled. Each phase keeps the DoD: fixtures +
-tests + a `docs/setup` snippet wiring it to real infrastructure + CHANGELOG.
+Build **P20 → P22 → P21**. P20 is pure read-side; P22 is read-side plus one
+nullable ingest-time `facts` column — and the earlier that lands the better,
+since facts are captured only for rows ingested after the migration, so
+`explain` coverage grows with time; P21 introduces the outbound worker/sinks
+and is the only one that can affect the ingest path, so it goes last once the
+query surface is settled. Each phase keeps the DoD: fixtures + tests + a
+`docs/setup` snippet wiring it to real infrastructure + CHANGELOG.

@@ -140,6 +140,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/blast": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Rank the changes most likely to have caused an alert (or list the alerts following a change).
+         * @description Anchored on an alert event or a bare instant, scores the changes in the preceding window as suspects — a deterministic documented heuristic: recency, same env (hard signal), same service, kind weight, failed/degraded bump. Anchored on a non-alert change the direction flips: it lists the alerts that fired in the window after it.
+         */
+        get: operations["blast"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/doctor": {
         parameters: {
             query?: never;
@@ -348,6 +368,33 @@ export interface components {
             events: components["schemas"]["Event"][];
             /** @description Pass as ?cursor= to fetch the next page; absent on the last page. */
             next_cursor?: string;
+        };
+        BlastSuspect: {
+            event: components["schemas"]["Event"];
+            /** @description Deterministic suspicion score; higher = likelier. Relative within one report. */
+            score: number;
+            /** @description Human-readable score breakdown (recency, same env/service, kind, status). */
+            reasons: string[];
+        };
+        BlastReport: {
+            anchor?: components["schemas"]["Event"];
+            /** Format: date-time */
+            anchor_ts: string;
+            /**
+             * @description causes: changes before an alert/instant. effects: alerts after a change.
+             * @enum {string}
+             */
+            direction: "causes" | "effects";
+            /** @description Env used for the same-env signal; absent when unknown (signal disabled, noted). */
+            env?: string;
+            /** @description Service used for the same-service signal. */
+            service?: string;
+            /** Format: int64 */
+            window_ms: number;
+            /** @description Ranked best-first. Always an array, never null. */
+            suspects: components["schemas"]["BlastSuspect"][];
+            /** @description Explicit caveats — disabled signals, truncation, empty windows. */
+            notes?: string[];
         };
         WhereEnv: {
             env: string;
@@ -942,6 +989,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EventsResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    blast: {
+        parameters: {
+            query?: {
+                /** @description Anchor instant. One of ts or id is required. */
+                ts?: string;
+                /** @description Anchor on an event id (an alert for causes; a change for effects). One of ts or id is required. */
+                id?: string;
+                /** @description Scoring env context; overrides the anchor event's env. Required with a bare ts anchor to enable the same-env signal. */
+                env?: string;
+                /** @description Scoring service context; overrides the anchor event's service. */
+                service?: string;
+                /** @description Lookback (causes) / lookahead (effects) duration (Go format, e.g. 2h). Default 2h. */
+                window?: string;
+                /** @description Maximum suspects returned. Default 20, capped at 100. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ranked suspects. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlastReport"];
                 };
             };
             400: components["responses"]["BadRequest"];
