@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { CalendarClock } from "lucide-react";
 import { useFacets, useMatrix } from "@/lib/queries";
 import { isEphemeral, orderEnvs } from "@/lib/envOrder";
 import { DiffMatrix } from "@/components/diff/DiffMatrix";
@@ -43,25 +44,37 @@ export function Diff() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <label htmlFor="asof" className="text-xs text-muted-foreground">
-          As of:
+        <label htmlFor="asof" className="text-sm font-medium">
+          As of
         </label>
-        <input
-          id="asof"
-          type="datetime-local"
-          value={atLocal}
-          onChange={(e) => setAtLocal(e.target.value)}
-          className="rounded-md border bg-background px-2 py-0.5 text-xs"
-        />
+        <div className="relative">
+          <CalendarClock className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            id="asof"
+            type="datetime-local"
+            value={atLocal}
+            onChange={(e) => setAtLocal(e.target.value)}
+            // Open the native picker from anywhere on the field, not just the
+            // tiny calendar glyph.
+            onClick={(e) => {
+              try {
+                e.currentTarget.showPicker();
+              } catch {
+                // showPicker() unsupported on older browsers — the field still works.
+              }
+            }}
+            className="h-9 min-w-[15rem] cursor-pointer rounded-md border bg-background pl-9 pr-3 text-sm hover:bg-accent"
+          />
+        </div>
         {atLocal ? (
           <button
             onClick={() => setAtLocal("")}
-            className="rounded-full border px-2.5 py-0.5 text-xs text-muted-foreground hover:bg-accent"
+            className="rounded-md border px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent"
           >
             Now
           </button>
         ) : (
-          <span className="text-xs text-muted-foreground">current state</span>
+          <span className="text-sm text-muted-foreground">showing current state</span>
         )}
       </div>
 

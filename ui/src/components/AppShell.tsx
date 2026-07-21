@@ -21,8 +21,8 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/timeline", label: "Timeline", icon: ListTree },
   { to: "/changes", label: "Changes", icon: Layers },
+  { to: "/timeline", label: "Timeline", icon: ListTree },
   { to: "/where", label: "Where", icon: Route },
   { to: "/diff", label: "Diff", icon: GitCompareArrows },
   { to: "/services", label: "Services", icon: Server },
