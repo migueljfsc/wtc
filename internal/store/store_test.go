@@ -395,6 +395,11 @@ func TestFullTextSearch(t *testing.T) {
 			e.Title = "bump image"
 			e.Artifact = "reg/payments-api:sha-abc1234"
 		}),
+		testEvent("q:4", base.Add(3*time.Minute), func(e *model.Event) {
+			e.Title = "reconcile"
+			e.Ref = "deadbeef1234567890"
+			e.Env = "canary"
+		}),
 	}
 	for _, ev := range seed {
 		if _, _, err := s.Ingest(ctx, ev); err != nil {
@@ -409,7 +414,9 @@ func TestFullTextSearch(t *testing.T) {
 		{"payments", []string{"q:3", "q:1"}}, // title + artifact, prefix-tokenized
 		{"alice", []string{"q:2"}},
 		{"credentials", []string{"q:1"}},
-		{"rot", []string{"q:1"}}, // prefix match
+		{"rot", []string{"q:1"}},      // prefix match
+		{"deadbeef", []string{"q:4"}}, // ref (sha) search
+		{"canary", []string{"q:4"}},   // env search
 		{"nosuchterm", nil},
 		{`weird"quote`, nil}, // FTS metachars must not error
 	}

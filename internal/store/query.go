@@ -40,7 +40,7 @@ type Filter struct {
 	Statuses []string
 	Actors   []string
 	Refs     []string // exact git sha / revision set — backs the changeset drill-in
-	Query    string   // FTS5 MATCH over title/service/actor/artifact
+	Query    string   // free-text over title/service/actor/artifact + ref/env/repo/owner
 	Since    time.Time
 	Until    time.Time
 	Limit    int
@@ -94,18 +94,26 @@ func (s *Store) ListEvents(ctx context.Context, f Filter) (events []model.Event,
 		add("ts <= ?", model.FormatTS(f.Until))
 	}
 	if f.Query != "" {
+		// Search spans the FTS text columns (title/service/actor/artifact) AND
+		// the facet columns ref/env/repo/owner, so typing a sha, env or team
+		// name in the search box finds its events. Terms are ANDed; each term
+		// must match some column.
 		if s.dialect == dialectPostgres {
-			// No FTS index on postgres (deliberate — the events table is
-			// small): each term must substring-match one of the searchable
-			// columns, terms ANDed. ILIKE mirrors FTS5's case-insensitivity;
-			// substring vs word-prefix is close enough for a change ledger.
+			// No FTS index on postgres (deliberate — the events table is small):
+			// each term substring-matches a searchable column via ILIKE.
 			for _, term := range strings.Fields(f.Query) {
 				p := "%" + escapeLike(term) + "%"
-				add(`(title ILIKE ? ESCAPE '\' OR service ILIKE ? ESCAPE '\' OR actor ILIKE ? ESCAPE '\' OR artifact ILIKE ? ESCAPE '\')`,
-					p, p, p, p)
+				add(`(title ILIKE ? ESCAPE '\' OR service ILIKE ? ESCAPE '\' OR actor ILIKE ? ESCAPE '\' OR artifact ILIKE ? ESCAPE '\' OR ref ILIKE ? ESCAPE '\' OR env ILIKE ? ESCAPE '\' OR repo ILIKE ? ESCAPE '\' OR owner ILIKE ? ESCAPE '\')`,
+					p, p, p, p, p, p, p, p)
 			}
 		} else {
-			add("rowid IN (SELECT rowid FROM events_fts WHERE events_fts MATCH ?)", ftsQuery(f.Query))
+			// FTS5 prefix match on the text columns, plus a substring LIKE on the
+			// facet columns the FTS index doesn't cover. Per term so both are ANDed.
+			for _, term := range strings.Fields(f.Query) {
+				p := "%" + escapeLike(term) + "%"
+				add(`(rowid IN (SELECT rowid FROM events_fts WHERE events_fts MATCH ?) OR ref LIKE ? ESCAPE '\' OR env LIKE ? ESCAPE '\' OR repo LIKE ? ESCAPE '\' OR owner LIKE ? ESCAPE '\')`,
+					ftsQuery(term), p, p, p, p)
+			}
 		}
 	}
 	if f.Cursor != "" {
