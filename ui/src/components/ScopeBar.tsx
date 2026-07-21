@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { Clock, Search } from "lucide-react";
 import { useScope, RANGE_PRESETS } from "@/lib/scope";
 import { useFacets } from "@/lib/queries";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
@@ -33,24 +33,7 @@ export function ScopeBar({ disabled = false }: { disabled?: boolean }) {
         disabled && "pointer-events-none select-none opacity-50",
       )}
     >
-      <div className="flex gap-0.5 rounded-md border p-0.5">
-        {RANGE_PRESETS.map((p) => (
-          <button
-            key={p.key}
-            onClick={() => setScope({ range: p.key })}
-            className={cn(
-              "rounded px-2 py-0.5 text-xs font-medium transition-colors",
-              scope.range === p.key
-                ? "bg-secondary text-secondary-foreground"
-                : "text-muted-foreground hover:bg-accent",
-            )}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="relative min-w-[10rem] flex-1">
+      <div className="relative w-56 max-w-full">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           className="h-8 pl-8"
@@ -73,6 +56,25 @@ export function ScopeBar({ disabled = false }: { disabled?: boolean }) {
           Clear
         </button>
       )}
+
+      {/* Time range — right-aligned, Grafana-style. */}
+      <div className="ml-auto flex items-center gap-0.5 rounded-md border p-0.5">
+        <Clock className="mx-1 size-3.5 text-muted-foreground" />
+        {RANGE_PRESETS.map((p) => (
+          <button
+            key={p.key}
+            onClick={() => setScope({ range: p.key })}
+            className={cn(
+              "rounded px-2 py-0.5 text-xs font-medium transition-colors",
+              scope.range === p.key
+                ? "bg-secondary text-secondary-foreground"
+                : "text-muted-foreground hover:bg-accent",
+            )}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
