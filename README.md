@@ -25,8 +25,9 @@ Working today, each verified against live infrastructure:
   JSON source, `/ingest/generic`, `wtc record`, `wtc wrap` (helm/terraform sniffers)
 - **Queries** — `log` (FTS5 `-q`), `where` (build → intent → applied per env,
   tag↔sha via configurable `tag_patterns`), `diff` (with `--at` point-in-time
-  state), `handoff`, `around`, `blast` (change↔alert correlation), `dora`
-  (change-failure rate + MTTR), `doctor`, `explain`
+  state), `changes` (build→deploy collapsed per commit), `handoff`, `around`,
+  `blast` (change↔alert correlation), `dora` (change-failure rate + MTTR),
+  `doctor`, `explain`
 - **Engine** — ordered env/service inference rules with globs + templates;
   owner inference from a service catalog (Backstage / Datadog / services.yaml /
   CODEOWNERS); strict-outrank dedup upsert (at-least-once ingestion, zero
@@ -83,8 +84,8 @@ end-to-end guide: Helm install + GitHub poller + Flux, start to finish.
 Per-source detail: [github-poller.md](docs/setup/github-poller.md) ·
 [flux.md](docs/setup/flux.md) · [wrap.md](docs/setup/wrap.md) ·
 [portal.md](docs/setup/portal.md) · [ownership.md](docs/setup/ownership.md) ·
-[dora.md](docs/setup/dora.md) · deploy via [deploy.md](docs/setup/deploy.md) ·
-[retention](docs/setup/retention.md).
+[dora.md](docs/setup/dora.md) · [changesets.md](docs/setup/changesets.md) ·
+deploy via [deploy.md](docs/setup/deploy.md) · [retention](docs/setup/retention.md).
 
 ## How it works
 

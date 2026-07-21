@@ -276,6 +276,21 @@
         }
       }
     },
+    "/api/v1/changesets": {
+      "get": {
+        "operationId": "changesets",
+        "summary": "Logical changes in a window: build → merge → per-env deploys collapsed by app sha.",
+        "parameters": [
+          { "name": "since", "in": "query", "description": "Window start. Default 30 days ago.", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "until", "in": "query", "description": "Window end. Default now.", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": { "description": "Changesets, newest-first.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChangesetsReport" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
     "/api/v1/facets": {
       "get": {
         "operationId": "facets",
@@ -701,6 +716,34 @@
           "overall": { "$ref": "#/components/schemas/DORAMetrics" },
           "by_env": { "type": "array", "items": { "$ref": "#/components/schemas/DORAGroup" } },
           "by_owner": { "type": "array", "items": { "$ref": "#/components/schemas/DORAGroup" } }
+        }
+      },
+      "Changeset": {
+        "type": "object",
+        "required": ["sha", "title", "services", "envs", "owners", "repos", "actors", "kinds", "first_ts", "last_ts", "events", "failed", "deployed"],
+        "properties": {
+          "sha": { "type": "string", "description": "Longest known form of the app commit sha." },
+          "title": { "type": "string", "description": "Representative title (merge > build > other)." },
+          "services": { "type": "array", "items": { "type": "string" } },
+          "envs": { "type": "array", "items": { "type": "string" }, "description": "Envs with a succeeded deploy of this sha." },
+          "owners": { "type": "array", "items": { "type": "string" } },
+          "repos": { "type": "array", "items": { "type": "string" } },
+          "actors": { "type": "array", "items": { "type": "string" } },
+          "kinds": { "type": "array", "items": { "type": "string" } },
+          "first_ts": { "type": "string", "format": "date-time" },
+          "last_ts": { "type": "string", "format": "date-time" },
+          "events": { "type": "integer", "description": "Events folded into the changeset." },
+          "failed": { "type": "boolean", "description": "Any failed/degraded event." },
+          "deployed": { "type": "boolean", "description": "Any succeeded deploy." }
+        }
+      },
+      "ChangesetsReport": {
+        "type": "object",
+        "required": ["since", "until", "changesets"],
+        "properties": {
+          "since": { "type": "string", "format": "date-time" },
+          "until": { "type": "string", "format": "date-time" },
+          "changesets": { "type": "array", "items": { "$ref": "#/components/schemas/Changeset" }, "description": "Newest-first by most recent event." }
         }
       },
       "Facets": {

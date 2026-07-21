@@ -288,6 +288,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/changesets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Logical changes in a window: build → merge → per-env deploys collapsed by app sha. */
+        get: operations["changesets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/facets": {
         parameters: {
             query?: never;
@@ -711,6 +728,37 @@ export interface components {
             overall: components["schemas"]["DORAMetrics"];
             by_env: components["schemas"]["DORAGroup"][];
             by_owner: components["schemas"]["DORAGroup"][];
+        };
+        Changeset: {
+            /** @description Longest known form of the app commit sha. */
+            sha: string;
+            /** @description Representative title (merge > build > other). */
+            title: string;
+            services: string[];
+            /** @description Envs with a succeeded deploy of this sha. */
+            envs: string[];
+            owners: string[];
+            repos: string[];
+            actors: string[];
+            kinds: string[];
+            /** Format: date-time */
+            first_ts: string;
+            /** Format: date-time */
+            last_ts: string;
+            /** @description Events folded into the changeset. */
+            events: number;
+            /** @description Any failed/degraded event. */
+            failed: boolean;
+            /** @description Any succeeded deploy. */
+            deployed: boolean;
+        };
+        ChangesetsReport: {
+            /** Format: date-time */
+            since: string;
+            /** Format: date-time */
+            until: string;
+            /** @description Newest-first by most recent event. */
+            changesets: components["schemas"]["Changeset"][];
         };
         Facets: {
             sources: string[];
@@ -1394,6 +1442,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DORAReport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    changesets: {
+        parameters: {
+            query?: {
+                /** @description Window start. Default 30 days ago. */
+                since?: string;
+                /** @description Window end. Default now. */
+                until?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Changesets, newest-first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangesetsReport"];
                 };
             };
             400: components["responses"]["BadRequest"];

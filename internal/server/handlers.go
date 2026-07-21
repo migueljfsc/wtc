@@ -179,6 +179,22 @@ func (s *Server) handleDORA(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusOK, report)
 }
 
+// handleChangesets lists the logical changes (grouped by app sha) active in a
+// window — build → merge → per-env deploys collapsed into one row each.
+func (s *Server) handleChangesets(w http.ResponseWriter, r *http.Request) {
+	since, until, ok := s.statsWindow(w, r)
+	if !ok {
+		return
+	}
+	report, err := query.Changesets(r.Context(), s.store, s.tags.Load(), since, until)
+	if err != nil {
+		s.log.Error("changesets", "error", err)
+		s.writeError(w, http.StatusInternalServerError, "query error")
+		return
+	}
+	s.writeJSON(w, http.StatusOK, report)
+}
+
 // resolveAnchor resolves the ?id=/?ts= anchor pair shared by /around and
 // /blast: the anchor instant, plus the anchor event when id-anchored (nil for
 // a bare ts). On failure it writes the error response and returns ok=false.

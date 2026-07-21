@@ -77,6 +77,82 @@ func newWhereCmd(flags *clientFlags) *cobra.Command {
 	return cmd
 }
 
+func newChangesCmd(flags *clientFlags) *cobra.Command {
+	var asJSON bool
+	var since, until string
+	cmd := &cobra.Command{
+		Use:   "changes",
+		Short: "List logical changes (build → merge → per-env deploys, grouped by sha)",
+		Long: `Collapses every event carrying one app commit sha — its build, merge/push,
+and per-env deploys — into a single change, newest first. A change spans all
+the envs it reached even though each env's deploy is a distinct manifests
+revision. Use "wtc where <sha>" to expand one change's full journey.`,
+		Example: "  wtc changes --since 7d\n  wtc changes --since 24h --json",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			now := time.Now()
+			sinceTS, err := parseTimeRef(since, now)
+			if err != nil {
+				return fmt.Errorf("--since: %w", err)
+			}
+			params := url.Values{"since": {model.FormatTS(sinceTS)}}
+			if until != "" {
+				u, err := parseTimeRef(until, now)
+				if err != nil {
+					return fmt.Errorf("--until: %w", err)
+				}
+				params.Set("until", model.FormatTS(u))
+			}
+
+			r, err := flags.resolve().Changesets(cmd.Context(), params)
+			if err != nil {
+				return err
+			}
+			if asJSON {
+				return jsonOut(cmd, r)
+			}
+			out := cmd.OutOrStdout()
+			if len(r.Changesets) == 0 {
+				_, _ = fmt.Fprintln(out, "no changes with a resolvable sha in the window")
+				return nil
+			}
+			w := tabwriter.NewWriter(out, 2, 4, 2, ' ', 0)
+			_, _ = fmt.Fprintln(w, "CHANGE\tSERVICES\tENVS\tSTATUS\tLATEST\tTITLE")
+			for _, cs := range r.Changesets {
+				status := "in progress"
+				switch {
+				case cs.Failed:
+					status = "failed"
+				case cs.Deployed:
+					status = "deployed"
+				}
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+					short7(cs.Sha), cmp.Or(strings.Join(cs.Services, ","), "-"),
+					cmp.Or(strings.Join(cs.Envs, ","), "-"), status,
+					cs.LastTS.Local().Format("2006-01-02 15:04"), firstLine(cs.Title))
+			}
+			return w.Flush()
+		},
+	}
+	cmd.Flags().StringVar(&since, "since", "7d", "window start: 2h, 7d, or RFC3339")
+	cmd.Flags().StringVar(&until, "until", "", "window end: duration ago or RFC3339 (default now)")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
+	return cmd
+}
+
+func short7(sha string) string {
+	if len(sha) > 7 {
+		return sha[:7]
+	}
+	return sha
+}
+
+func firstLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return s[:i]
+	}
+	return s
+}
+
 func newDoraCmd(flags *clientFlags) *cobra.Command {
 	var asJSON bool
 	var since, until, window string

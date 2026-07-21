@@ -65,6 +65,20 @@ export function useDORA(sinceISO: string) {
   });
 }
 
+/** Logical changes (build → merge → per-env deploys, grouped by app sha). */
+export function useChangesets(sinceISO: string) {
+  return useQuery({
+    queryKey: ["changesets", sinceISO],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/changesets", {
+        params: { query: { since: sinceISO } },
+      });
+      if (error) throw new Error("changesets request failed");
+      return data;
+    },
+  });
+}
+
 export function useRecentEvents(limit: number) {
   return useQuery({
     queryKey: ["events", "recent", limit],

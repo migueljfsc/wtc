@@ -8,6 +8,7 @@ import { LoginPage } from "@/auth/LoginPage";
 // (Recharts in the dashboard) don't weigh down first load or the other views.
 const Dashboard = lazy(() => import("@/pages/Dashboard").then((m) => ({ default: m.Dashboard })));
 const Timeline = lazy(() => import("@/pages/Timeline").then((m) => ({ default: m.Timeline })));
+const Changes = lazy(() => import("@/pages/Changes").then((m) => ({ default: m.Changes })));
 const Where = lazy(() => import("@/pages/Where").then((m) => ({ default: m.Where })));
 const Diff = lazy(() => import("@/pages/Diff").then((m) => ({ default: m.Diff })));
 const Services = lazy(() => import("@/pages/Services").then((m) => ({ default: m.Services })));
@@ -38,6 +39,7 @@ export function App() {
             }
           />
           <Route path="timeline" element={<Suspense fallback={<PageFallback />}><Timeline /></Suspense>} />
+          <Route path="changes" element={<Suspense fallback={<PageFallback />}><Changes /></Suspense>} />
           <Route path="where" element={<Suspense fallback={<PageFallback />}><Where /></Suspense>} />
           <Route path="diff" element={<Suspense fallback={<PageFallback />}><Diff /></Suspense>} />
           <Route path="services" element={<Suspense fallback={<PageFallback />}><Services /></Suspense>} />

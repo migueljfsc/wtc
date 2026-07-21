@@ -157,6 +157,13 @@ func (c *Client) DORA(ctx context.Context, params url.Values) (query.DORAReport,
 	return out, err
 }
 
+// Changesets lists the logical changes (grouped by app sha) active in a window.
+func (c *Client) Changesets(ctx context.Context, params url.Values) (query.ChangesetsReport, error) {
+	var out query.ChangesetsReport
+	err := c.do(ctx, http.MethodGet, "/api/changesets?"+params.Encode(), nil, &out)
+	return out, err
+}
+
 // Explain fetches the per-field inference trace for an event.
 func (c *Client) Explain(ctx context.Context, id string) (server.ExplainReport, error) {
 	var out server.ExplainReport

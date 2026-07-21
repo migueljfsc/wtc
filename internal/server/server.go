@@ -241,6 +241,7 @@ func (s *Server) apiRoutes() []apiRoute {
 		{"GET", "/stats/activity", http.HandlerFunc(s.handleStatsActivity)},
 		{"GET", "/stats/deploys", http.HandlerFunc(s.handleStatsDeploys)},
 		{"GET", "/dora", http.HandlerFunc(s.handleDORA)},
+		{"GET", "/changesets", http.HandlerFunc(s.handleChangesets)},
 		{"GET", "/facets", http.HandlerFunc(s.handleFacets)},
 		{"GET", "/matrix", http.HandlerFunc(s.handleMatrix)},
 		{"GET", "/config", http.HandlerFunc(s.handleConfig)},
