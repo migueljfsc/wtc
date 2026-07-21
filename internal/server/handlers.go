@@ -59,6 +59,12 @@ func (s *Server) handleIngestGeneric(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	// Owner is a catalog stamp, not payload inference, so it applies even on
+	// this operator-owned path (which skips the rules engine) — service is
+	// caller-provided here. Mirrors how redaction runs on every ingest path.
+	if s.ownerResolver != nil && ev.Owner == "" {
+		ev.Owner = s.ownerResolver(ev.Service, ev.Repo)
+	}
 	// Redaction before storage — hard rule, every ingest path.
 	normalize.RedactEvent(ev)
 
@@ -290,6 +296,7 @@ func (s *Server) handleListEvents(w http.ResponseWriter, r *http.Request) {
 		Envs:     csv(q.Get("env")),
 		Services: csv(q.Get("service")),
 		Repos:    csv(q.Get("repo")),
+		Owners:   csv(q.Get("owner")),
 		Kinds:    csv(q.Get("kind")),
 		Statuses: csv(q.Get("status")),
 		Actors:   csv(q.Get("actor")),

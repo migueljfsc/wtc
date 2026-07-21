@@ -39,7 +39,7 @@ func (s *Server) loadConfigOverrides() {
 		var rules []normalize.Rule
 		if err := json.Unmarshal([]byte(raw), &rules); err != nil {
 			s.log.Error("parse rules override", "error", err)
-		} else if eng, err := normalize.NewEngine(rules); err != nil {
+		} else if eng, err := normalize.NewEngine(rules, normalize.WithOwnerResolver(s.ownerResolver)); err != nil {
 			s.log.Error("compile rules override", "error", err)
 		} else {
 			s.engine.Swap(eng)
@@ -98,7 +98,7 @@ func (s *Server) handlePutRules(w http.ResponseWriter, r *http.Request) {
 	if !s.decodeBody(w, r, &body) {
 		return
 	}
-	eng, err := normalize.NewEngine(body.Rules)
+	eng, err := normalize.NewEngine(body.Rules, normalize.WithOwnerResolver(s.ownerResolver))
 	if err != nil {
 		s.writeError(w, http.StatusBadRequest, "invalid rules: "+err.Error())
 		return
@@ -127,7 +127,7 @@ func (s *Server) handleResetRules(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusInternalServerError, "storage error")
 		return
 	}
-	eng, err := normalize.NewEngine(s.fileRules) // valid at startup
+	eng, err := normalize.NewEngine(s.fileRules, normalize.WithOwnerResolver(s.ownerResolver)) // valid at startup
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, "rebuild baseline rules")
 		return

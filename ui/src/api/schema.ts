@@ -411,6 +411,8 @@ export interface components {
             service: string;
             /** @description Source repo (owner/name); empty for cluster-side events (flux/argo). */
             repo: string;
+            /** @description Owning team, inferred from service via the catalog; empty when unmapped. */
+            owner: string;
             actor: string;
             /** @description Git sha / revision. */
             ref: string;
@@ -603,6 +605,8 @@ export interface components {
             sources: components["schemas"]["SourceHealth"][];
             unmapped_24h: number;
             unmapped_samples?: string[];
+            /** @description Services absent from the catalog; only when a catalog is in use. */
+            unowned_services?: string[];
             clock_skew_24h: number;
             poll?: components["schemas"]["PollState"][];
             /** @description Mapping-webhook sources with a probable unstable dedup_key. */
@@ -669,6 +673,7 @@ export interface components {
             envs: string[];
             services: string[];
             repos: string[];
+            owners: string[];
             actors: string[];
         };
         MatrixCell: {
@@ -965,6 +970,8 @@ export interface operations {
                 service?: string;
                 /** @description Facet OR-set (comma-separated): source repo (owner/name). */
                 repo?: string;
+                /** @description Facet OR-set (comma-separated): owning team. */
+                owner?: string;
                 /** @description Facet OR-set (comma-separated). */
                 kind?: string;
                 /** @description Facet OR-set (comma-separated). */

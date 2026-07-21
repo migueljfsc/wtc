@@ -1,0 +1,23 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: api
+spec:
+  type: service
+  lifecycle: production
+  owner: group:platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: web
+spec:
+  owner: frontend
+---
+# Non-Component entities carry an owner too but are not deploy units.
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: storefront
+spec:
+  owner: commerce

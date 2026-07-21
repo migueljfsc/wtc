@@ -23,7 +23,7 @@ var ErrInvalidCursor = errors.New("invalid cursor")
 
 // eventColumns is the canonical select list scanEvent expects.
 const eventColumns = `id, ts, ingested_at, source, kind, status, env, cluster,
-	namespace, service, repo, actor, ref, artifact, title, url,
+	namespace, service, repo, owner, actor, ref, artifact, title, url,
 	duration_ms, dedup_key, payload, facts`
 
 // Filter selects events for ListEvents. Zero values mean "no constraint".
@@ -35,6 +35,7 @@ type Filter struct {
 	Envs     []string
 	Services []string
 	Repos    []string
+	Owners   []string
 	Kinds    []string
 	Statuses []string
 	Actors   []string
@@ -80,6 +81,7 @@ func (s *Store) ListEvents(ctx context.Context, f Filter) (events []model.Event,
 	addIn("env", f.Envs)
 	addIn("service", f.Services)
 	addIn("repo", f.Repos)
+	addIn("owner", f.Owners)
 	addIn("kind", f.Kinds)
 	addIn("status", f.Statuses)
 	addIn("actor", f.Actors)
@@ -154,7 +156,7 @@ func scanEvent(rows *sql.Rows) (model.Event, error) {
 	)
 	if err := rows.Scan(
 		&ev.ID, &ts, &ingestedAt, &ev.Source, &ev.Kind, &ev.Status,
-		&ev.Env, &ev.Cluster, &ev.Namespace, &ev.Service, &ev.Repo, &ev.Actor,
+		&ev.Env, &ev.Cluster, &ev.Namespace, &ev.Service, &ev.Repo, &ev.Owner, &ev.Actor,
 		&ev.Ref, &ev.Artifact, &ev.Title, &ev.URL,
 		&durationMS, &ev.DedupKey, &payload, &facts,
 	); err != nil {

@@ -173,3 +173,50 @@ func TestNewEngineErrors(t *testing.T) {
 		t.Error("bad template: want error at NewEngine time")
 	}
 }
+
+func TestEngineOwnerResolver(t *testing.T) {
+	resolver := func(service, repo string) string {
+		switch {
+		case service == "api":
+			return "platform"
+		case repo == "acme/legacy":
+			return "legacy-team"
+		}
+		return ""
+	}
+	rules := []Rule{
+		{Match: RuleMatch{Source: "github", Event: "workflow_run"}, Set: RuleSet{Service: `{{ trimPrefix .Repo "acme/" }}`}},
+	}
+	e, err := NewEngine(rules, WithOwnerResolver(resolver))
+	if err != nil {
+		t.Fatalf("NewEngine: %v", err)
+	}
+
+	// service inferred = "api" → owner resolved from the service.
+	ev := apply(t, e, &model.Event{}, Facts{Source: "github", Event: "workflow_run", Repo: "acme/api"})
+	if ev.Service != "api" {
+		t.Fatalf("service = %q, want api", ev.Service)
+	}
+	if ev.Owner != "platform" {
+		t.Errorf("owner = %q, want platform (from service)", ev.Owner)
+	}
+
+	// service has no owner mapping → repo fallback wins.
+	ev2 := apply(t, e, &model.Event{}, Facts{Source: "github", Event: "workflow_run", Repo: "acme/legacy"})
+	if ev2.Owner != "legacy-team" {
+		t.Errorf("owner = %q, want legacy-team (repo fallback)", ev2.Owner)
+	}
+
+	// no resolver configured → owner stays "".
+	bare := mustEngine(t, rules)
+	evb := apply(t, bare, &model.Event{}, Facts{Source: "github", Event: "workflow_run", Repo: "acme/api"})
+	if evb.Owner != "" {
+		t.Errorf("owner without resolver = %q, want empty", evb.Owner)
+	}
+
+	// a normalizer that already set owner wins (first-writer-wins).
+	pre := apply(t, e, &model.Event{Owner: "preset-team"}, Facts{Source: "github", Event: "workflow_run", Repo: "acme/api"})
+	if pre.Owner != "preset-team" {
+		t.Errorf("preset owner overwritten = %q, want preset-team", pre.Owner)
+	}
+}

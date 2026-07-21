@@ -200,6 +200,7 @@ type Facets struct {
 	Envs     []string `json:"envs"`
 	Services []string `json:"services"`
 	Repos    []string `json:"repos"`
+	Owners   []string `json:"owners"`
 	Actors   []string `json:"actors"`
 }
 
@@ -207,7 +208,7 @@ type Facets struct {
 // actors/ephemeral envs) can't return an unbounded list.
 const maxFacetValues = 500
 
-// Facets returns the sorted distinct non-empty source/env/service/repo/actor values.
+// Facets returns the sorted distinct non-empty source/env/service/repo/owner/actor values.
 func (s *Store) Facets(ctx context.Context) (*Facets, error) {
 	distinct := func(col string) ([]string, error) {
 		// col is a fixed literal from the call sites below, never user input.
@@ -241,6 +242,9 @@ func (s *Store) Facets(ctx context.Context) (*Facets, error) {
 		return nil, err
 	}
 	if f.Repos, err = distinct("repo"); err != nil {
+		return nil, err
+	}
+	if f.Owners, err = distinct("owner"); err != nil {
 		return nil, err
 	}
 	if f.Actors, err = distinct("actor"); err != nil {

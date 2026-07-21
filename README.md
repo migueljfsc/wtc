@@ -27,8 +27,9 @@ Working today, each verified against live infrastructure:
   tag↔sha via configurable `tag_patterns`), `diff` (with `--at` point-in-time
   state), `handoff`, `around`, `blast` (change↔alert correlation), `doctor`, `explain`
 - **Engine** — ordered env/service inference rules with globs + templates;
-  strict-outrank dedup upsert (at-least-once ingestion, zero duplicates);
-  PR/MR-diff enrichment; redaction before storage
+  owner inference from a service catalog (Backstage / Datadog / services.yaml /
+  CODEOWNERS); strict-outrank dedup upsert (at-least-once ingestion, zero
+  duplicates); PR/MR-diff enrichment; redaction before storage
 - **Surfaces** — embedded timeline UI at `/`, a **rich portal SPA** (dashboard +
   faceted timeline + config), Atom feed, Slack digest, outbound notifications
   (slack / webhook / grafana-annotation), Prometheus `/metrics`, `wtc demo` seed
@@ -80,8 +81,8 @@ end-to-end guide: Helm install + GitHub poller + Flux, start to finish.
 
 Per-source detail: [github-poller.md](docs/setup/github-poller.md) ·
 [flux.md](docs/setup/flux.md) · [wrap.md](docs/setup/wrap.md) ·
-[portal.md](docs/setup/portal.md) · deploy via [deploy.md](docs/setup/deploy.md) ·
-[retention](docs/setup/retention.md).
+[portal.md](docs/setup/portal.md) · [ownership.md](docs/setup/ownership.md) ·
+deploy via [deploy.md](docs/setup/deploy.md) · [retention](docs/setup/retention.md).
 
 ## How it works
 

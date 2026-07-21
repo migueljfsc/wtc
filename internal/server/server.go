@@ -65,6 +65,10 @@ type Options struct {
 	// config viewer). Display copies of what the engine/resolver were built from.
 	Rules       []normalize.Rule
 	TagPatterns []string
+	// OwnerResolver stamps each event's owning team from the service catalog;
+	// nil leaves owner unset. Re-applied on every engine rebuild so rule
+	// hot-reloads never drop ownership.
+	OwnerResolver normalize.OwnerResolver
 	// Mappers are the compiled mapping webhooks, keyed by source name;
 	// nil/empty means /ingest/webhook/<name> 404s for every name.
 	Mappers map[string]*mapping.Mapper
@@ -92,6 +96,7 @@ type Server struct {
 	fluxScope          *normalize.CompiledScope // ingest allow/deny; nil = permit all
 	argocdScope        *normalize.CompiledScope
 	engine             *normalize.EngineHolder
+	ownerResolver      normalize.OwnerResolver
 	tags               *normalize.TagResolverHolder
 	mappers            map[string]*mapping.Mapper
 	mapErrs            *mappingErrorTracker
@@ -124,7 +129,7 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 	}
 	engine := opts.Engine
 	if engine == nil {
-		e, _ := normalize.NewEngine(nil) // empty rule set cannot fail
+		e, _ := normalize.NewEngine(nil, normalize.WithOwnerResolver(opts.OwnerResolver)) // empty rule set cannot fail
 		engine = normalize.NewEngineHolder(e)
 	}
 	tags := opts.Tags
@@ -144,6 +149,7 @@ func New(st *store.Store, opts Options, log *slog.Logger) *Server {
 		fluxScope:          opts.FluxScope,
 		argocdScope:        opts.ArgoCDScope,
 		engine:             engine,
+		ownerResolver:      opts.OwnerResolver,
 		tags:               tags,
 		mappers:            opts.Mappers,
 		mapErrs:            newMappingErrorTracker(),

@@ -1,0 +1,3 @@
+# Fallback ownership for a repo with no catalog entry.
+*        @acme/legacy-team
+/docs    @acme/docs-team

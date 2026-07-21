@@ -56,6 +56,7 @@ type DoctorReport struct {
 	Sources              []SourceHealth        `json:"sources"`
 	Unmapped24h          int                   `json:"unmapped_24h"`
 	UnmappedSamples      []string              `json:"unmapped_samples,omitempty"`
+	UnownedServices      []string              `json:"unowned_services,omitempty"` // services absent from the catalog (only when a catalog is in use)
 	ClockSkew24h         int                   `json:"clock_skew_24h"`
 	Poll                 []PollState           `json:"poll,omitempty"`
 	WebhookChurn         []WebhookChurn        `json:"webhook_churn,omitempty"`          // unstable dedup_key heuristic
@@ -158,6 +159,37 @@ FROM events GROUP BY source ORDER BY source`, dayAgo)
 			r.UnmappedSamples = append(r.UnmappedSamples, t)
 		}
 		if err := samples.Err(); err != nil {
+			return nil, err
+		}
+	}
+
+	// Owner gaps: services that appear without an owner while a catalog is
+	// clearly in use (some event carries one). Actionable — add them to the
+	// catalog. Skipped entirely when no owner is set anywhere (no catalog),
+	// so this never fires as noise on installs that don't use ownership.
+	var owned int
+	if err := s.readDB.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM events WHERE owner != ''`).Scan(&owned); err != nil {
+		return nil, fmt.Errorf("doctor: owned count: %w", err)
+	}
+	if owned > 0 {
+		unowned, err := s.readDB.QueryContext(ctx, `
+SELECT DISTINCT service FROM events
+WHERE service != '' AND owner = ''
+  AND service NOT IN (SELECT service FROM events WHERE service != '' AND owner != '')
+ORDER BY service LIMIT 50`)
+		if err != nil {
+			return nil, fmt.Errorf("doctor: unowned services: %w", err)
+		}
+		defer func() { _ = unowned.Close() }()
+		for unowned.Next() {
+			var svc string
+			if err := unowned.Scan(&svc); err != nil {
+				return nil, err
+			}
+			r.UnownedServices = append(r.UnownedServices, svc)
+		}
+		if err := unowned.Err(); err != nil {
 			return nil, err
 		}
 	}

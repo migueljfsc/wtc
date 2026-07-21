@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/migueljfsc/wtc/internal/catalog"
 	"github.com/migueljfsc/wtc/internal/config"
 	"github.com/migueljfsc/wtc/internal/ingest/github"
 	"github.com/migueljfsc/wtc/internal/ingest/gitlab"
@@ -77,8 +78,20 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 		return err
 	}
 
-	// Rules engine — compiled once; config errors surface at startup.
-	engine, err := normalize.NewEngine(cfg.Rules)
+	// Service catalog — read once at startup; owner is stamped from it at
+	// ingest. An empty catalog resolves every owner to "" (harmless no-op).
+	cat, err := catalog.Load(cfg.Catalog.Sources)
+	if err != nil {
+		_ = st.Close()
+		return fmt.Errorf("catalog: %w", err)
+	}
+	if len(cfg.Catalog.Sources) > 0 {
+		log.Info("service catalog loaded", "sources", len(cfg.Catalog.Sources), "mappings", cat.Len())
+	}
+
+	// Rules engine — compiled once; config errors surface at startup. The
+	// catalog resolver rides along so ingest stamps each event's owner.
+	engine, err := normalize.NewEngine(cfg.Rules, normalize.WithOwnerResolver(cat.Owner))
 	if err != nil {
 		_ = st.Close()
 		return fmt.Errorf("rules: %w", err)
@@ -137,6 +150,7 @@ func runServe(configPath string, configOptional bool, captureDir string) error {
 			ArgoCDScope:         argocdScope,
 			GitLabWebhookToken:  cfg.Sources.GitLab.WebhookSecret,
 			Engine:              engineHolder,
+			OwnerResolver:       cat.Owner,
 			Tags:                tagHolder,
 			CaptureDir:          cfg.Server.CaptureDir,
 			CORSAllowedOrigins:  cfg.Server.CORS.AllowedOrigins,

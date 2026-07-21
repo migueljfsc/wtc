@@ -15,6 +15,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/migueljfsc/wtc/internal/catalog"
 	"github.com/migueljfsc/wtc/internal/ingest/mapping"
 	"github.com/migueljfsc/wtc/internal/normalize"
 	"github.com/migueljfsc/wtc/internal/notify"
@@ -177,6 +178,14 @@ type Retention struct {
 	Interval            Duration `yaml:"interval"`              // run cadence; default 24h when Keep set
 }
 
+// Catalog configures the service→owner lookup. Sources are scanned in a fixed
+// priority order (backstage > datadog > services > codeowners); the first
+// non-empty owner per service wins. Files are read by `wtc serve` at startup,
+// not by CLI clients. Empty => owner is never inferred.
+type Catalog struct {
+	Sources []catalog.Source `yaml:"sources"`
+}
+
 // Config is the full wtc.yaml.
 type Config struct {
 	Server      Server           `yaml:"server"`
@@ -185,6 +194,7 @@ type Config struct {
 	Sources     Sources          `yaml:"sources"`
 	Rules       []normalize.Rule `yaml:"rules"`        // ordered env/service inference rules (SPEC §3)
 	TagPatterns []string         `yaml:"tag_patterns"` // tag→sha extraction; empty = defaults (SPEC §2)
+	Catalog     Catalog          `yaml:"catalog"`      // optional service→owner lookup
 	Digest      Digest           `yaml:"digest"`       // optional scheduled Slack digest
 	Retention   Retention        `yaml:"retention"`    // optional prune job (SPEC §8)
 	Metrics     Metrics          `yaml:"metrics"`      // Prometheus exposition
@@ -381,6 +391,22 @@ func Load(path string, optional bool) (*Config, error) {
 	}
 	if _, err := cfg.Sources.ArgoCD.Scope.Compile(); err != nil {
 		return nil, fmt.Errorf("config %s: sources.argocd.scope: %w", path, err)
+	}
+
+	// Catalog sources: validate shape up front (type known, path set, codeowners
+	// carries a repo). The files themselves are read by serve, not here — a CLI
+	// client need not have the catalog on disk.
+	for i, cs := range cfg.Catalog.Sources {
+		if !slices.Contains(catalog.ValidTypes, cs.Type) {
+			return nil, fmt.Errorf("config %s: catalog.sources[%d].type %q invalid (want one of %s)",
+				path, i, cs.Type, strings.Join(catalog.ValidTypes, ", "))
+		}
+		if cs.Path == "" {
+			return nil, fmt.Errorf("config %s: catalog.sources[%d] needs a path", path, i)
+		}
+		if cs.Type == "codeowners" && cs.Repo == "" {
+			return nil, fmt.Errorf("config %s: catalog.sources[%d] (codeowners) needs `repo`", path, i)
+		}
 	}
 
 	return &cfg, nil

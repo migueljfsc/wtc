@@ -84,6 +84,20 @@ type compiledRule struct {
 // matching rule fills only fields still unset (first-writer-wins per field).
 type Engine struct {
 	rules []compiledRule
+	owner OwnerResolver
+}
+
+// OwnerResolver maps (service, repo) to an owning team. Set via WithOwnerResolver;
+// nil leaves owner unset (no catalog configured).
+type OwnerResolver func(service, repo string) string
+
+// EngineOption configures a new Engine.
+type EngineOption func(*Engine)
+
+// WithOwnerResolver stamps each event's owner from the service catalog after
+// service inference. A nil resolver is a no-op.
+func WithOwnerResolver(fn OwnerResolver) EngineOption {
+	return func(e *Engine) { e.owner = fn }
 }
 
 var tmplFuncs = template.FuncMap{
@@ -112,8 +126,9 @@ func TemplateFuncs() template.FuncMap {
 }
 
 // NewEngine compiles globs and templates up front so config errors surface at
-// startup, not per event.
-func NewEngine(rules []Rule) (*Engine, error) {
+// startup, not per event. Options attach cross-cutting resolvers (e.g. the
+// service catalog) that survive rule hot-reloads by being re-applied on rebuild.
+func NewEngine(rules []Rule, opts ...EngineOption) (*Engine, error) {
 	e := &Engine{}
 	for i, r := range rules {
 		var c compiledRule
@@ -164,6 +179,9 @@ func NewEngine(rules []Rule) (*Engine, error) {
 		}
 		e.rules = append(e.rules, c)
 	}
+	for _, opt := range opts {
+		opt(e)
+	}
 	return e, nil
 }
 
@@ -194,6 +212,12 @@ func (e *Engine) Apply(ev *model.Event, f Facts) error {
 	// (flux/argo) leave it empty. A normalizer that already set repo wins.
 	if ev.Repo == "" {
 		ev.Repo = f.Repo
+	}
+	// Owner is derived from the now-final service (repo is the fallback, e.g.
+	// CODEOWNERS). Left "" when no catalog match — surfaced by doctor, never
+	// guessed. A normalizer that already set owner wins.
+	if ev.Owner == "" && e.owner != nil {
+		ev.Owner = e.owner(ev.Service, ev.Repo)
 	}
 	ev.Facts = EncodeFactsRecord(f, preset)
 	RedactEvent(ev)

@@ -100,9 +100,9 @@ func dsn(path string, readOnly bool) string {
 // qualified form, so one statement serves both dialects.
 const upsertSQL = `
 INSERT INTO events (id, ts, ingested_at, source, kind, status, env, cluster,
-                    namespace, service, repo, actor, ref, artifact, title, url,
+                    namespace, service, repo, owner, actor, ref, artifact, title, url,
                     duration_ms, dedup_key, payload, facts)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(dedup_key) DO UPDATE SET
   status      = excluded.status,
   ts          = excluded.ts,
@@ -116,12 +116,13 @@ ON CONFLICT(dedup_key) DO UPDATE SET
   namespace   = coalesce(nullif(excluded.namespace, ''), events.namespace),
   service     = coalesce(nullif(excluded.service, ''), events.service),
   repo        = coalesce(nullif(excluded.repo, ''), events.repo),
+  owner       = coalesce(nullif(excluded.owner, ''), events.owner),
   actor       = coalesce(nullif(excluded.actor, ''), events.actor),
   ref         = coalesce(nullif(excluded.ref, ''), events.ref),
   artifact    = coalesce(nullif(excluded.artifact, ''), events.artifact)
 WHERE ? > (CASE events.status WHEN 'degraded' THEN 3 WHEN 'succeeded' THEN 2 WHEN 'failed' THEN 2 WHEN 'started' THEN 1 ELSE 0 END)
 RETURNING id, ts, ingested_at, source, kind, status, env, cluster, namespace,
-          service, repo, actor, ref, artifact, title, url, duration_ms, dedup_key`
+          service, repo, owner, actor, ref, artifact, title, url, duration_ms, dedup_key`
 
 // Open opens (creating if needed) the SQLite database at path, applies
 // pragmas and migrations, prepares the hot-path statements, and starts the
@@ -305,14 +306,14 @@ func (s *Store) upsert(ev *model.Event) writeResp {
 	err := s.upsertStmt.QueryRow(
 		ev.ID, model.FormatTS(ev.TS), model.FormatTS(ev.IngestedAt),
 		string(ev.Source), string(ev.Kind), string(ev.Status),
-		ev.Env, ev.Cluster, ev.Namespace, ev.Service, ev.Repo, ev.Actor,
+		ev.Env, ev.Cluster, ev.Namespace, ev.Service, ev.Repo, ev.Owner, ev.Actor,
 		ev.Ref, ev.Artifact, ev.Title, ev.URL,
 		ev.DurationMS, ev.DedupKey, payload, facts,
 		model.StatusRank(ev.Status), // strict-outrank guard on the update arm
 	).Scan(
 		&merged.ID, &ts, &ingestedAt, &merged.Source, &merged.Kind, &merged.Status,
 		&merged.Env, &merged.Cluster, &merged.Namespace, &merged.Service,
-		&merged.Repo, &merged.Actor, &merged.Ref, &merged.Artifact,
+		&merged.Repo, &merged.Owner, &merged.Actor, &merged.Ref, &merged.Artifact,
 		&merged.Title, &merged.URL, &durationMS, &merged.DedupKey,
 	)
 

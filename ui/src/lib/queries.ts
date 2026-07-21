@@ -8,6 +8,7 @@ export interface EventFilters {
   env?: string;
   service?: string;
   repo?: string;
+  owner?: string;
   kind?: string;
   status?: string;
   actor?: string;

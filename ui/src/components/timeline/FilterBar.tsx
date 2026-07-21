@@ -13,7 +13,7 @@ const KINDS = [
 ];
 const STATUSES = ["started", "succeeded", "failed", "degraded", "unknown"];
 
-type SelectKey = "source" | "env" | "service" | "repo" | "kind" | "status" | "actor";
+type SelectKey = "source" | "env" | "service" | "repo" | "owner" | "kind" | "status" | "actor";
 
 export function FilterBar({
   filters,
@@ -50,6 +50,7 @@ export function FilterBar({
         <MultiSelect label="env" value={filters.env} options={facets?.envs ?? []} onChange={(v) => onSelect("env", v)} />
         <MultiSelect label="repo" value={filters.repo} options={facets?.repos ?? []} onChange={(v) => onSelect("repo", v)} searchable />
         <MultiSelect label="service" value={filters.service} options={facets?.services ?? []} onChange={(v) => onSelect("service", v)} searchable />
+        <MultiSelect label="owner" value={filters.owner} options={facets?.owners ?? []} onChange={(v) => onSelect("owner", v)} searchable />
         <MultiSelect label="kind" value={filters.kind} options={KINDS} onChange={(v) => onSelect("kind", v)} />
         <MultiSelect label="status" value={filters.status} options={STATUSES} onChange={(v) => onSelect("status", v)} />
         <MultiSelect label="actor" value={filters.actor} options={facets?.actors ?? []} onChange={(v) => onSelect("actor", v)} searchable />

@@ -61,6 +61,7 @@
           { "name": "env", "in": "query", "description": "Facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "service", "in": "query", "description": "Facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "repo", "in": "query", "description": "Facet OR-set (comma-separated): source repo (owner/name).", "schema": { "type": "string" } },
+          { "name": "owner", "in": "query", "description": "Facet OR-set (comma-separated): owning team.", "schema": { "type": "string" } },
           { "name": "kind", "in": "query", "description": "Facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "status", "in": "query", "description": "Facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "actor", "in": "query", "description": "Facet OR-set (comma-separated).", "schema": { "type": "string" } },
@@ -378,7 +379,7 @@
       },
       "Event": {
         "type": "object",
-        "required": ["id", "ts", "ingested_at", "source", "kind", "status", "env", "cluster", "namespace", "service", "repo", "actor", "ref", "artifact", "title", "url", "dedup_key"],
+        "required": ["id", "ts", "ingested_at", "source", "kind", "status", "env", "cluster", "namespace", "service", "repo", "owner", "actor", "ref", "artifact", "title", "url", "dedup_key"],
         "properties": {
           "id": { "type": "string", "description": "ULID." },
           "ts": { "type": "string", "format": "date-time", "description": "Source event time (UTC)." },
@@ -391,6 +392,7 @@
           "namespace": { "type": "string" },
           "service": { "type": "string" },
           "repo": { "type": "string", "description": "Source repo (owner/name); empty for cluster-side events (flux/argo)." },
+          "owner": { "type": "string", "description": "Owning team, inferred from service via the catalog; empty when unmapped." },
           "actor": { "type": "string" },
           "ref": { "type": "string", "description": "Git sha / revision." },
           "artifact": { "type": "string", "description": "Primary artifact, e.g. registry/app:tag." },
@@ -587,6 +589,7 @@
           "sources": { "type": "array", "items": { "$ref": "#/components/schemas/SourceHealth" } },
           "unmapped_24h": { "type": "integer" },
           "unmapped_samples": { "type": "array", "items": { "type": "string" } },
+          "unowned_services": { "type": "array", "items": { "type": "string" }, "description": "Services absent from the catalog; only when a catalog is in use." },
           "clock_skew_24h": { "type": "integer" },
           "poll": { "type": "array", "items": { "$ref": "#/components/schemas/PollState" } },
           "webhook_churn": { "type": "array", "items": { "$ref": "#/components/schemas/WebhookChurn" }, "description": "Mapping-webhook sources with a probable unstable dedup_key." },
@@ -657,12 +660,13 @@
       },
       "Facets": {
         "type": "object",
-        "required": ["sources", "envs", "services", "repos", "actors"],
+        "required": ["sources", "envs", "services", "repos", "owners", "actors"],
         "properties": {
           "sources": { "type": "array", "items": { "type": "string" } },
           "envs": { "type": "array", "items": { "type": "string" } },
           "services": { "type": "array", "items": { "type": "string" } },
           "repos": { "type": "array", "items": { "type": "string" } },
+          "owners": { "type": "array", "items": { "type": "string" } },
           "actors": { "type": "array", "items": { "type": "string" } }
         }
       },

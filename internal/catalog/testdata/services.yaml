@@ -1,0 +1,6 @@
+services:
+  - service: catalog
+    owner: commerce
+    repo: acme/storefront-catalog
+  - service: worker
+    team: should-not-win

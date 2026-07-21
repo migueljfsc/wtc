@@ -29,6 +29,7 @@ type Match struct {
 	Env     string `yaml:"env" json:"env,omitempty"`
 	Service string `yaml:"service" json:"service,omitempty"`
 	Repo    string `yaml:"repo" json:"repo,omitempty"`
+	Owner   string `yaml:"owner" json:"owner,omitempty"`
 	Kind    string `yaml:"kind" json:"kind,omitempty"`
 	Status  string `yaml:"status" json:"status,omitempty"`
 }
@@ -60,9 +61,9 @@ const (
 )
 
 type compiledSub struct {
-	name                             string
-	env, service, repo, kind, status *regexp.Regexp // nil = unconstrained
-	sink                             Sink
+	name                                    string
+	env, service, repo, owner, kind, status *regexp.Regexp // nil = unconstrained
+	sink                                    Sink
 }
 
 // Compiled is a validated, glob-compiled subscription set ready for the
@@ -94,6 +95,7 @@ func Compile(subs []Subscription) (*Compiled, error) {
 		compile(&cs.env, sub.Match.Env)
 		compile(&cs.service, sub.Match.Service)
 		compile(&cs.repo, sub.Match.Repo)
+		compile(&cs.owner, sub.Match.Owner)
 		compile(&cs.kind, sub.Match.Kind)
 		compile(&cs.status, sub.Match.Status)
 		if err != nil {
@@ -139,6 +141,6 @@ func validateSink(s Sink) error {
 func (cs *compiledSub) matches(ev model.Event) bool {
 	check := func(re *regexp.Regexp, val string) bool { return re == nil || re.MatchString(val) }
 	return check(cs.env, ev.Env) && check(cs.service, ev.Service) &&
-		check(cs.repo, ev.Repo) && check(cs.kind, string(ev.Kind)) &&
-		check(cs.status, string(ev.Status))
+		check(cs.repo, ev.Repo) && check(cs.owner, ev.Owner) &&
+		check(cs.kind, string(ev.Kind)) && check(cs.status, string(ev.Status))
 }
