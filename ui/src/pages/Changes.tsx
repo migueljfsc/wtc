@@ -11,15 +11,22 @@ const WINDOWS = [
   { label: "30d", days: 30 },
 ];
 
-function Chips({ values }: { values: string[] }) {
+function Chips({ values, to }: { values: string[]; to?: (v: string) => string }) {
   if (values.length === 0) return <span className="text-muted-foreground">—</span>;
+  const cls = "rounded-full border px-1.5 py-0.5 font-mono text-xs";
   return (
     <span className="flex flex-wrap gap-1">
-      {values.map((v) => (
-        <span key={v} className="rounded-full border px-1.5 py-0.5 font-mono text-xs">
-          {v}
-        </span>
-      ))}
+      {values.map((v) =>
+        to ? (
+          <Link key={v} to={to(v)} className={cls + " hover:bg-accent"}>
+            {v}
+          </Link>
+        ) : (
+          <span key={v} className={cls}>
+            {v}
+          </span>
+        ),
+      )}
     </span>
   );
 }
@@ -69,24 +76,38 @@ export function Changes() {
             : cs.deployed
               ? "text-emerald-600 dark:text-emerald-500"
               : "text-muted-foreground";
+          // The change's events, filtered in the Timeline by the service(s) it
+          // touched (or its repo when it maps to no service — e.g. CI-only builds).
+          const filter = cs.services.length
+            ? `service=${cs.services.map(encodeURIComponent).join(",")}`
+            : cs.repos.length
+              ? `repo=${cs.repos.map(encodeURIComponent).join(",")}`
+              : "";
           return (
             <Card key={cs.sha}>
               <CardContent className="space-y-2 py-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <div className="flex items-baseline gap-2">
+                  <div className="flex min-w-0 items-baseline gap-2">
                     <Link
                       to={`/where?ref=${cs.sha}`}
+                      title="Trace this change's journey"
                       className="font-mono text-sm text-primary hover:underline"
                     >
                       {cs.sha.slice(0, 7)}
                     </Link>
-                    <span className="truncate text-sm">{cs.title || "—"}</span>
+                    <Link
+                      to={filter ? `/timeline?${filter}` : "/timeline"}
+                      title="See this change's events in the timeline"
+                      className="truncate text-sm hover:underline"
+                    >
+                      {cs.title || "—"}
+                    </Link>
                   </div>
                   <span className={"text-xs font-medium " + statusClass}>{status}</span>
                 </div>
                 <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-[auto_1fr] sm:gap-x-4">
                   <span className="pt-0.5">services</span>
-                  <Chips values={cs.services} />
+                  <Chips values={cs.services} to={(s) => `/services?service=${encodeURIComponent(s)}`} />
                   <span className="pt-0.5">envs</span>
                   <Chips values={cs.envs} />
                   {cs.owners.length > 0 && (

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Star, X } from "lucide-react";
 import type { components } from "@/api/schema";
 import { FilterBar } from "@/components/timeline/FilterBar";
@@ -17,9 +18,25 @@ import {
 type Event = components["schemas"]["Event"];
 type SelectKey = "source" | "env" | "service" | "repo" | "owner" | "kind" | "status" | "actor";
 
+const URL_FILTER_KEYS: SelectKey[] = [
+  "source", "env", "service", "repo", "owner", "kind", "status", "actor",
+];
+
 export function Timeline() {
-  const [filters, setFilters] = useState<EventFilters>({});
-  const [search, setSearch] = useState("");
+  // Seed filters from the URL once (deep-links, e.g. from the Changes page).
+  const [urlParams] = useSearchParams();
+  const initialFilters = useMemo<EventFilters>(() => {
+    const f: EventFilters = {};
+    for (const k of URL_FILTER_KEYS) {
+      const v = urlParams.get(k);
+      if (v) f[k] = v;
+    }
+    return f;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [filters, setFilters] = useState<EventFilters>(initialFilters);
+  const [search, setSearch] = useState(() => urlParams.get("q") ?? "");
   const [selected, setSelected] = useState<Event | null>(null);
   const [saved, setSaved] = useState<SavedFilter[]>(() => loadSavedFilters());
 

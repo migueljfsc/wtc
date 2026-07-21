@@ -123,6 +123,19 @@ func TestMatrixAsOf(t *testing.T) {
 	if len(m0.Services) != 0 {
 		t.Errorf("matrix as-of +30m must be empty; got %+v", m0.Services)
 	}
+
+	// Default-env discovery before any data returns no envs, so the grid must
+	// be empty WITHOUT building `env IN ()` — a SQL syntax error on postgres.
+	if _, err := s.LatestSucceededDeploys(ctx, nil, base.Add(3*time.Hour)); err != nil {
+		t.Errorf("LatestSucceededDeploys with no envs must not error: %v", err)
+	}
+	early, err := s.Matrix(ctx, nil, base.Add(-time.Hour))
+	if err != nil {
+		t.Fatalf("Matrix as-of before any data must not error: %v", err)
+	}
+	if len(early.Services) != 0 {
+		t.Errorf("matrix before any data must be empty; got %+v", early.Services)
+	}
 	// Default env discovery is point-in-time too: staging is first seen at +8h,
 	// so an as-of +3h default grid must not invent it as a column.
 	def, err := s.Matrix(ctx, nil, base.Add(3*time.Hour))

@@ -82,6 +82,11 @@ func (s *Store) EventsArtifactContaining(ctx context.Context, needle string, kin
 // deploys at or before that instant, reconstructing the state that was
 // running then; the zero value means "now" (no upper bound).
 func (s *Store) LatestSucceededDeploys(ctx context.Context, envs []string, asOf time.Time) ([]model.Event, error) {
+	// No envs => no query: `env IN ()` is a syntax error on postgres (and sqlite).
+	// This happens legitimately for a point-in-time `at` before any env existed.
+	if len(envs) == 0 {
+		return []model.Event{}, nil
+	}
 	ph := make([]string, len(envs))
 	args := make([]any, len(envs))
 	for i, e := range envs {
