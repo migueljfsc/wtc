@@ -240,6 +240,7 @@ func (s *Server) apiRoutes() []apiRoute {
 		{"GET", "/handoff", http.HandlerFunc(s.handleHandoff)},
 		{"GET", "/stats/activity", http.HandlerFunc(s.handleStatsActivity)},
 		{"GET", "/stats/deploys", http.HandlerFunc(s.handleStatsDeploys)},
+		{"GET", "/dora", http.HandlerFunc(s.handleDORA)},
 		{"GET", "/facets", http.HandlerFunc(s.handleFacets)},
 		{"GET", "/matrix", http.HandlerFunc(s.handleMatrix)},
 		{"GET", "/config", http.HandlerFunc(s.handleConfig)},

@@ -11,8 +11,12 @@ import { Button } from "@/components/ui/button";
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
 import { EnvHealthCards } from "@/components/dashboard/EnvHealthCards";
 import { RecentChanges } from "@/components/dashboard/RecentChanges";
-import { useActivity, useDeployStats, useRecentEvents } from "@/lib/queries";
+import { useActivity, useDeployStats, useDORA, useRecentEvents } from "@/lib/queries";
 import { daysAgoISO, pct } from "@/lib/format";
+
+const asPct = (f: number) => `${(f * 100).toFixed(1)}%`;
+const asMTTR = (s?: number) =>
+  s == null ? "—" : s < 3600 ? `${Math.round(s / 60)}m` : `${(s / 3600).toFixed(1)}h`;
 
 const WINDOWS = [
   { label: "14d", days: 14 },
@@ -54,6 +58,7 @@ export function Dashboard() {
 
   const activity = useActivity(since, "day");
   const deploys = useDeployStats(since);
+  const dora = useDORA(since);
   const recent = useRecentEvents(12);
 
   const totals = useMemo(() => {
@@ -113,6 +118,55 @@ export function Dashboard() {
         {deploys.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
         {deploys.error && <ErrorCard what="deploy stats" />}
         {deploys.data && <EnvHealthCards data={deploys.data} />}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-medium text-muted-foreground">
+          Delivery quality (DORA)
+        </h2>
+        {dora.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {dora.error && <ErrorCard what="DORA metrics" />}
+        {dora.data && (
+          <>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <StatTile
+                label="Change-failure rate"
+                value={asPct(dora.data.overall.change_failure_rate)}
+                tone={dora.data.overall.failures > 0 ? "danger" : undefined}
+              />
+              <StatTile label="MTTR" value={asMTTR(dora.data.overall.mttr_seconds)} />
+              <StatTile label="Incidents" value={dora.data.overall.incidents.toLocaleString()} />
+            </div>
+            {dora.data.by_env.length > 0 && (
+              <Card>
+                <CardContent className="pt-4">
+                  <table className="w-full text-sm">
+                    <thead className="text-xs text-muted-foreground">
+                      <tr className="text-left">
+                        <th className="pb-1 font-medium">env</th>
+                        <th className="pb-1 text-right font-medium">deploys</th>
+                        <th className="pb-1 text-right font-medium">CFR</th>
+                        <th className="pb-1 text-right font-medium">MTTR</th>
+                      </tr>
+                    </thead>
+                    <tbody className="tabular-nums">
+                      {dora.data.by_env.map((g) => (
+                        <tr key={g.key} className="border-t">
+                          <td className="py-1 font-mono">{g.key}</td>
+                          <td className="py-1 text-right">{g.deploys}</td>
+                          <td className={"py-1 text-right " + (g.failures > 0 ? "text-red-600 dark:text-red-500" : "")}>
+                            {asPct(g.change_failure_rate)}
+                          </td>
+                          <td className="py-1 text-right">{asMTTR(g.mttr_seconds)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )}
       </section>
 
       <Card>

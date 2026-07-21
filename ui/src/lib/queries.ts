@@ -51,6 +51,20 @@ export function useDeployStats(sinceISO: string) {
   });
 }
 
+/** Change-failure rate + MTTR over a window (DORA), overall and by env/owner. */
+export function useDORA(sinceISO: string) {
+  return useQuery({
+    queryKey: ["dora", sinceISO],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/dora", {
+        params: { query: { since: sinceISO } },
+      });
+      if (error) throw new Error("dora request failed");
+      return data;
+    },
+  });
+}
+
 export function useRecentEvents(limit: number) {
   return useQuery({
     queryKey: ["events", "recent", limit],

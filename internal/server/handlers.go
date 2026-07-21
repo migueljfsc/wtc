@@ -154,6 +154,31 @@ func (s *Server) handleHandoff(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusOK, report)
 }
 
+// handleDORA reports change-failure rate and MTTR over a window (overall, per
+// env, per owner). ?window= tunes the deploy→failure attribution span.
+func (s *Server) handleDORA(w http.ResponseWriter, r *http.Request) {
+	since, until, ok := s.statsWindow(w, r)
+	if !ok {
+		return
+	}
+	window := query.DefaultDORAWindow
+	if v := r.URL.Query().Get("window"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			s.writeError(w, http.StatusBadRequest, "window: expected a positive duration like 60m")
+			return
+		}
+		window = d
+	}
+	report, err := query.DORA(r.Context(), s.store, since, until, window)
+	if err != nil {
+		s.log.Error("dora", "error", err)
+		s.writeError(w, http.StatusInternalServerError, "query error")
+		return
+	}
+	s.writeJSON(w, http.StatusOK, report)
+}
+
 // resolveAnchor resolves the ?id=/?ts= anchor pair shared by /around and
 // /blast: the anchor instant, plus the anchor event when id-anchored (nil for
 // a bare ts). On failure it writes the error response and returns ok=false.

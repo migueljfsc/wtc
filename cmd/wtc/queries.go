@@ -14,6 +14,7 @@ import (
 
 	"github.com/migueljfsc/wtc/internal/model"
 	"github.com/migueljfsc/wtc/internal/notify"
+	"github.com/migueljfsc/wtc/internal/query"
 )
 
 func jsonOut(cmd *cobra.Command, v any) error {
@@ -74,6 +75,84 @@ func newWhereCmd(flags *clientFlags) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
 	return cmd
+}
+
+func newDoraCmd(flags *clientFlags) *cobra.Command {
+	var asJSON bool
+	var since, until, window string
+	cmd := &cobra.Command{
+		Use:   "dora",
+		Short: "Deploy-quality metrics: change-failure rate and MTTR, by env and team",
+		Long: `Change-failure rate (deploys that failed or were followed by an alert or
+rollback in the same env within --window) and MTTR (mean alert firing→resolved),
+overall and grouped by env and owning team. Deploy frequency lives in the
+dashboard; lead time is not yet computed.`,
+		Example: "  wtc dora --since 30d\n  wtc dora --since 90d --window 2h --json",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			now := time.Now()
+			sinceTS, err := parseTimeRef(since, now)
+			if err != nil {
+				return fmt.Errorf("--since: %w", err)
+			}
+			params := url.Values{"since": {model.FormatTS(sinceTS)}}
+			if until != "" {
+				u, err := parseTimeRef(until, now)
+				if err != nil {
+					return fmt.Errorf("--until: %w", err)
+				}
+				params.Set("until", model.FormatTS(u))
+			}
+			if window != "" {
+				params.Set("window", window)
+			}
+
+			r, err := flags.resolve().DORA(cmd.Context(), params)
+			if err != nil {
+				return err
+			}
+			if asJSON {
+				return jsonOut(cmd, r)
+			}
+
+			out := cmd.OutOrStdout()
+			win := (time.Duration(r.WindowSeconds) * time.Second).String()
+			_, _ = fmt.Fprintf(out, "%s → %s   (failure window %s)\n\n",
+				r.Since.Local().Format("2006-01-02"), r.Until.Local().Format("2006-01-02"), win)
+			_, _ = fmt.Fprintf(out, "overall: %d deploys · %s change-failure rate · %s MTTR (%d incidents)\n",
+				r.Overall.Deploys, doraPct(r.Overall.ChangeFailureRate), doraMTTR(r.Overall.MTTRSeconds), r.Overall.Incidents)
+
+			table := func(header string, groups []query.DORAGroup) {
+				if len(groups) == 0 {
+					return
+				}
+				_, _ = fmt.Fprintf(out, "\n%s\n", header)
+				w := tabwriter.NewWriter(out, 2, 4, 2, ' ', 0)
+				_, _ = fmt.Fprintln(w, "\tDEPLOYS\tCFR\tMTTR\tINCIDENTS")
+				for _, g := range groups {
+					_, _ = fmt.Fprintf(w, "%s\t%d\t%s\t%s\t%d\n",
+						g.Key, g.Deploys, doraPct(g.ChangeFailureRate), doraMTTR(g.MTTRSeconds), g.Incidents)
+				}
+				_ = w.Flush()
+			}
+			table("BY ENV", r.ByEnv)
+			table("BY TEAM", r.ByOwner)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&since, "since", "30d", "window start: 2h, 30d, or RFC3339")
+	cmd.Flags().StringVar(&until, "until", "", "window end: duration ago or RFC3339 (default now)")
+	cmd.Flags().StringVar(&window, "window", "", "deploy→failure attribution span, e.g. 60m (default 1h)")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
+	return cmd
+}
+
+func doraPct(f float64) string { return fmt.Sprintf("%.1f%%", f*100) }
+
+func doraMTTR(secs *float64) string {
+	if secs == nil {
+		return "-"
+	}
+	return (time.Duration(*secs) * time.Second).Round(time.Second).String()
 }
 
 func newDiffCmd(flags *clientFlags) *cobra.Command {

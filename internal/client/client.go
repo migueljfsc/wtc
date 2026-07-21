@@ -149,6 +149,14 @@ func (c *Client) Blast(ctx context.Context, params url.Values) (query.BlastRepor
 	return out, err
 }
 
+// DORA fetches change-failure rate and MTTR over a window (overall, per env,
+// per owner).
+func (c *Client) DORA(ctx context.Context, params url.Values) (query.DORAReport, error) {
+	var out query.DORAReport
+	err := c.do(ctx, http.MethodGet, "/api/dora?"+params.Encode(), nil, &out)
+	return out, err
+}
+
 // Explain fetches the per-field inference trace for an event.
 func (c *Client) Explain(ctx context.Context, id string) (server.ExplainReport, error) {
 	var out server.ExplainReport

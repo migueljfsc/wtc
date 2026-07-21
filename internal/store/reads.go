@@ -113,6 +113,18 @@ func (s *Store) LatestSucceededDeploys(ctx context.Context, envs []string, asOf 
 	return latest, nil
 }
 
+// EventsInWindow returns every event of the given kinds in [since, until],
+// oldest-first and uncapped — for aggregations (DORA) that must see all rows,
+// not a page. Kinds must be non-empty.
+func (s *Store) EventsInWindow(ctx context.Context, since, until time.Time, kinds []model.Kind) ([]model.Event, error) {
+	ph, args := kindPlaceholders(kinds)
+	args = append(args, model.FormatTS(since), model.FormatTS(until))
+	return s.queryEvents(ctx,
+		`SELECT `+eventColumns+` FROM events
+		 WHERE kind IN (`+ph+`) AND ts >= ? AND ts <= ?
+		 ORDER BY ts ASC`, args...)
+}
+
 func escapeLike(s string) string {
 	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 	return r.Replace(s)

@@ -260,6 +260,22 @@
         }
       }
     },
+    "/api/v1/dora": {
+      "get": {
+        "operationId": "dora",
+        "summary": "Change-failure rate and MTTR over a window (overall, per env, per owner).",
+        "parameters": [
+          { "name": "since", "in": "query", "description": "Window start. Default 30 days ago.", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "until", "in": "query", "description": "Window end. Default now.", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "window", "in": "query", "description": "Deploy→failure attribution span (Go duration, e.g. 60m). Default 1h.", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Deploy-quality metrics.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DORAReport" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
     "/api/v1/facets": {
       "get": {
         "operationId": "facets",
@@ -656,6 +672,35 @@
           "since": { "type": "string", "format": "date-time" },
           "until": { "type": "string", "format": "date-time" },
           "envs": { "type": "array", "items": { "$ref": "#/components/schemas/EnvDeployStats" }, "description": "Non-empty envs only, sorted by name." }
+        }
+      },
+      "DORAMetrics": {
+        "type": "object",
+        "required": ["deploys", "failures", "change_failure_rate", "incidents"],
+        "properties": {
+          "deploys": { "type": "integer", "description": "Terminal deploy events (succeeded + failed)." },
+          "failures": { "type": "integer", "description": "Deploys that failed or were followed by an alert/rollback in the same env within the window." },
+          "change_failure_rate": { "type": "number", "description": "failures / deploys; 0 when no deploys." },
+          "incidents": { "type": "integer", "description": "Resolved alerts counted for MTTR." },
+          "mttr_seconds": { "type": "number", "description": "Mean alert firing→resolved duration; absent when no incident resolved." }
+        }
+      },
+      "DORAGroup": {
+        "allOf": [
+          { "$ref": "#/components/schemas/DORAMetrics" },
+          { "type": "object", "required": ["key"], "properties": { "key": { "type": "string", "description": "The env or owner name." } } }
+        ]
+      },
+      "DORAReport": {
+        "type": "object",
+        "required": ["since", "until", "window_seconds", "overall", "by_env", "by_owner"],
+        "properties": {
+          "since": { "type": "string", "format": "date-time" },
+          "until": { "type": "string", "format": "date-time" },
+          "window_seconds": { "type": "integer", "description": "Deploy→failure attribution window." },
+          "overall": { "$ref": "#/components/schemas/DORAMetrics" },
+          "by_env": { "type": "array", "items": { "$ref": "#/components/schemas/DORAGroup" } },
+          "by_owner": { "type": "array", "items": { "$ref": "#/components/schemas/DORAGroup" } }
         }
       },
       "Facets": {

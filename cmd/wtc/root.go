@@ -53,6 +53,7 @@ func newRootCmd() *cobra.Command {
 		newHandoffCmd(flags),
 		newAroundCmd(flags),
 		newBlastCmd(flags),
+		newDoraCmd(flags),
 		newExplainCmd(flags),
 		newExportCmd(flags),
 		newBackupCmd(flags),

@@ -271,6 +271,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dora": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Change-failure rate and MTTR over a window (overall, per env, per owner). */
+        get: operations["dora"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/facets": {
         parameters: {
             query?: never;
@@ -667,6 +684,33 @@ export interface components {
             until: string;
             /** @description Non-empty envs only, sorted by name. */
             envs: components["schemas"]["EnvDeployStats"][];
+        };
+        DORAMetrics: {
+            /** @description Terminal deploy events (succeeded + failed). */
+            deploys: number;
+            /** @description Deploys that failed or were followed by an alert/rollback in the same env within the window. */
+            failures: number;
+            /** @description failures / deploys; 0 when no deploys. */
+            change_failure_rate: number;
+            /** @description Resolved alerts counted for MTTR. */
+            incidents: number;
+            /** @description Mean alert firing→resolved duration; absent when no incident resolved. */
+            mttr_seconds?: number;
+        };
+        DORAGroup: components["schemas"]["DORAMetrics"] & {
+            /** @description The env or owner name. */
+            key: string;
+        };
+        DORAReport: {
+            /** Format: date-time */
+            since: string;
+            /** Format: date-time */
+            until: string;
+            /** @description Deploy→failure attribution window. */
+            window_seconds: number;
+            overall: components["schemas"]["DORAMetrics"];
+            by_env: components["schemas"]["DORAGroup"][];
+            by_owner: components["schemas"]["DORAGroup"][];
         };
         Facets: {
             sources: string[];
@@ -1321,6 +1365,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeployStats"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    dora: {
+        parameters: {
+            query?: {
+                /** @description Window start. Default 30 days ago. */
+                since?: string;
+                /** @description Window end. Default now. */
+                until?: string;
+                /** @description Deploy→failure attribution span (Go duration, e.g. 60m). Default 1h. */
+                window?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deploy-quality metrics. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DORAReport"];
                 };
             };
             400: components["responses"]["BadRequest"];
