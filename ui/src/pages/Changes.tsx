@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useChangesets } from "@/lib/queries";
@@ -18,7 +18,12 @@ function Chips({ values, to }: { values: string[]; to?: (v: string) => string })
     <span className="flex flex-wrap gap-1">
       {values.map((v) =>
         to ? (
-          <Link key={v} to={to(v)} className={cls + " hover:bg-accent"}>
+          <Link
+            key={v}
+            to={to(v)}
+            onClick={(e) => e.stopPropagation()}
+            className={cls + " hover:bg-accent"}
+          >
             {v}
           </Link>
         ) : (
@@ -32,6 +37,7 @@ function Chips({ values, to }: { values: string[]; to?: (v: string) => string })
 }
 
 export function Changes() {
+  const navigate = useNavigate();
   const [days, setDays] = useState(7);
   const since = useMemo(() => daysAgoISO(days), [days]);
   const changes = useChangesets(since);
@@ -76,32 +82,37 @@ export function Changes() {
             : cs.deployed
               ? "text-emerald-600 dark:text-emerald-500"
               : "text-muted-foreground";
-          // The change's events, filtered in the Timeline by the service(s) it
-          // touched (or its repo when it maps to no service — e.g. CI-only builds).
-          const filter = cs.services.length
-            ? `service=${cs.services.map(encodeURIComponent).join(",")}`
-            : cs.repos.length
-              ? `repo=${cs.repos.map(encodeURIComponent).join(",")}`
-              : "";
+          // Scope the timeline to exactly this change's events by its refs (the
+          // app sha + every per-env manifests revision).
+          const timelineTo = cs.refs.length
+            ? `/timeline?ref=${cs.refs.join(",")}`
+            : "/timeline";
           return (
-            <Card key={cs.sha}>
+            <Card
+              key={cs.sha}
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate(timelineTo)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  navigate(timelineTo);
+                }
+              }}
+              className="cursor-pointer transition-colors hover:bg-accent/50"
+            >
               <CardContent className="space-y-2 py-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <div className="flex min-w-0 items-baseline gap-2">
                     <Link
                       to={`/where?ref=${cs.sha}`}
+                      onClick={(e) => e.stopPropagation()}
                       title="Trace this change's journey"
                       className="font-mono text-sm text-primary hover:underline"
                     >
                       {cs.sha.slice(0, 7)}
                     </Link>
-                    <Link
-                      to={filter ? `/timeline?${filter}` : "/timeline"}
-                      title="See this change's events in the timeline"
-                      className="truncate text-sm hover:underline"
-                    >
-                      {cs.title || "—"}
-                    </Link>
+                    <span className="truncate text-sm">{cs.title || "—"}</span>
                   </div>
                   <span className={"text-xs font-medium " + statusClass}>{status}</span>
                 </div>
@@ -118,7 +129,8 @@ export function Changes() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {cs.events} events · latest {new Date(cs.last_ts).toLocaleString()}
+                  {cs.events} events · latest {new Date(cs.last_ts).toLocaleString()} · click
+                  to open its events in the timeline
                 </p>
               </CardContent>
             </Card>

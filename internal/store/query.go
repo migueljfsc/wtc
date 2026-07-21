@@ -39,7 +39,8 @@ type Filter struct {
 	Kinds    []string
 	Statuses []string
 	Actors   []string
-	Query    string // FTS5 MATCH over title/service/actor/artifact
+	Refs     []string // exact git sha / revision set — backs the changeset drill-in
+	Query    string   // FTS5 MATCH over title/service/actor/artifact
 	Since    time.Time
 	Until    time.Time
 	Limit    int
@@ -85,6 +86,7 @@ func (s *Store) ListEvents(ctx context.Context, f Filter) (events []model.Event,
 	addIn("kind", f.Kinds)
 	addIn("status", f.Statuses)
 	addIn("actor", f.Actors)
+	addIn("ref", f.Refs)
 	if !f.Since.IsZero() {
 		add("ts >= ?", model.FormatTS(f.Since))
 	}

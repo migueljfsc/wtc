@@ -31,6 +31,10 @@ export function Timeline() {
       const v = urlParams.get(k);
       if (v) f[k] = v;
     }
+    // `ref` isn't a facet chip (high-cardinality shas) but is URL-drivable, so
+    // a changeset row can scope the timeline to exactly its events.
+    const ref = urlParams.get("ref");
+    if (ref) f.ref = ref;
     return f;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

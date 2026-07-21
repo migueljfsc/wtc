@@ -12,6 +12,7 @@ export interface EventFilters {
   kind?: string;
   status?: string;
   actor?: string;
+  ref?: string; // exact sha/revision OR-set — scopes the timeline to one changeset
   q?: string;
 }
 

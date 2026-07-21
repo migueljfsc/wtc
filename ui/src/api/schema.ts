@@ -741,6 +741,8 @@ export interface components {
             repos: string[];
             actors: string[];
             kinds: string[];
+            /** @description Every ref in the change; filters the timeline to exactly its events. */
+            refs: string[];
             /** Format: date-time */
             first_ts: string;
             /** Format: date-time */
@@ -1070,6 +1072,8 @@ export interface operations {
                 status?: string;
                 /** @description Facet OR-set (comma-separated). */
                 actor?: string;
+                /** @description Exact git sha/revision OR-set (comma-separated) — used to scope the timeline to one changeset. */
+                ref?: string;
                 /** @description Full-text search over event text. */
                 q?: string;
                 since?: string;

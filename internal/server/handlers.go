@@ -341,6 +341,7 @@ func (s *Server) handleListEvents(w http.ResponseWriter, r *http.Request) {
 		Kinds:    csv(q.Get("kind")),
 		Statuses: csv(q.Get("status")),
 		Actors:   csv(q.Get("actor")),
+		Refs:     csv(q.Get("ref")),
 		Query:    q.Get("q"),
 		Cursor:   q.Get("cursor"),
 	}

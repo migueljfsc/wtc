@@ -23,6 +23,7 @@ type Changeset struct {
 	Repos    []string  `json:"repos"`    // distinct source repos
 	Actors   []string  `json:"actors"`   // distinct actors
 	Kinds    []string  `json:"kinds"`    // distinct kinds present
+	Refs     []string  `json:"refs"`     // every ref in the change (app sha + manifests revisions); filters the timeline to it
 	FirstTS  time.Time `json:"first_ts"` // earliest event
 	LastTS   time.Time `json:"last_ts"`  // latest event
 	Events   int       `json:"events"`   // events folded in
@@ -49,6 +50,7 @@ type csAccum struct {
 	repos     set
 	actors    set
 	kinds     set
+	refs      set
 	firstTS   time.Time
 	lastTS    time.Time
 	events    int
@@ -83,6 +85,7 @@ func (a *csAccum) add(e model.Event, envReached bool) {
 	a.repos.add(e.Repo)
 	a.actors.add(e.Actor)
 	a.kinds.add(string(e.Kind))
+	a.refs.add(e.Ref)
 	if envReached {
 		a.envs.add(e.Env)
 	}
@@ -115,7 +118,7 @@ func Changesets(ctx context.Context, st *store.Store, tags *normalize.TagResolve
 	get := func(key, full string) *csAccum {
 		g := groups[key]
 		if g == nil {
-			g = &csAccum{sha: full, services: set{}, envs: set{}, owners: set{}, repos: set{}, actors: set{}, kinds: set{}}
+			g = &csAccum{sha: full, services: set{}, envs: set{}, owners: set{}, repos: set{}, actors: set{}, kinds: set{}, refs: set{}}
 			groups[key] = g
 		}
 		return g
@@ -178,6 +181,7 @@ func Changesets(ctx context.Context, st *store.Store, tags *normalize.TagResolve
 			Repos:    g.repos.sorted(),
 			Actors:   g.actors.sorted(),
 			Kinds:    g.kinds.sorted(),
+			Refs:     g.refs.sorted(),
 			FirstTS:  g.firstTS,
 			LastTS:   g.lastTS,
 			Events:   g.events,
