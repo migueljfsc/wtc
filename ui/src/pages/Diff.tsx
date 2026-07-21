@@ -48,7 +48,7 @@ export function Diff() {
           As of
         </label>
         <div className="relative">
-          <CalendarClock className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <CalendarClock className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground" />
           <input
             id="asof"
             type="datetime-local"
@@ -63,7 +63,9 @@ export function Diff() {
                 // showPicker() unsupported on older browsers — the field still works.
               }
             }}
-            className="h-9 min-w-[15rem] cursor-pointer rounded-md border bg-background pl-9 pr-3 text-sm hover:bg-accent"
+            // Hide the native right-side picker glyph (it's near-invisible in
+            // dark mode and leaves a gap) — our own icon + click-to-open replace it.
+            className="h-9 cursor-pointer rounded-md border bg-background pl-9 pr-3 text-sm hover:bg-accent [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden"
           />
         </div>
         {atLocal ? (
