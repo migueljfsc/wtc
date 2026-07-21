@@ -14,6 +14,8 @@ export interface EventFilters {
   actor?: string;
   ref?: string; // exact sha/revision OR-set — scopes the timeline to one changeset
   q?: string;
+  since?: string; // RFC3339 window bounds (from the global scope's time range)
+  until?: string;
 }
 
 // Drop empty values so the client omits them rather than sending `env=`.

@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   Activity,
   GitCompareArrows,
@@ -14,6 +14,7 @@ import {
   Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ScopeBar } from "@/components/ScopeBar";
 import { useTheme } from "@/components/ThemeProvider";
 import { useAuth } from "@/auth/AuthProvider";
 import { useLiveUpdates } from "@/lib/useLiveUpdates";
@@ -65,9 +66,15 @@ function LiveIndicator({ connected }: { connected: boolean }) {
   );
 }
 
+// Pages that don't filter by the global scope — the bar is shown greyed there
+// so the active scope stays visible.
+const SCOPE_OPT_OUT = ["/where", "/configuration", "/settings"];
+
 export function AppShell() {
   const { logout } = useAuth();
   const connected = useLiveUpdates();
+  const { pathname } = useLocation();
+  const scopeDisabled = SCOPE_OPT_OUT.some((p) => pathname.startsWith(p));
   return (
     <div className="flex min-h-screen">
       <aside className="hidden w-56 shrink-0 flex-col border-r bg-card px-3 py-4 sm:flex">
@@ -110,6 +117,7 @@ export function AppShell() {
             </Button>
           </div>
         </header>
+        <ScopeBar disabled={scopeDisabled} />
         <main className="flex-1 overflow-auto p-6">
           <Outlet />
         </main>

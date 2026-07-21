@@ -1,15 +1,7 @@
-import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useChangesets } from "@/lib/queries";
-import { daysAgoISO } from "@/lib/format";
-
-const WINDOWS = [
-  { label: "24h", days: 1 },
-  { label: "7d", days: 7 },
-  { label: "30d", days: 30 },
-];
+import { useScope } from "@/lib/scope";
 
 function Chips({ values, to }: { values: string[]; to?: (v: string) => string }) {
   if (values.length === 0) return <span className="text-muted-foreground">—</span>;
@@ -38,9 +30,8 @@ function Chips({ values, to }: { values: string[]; to?: (v: string) => string })
 
 export function Changes() {
   const navigate = useNavigate();
-  const [days, setDays] = useState(7);
-  const since = useMemo(() => daysAgoISO(days), [days]);
-  const changes = useChangesets(since);
+  const { scope } = useScope();
+  const changes = useChangesets(scope.since);
 
   return (
     <div className="mx-auto max-w-7xl space-y-4">
@@ -51,18 +42,6 @@ export function Changes() {
             Every build → merge → per-env deploy carrying one commit, collapsed into
             a single change. A change spans all the envs it reached.
           </p>
-        </div>
-        <div className="flex gap-1 rounded-md border p-0.5">
-          {WINDOWS.map((w) => (
-            <Button
-              key={w.days}
-              size="sm"
-              variant={days === w.days ? "secondary" : "ghost"}
-              onClick={() => setDays(w.days)}
-            >
-              {w.label}
-            </Button>
-          ))}
         </div>
       </div>
 

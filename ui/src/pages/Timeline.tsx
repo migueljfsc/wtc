@@ -7,7 +7,7 @@ import { EventRow } from "@/components/timeline/EventRow";
 import { EventDrawer } from "@/components/timeline/EventDrawer";
 import { Button } from "@/components/ui/button";
 import { useEventsInfinite, useFacets, type EventFilters } from "@/lib/queries";
-import { useDebouncedValue } from "@/lib/useDebouncedValue";
+import { useScope } from "@/lib/scope";
 import {
   deleteFilter,
   loadSavedFilters,
@@ -16,38 +16,40 @@ import {
 } from "@/lib/savedFilters";
 
 type Event = components["schemas"]["Event"];
-type SelectKey = "source" | "env" | "service" | "repo" | "owner" | "kind" | "status" | "actor";
-
-const URL_FILTER_KEYS: SelectKey[] = [
-  "source", "env", "service", "repo", "owner", "kind", "status", "actor",
-];
+type AdvancedKey = "source" | "kind" | "status" | "actor";
+const ADVANCED_KEYS: AdvancedKey[] = ["source", "kind", "status", "actor"];
 
 export function Timeline() {
-  // Seed filters from the URL once (deep-links, e.g. from the Changes page).
-  const [urlParams] = useSearchParams();
-  const initialFilters = useMemo<EventFilters>(() => {
-    const f: EventFilters = {};
-    for (const k of URL_FILTER_KEYS) {
-      const v = urlParams.get(k);
-      if (v) f[k] = v;
-    }
-    // `ref` isn't a facet chip (high-cardinality shas) but is URL-drivable, so
-    // a changeset row can scope the timeline to exactly its events.
-    const ref = urlParams.get("ref");
-    if (ref) f.ref = ref;
-    return f;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const [filters, setFilters] = useState<EventFilters>(initialFilters);
-  const [search, setSearch] = useState(() => urlParams.get("q") ?? "");
+  const { scope } = useScope();
+  const [params, setParams] = useSearchParams();
   const [selected, setSelected] = useState<Event | null>(null);
   const [saved, setSaved] = useState<SavedFilter[]>(() => loadSavedFilters());
 
-  const debouncedSearch = useDebouncedValue(search, 300);
+  // Advanced facets + the changeset `ref` live in the URL, refining the global
+  // scope (env/service/owner/repo/time/search, which come from the scope bar).
+  const advanced = useMemo<EventFilters>(() => {
+    const f: EventFilters = {};
+    for (const k of ADVANCED_KEYS) {
+      const v = params.get(k);
+      if (v) f[k] = v;
+    }
+    return f;
+  }, [params]);
+  const ref = params.get("ref") || undefined;
+
   const effective = useMemo<EventFilters>(
-    () => ({ ...filters, q: debouncedSearch || undefined }),
-    [filters, debouncedSearch],
+    () => ({
+      env: scope.env || undefined,
+      service: scope.service || undefined,
+      owner: scope.owner || undefined,
+      repo: scope.repo || undefined,
+      q: scope.q || undefined,
+      since: scope.since,
+      until: scope.until,
+      ref,
+      ...advanced,
+    }),
+    [scope, advanced, ref],
   );
 
   const facets = useFacets();
@@ -56,9 +58,6 @@ export function Timeline() {
     () => events.data?.pages.flatMap((p) => p.events ?? []) ?? [],
     [events.data],
   );
-
-  const hasActive =
-    Object.values(filters).some(Boolean) || search.trim() !== "";
 
   // Infinite scroll: load the next page when the sentinel scrolls into view.
   const sentinel = useRef<HTMLDivElement>(null);
@@ -73,25 +72,49 @@ export function Timeline() {
     return () => obs.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const onSelect = useCallback((key: SelectKey, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value || undefined }));
-  }, []);
+  const patchParams = useCallback(
+    (mut: (p: URLSearchParams) => void) => {
+      setParams((prev) => {
+        const n = new URLSearchParams(prev);
+        mut(n);
+        return n;
+      });
+    },
+    [setParams],
+  );
 
-  const onClear = useCallback(() => {
-    setFilters({});
-    setSearch("");
-  }, []);
+  const onSelect = useCallback(
+    (key: AdvancedKey, value: string) =>
+      patchParams((p) => {
+        if (value) p.set(key, value);
+        else p.delete(key);
+      }),
+    [patchParams],
+  );
+
+  const refineActive = ADVANCED_KEYS.some((k) => params.get(k)) || !!ref;
+
+  const onClear = useCallback(
+    () =>
+      patchParams((p) => {
+        [...ADVANCED_KEYS, "ref"].forEach((k) => p.delete(k));
+      }),
+    [patchParams],
+  );
 
   const onSave = useCallback(() => {
-    const name = window.prompt("Name this filter set:")?.trim();
-    if (name) setSaved(saveFilter(name, effective));
-  }, [effective]);
+    const name = window.prompt("Name this refinement:")?.trim();
+    if (name) setSaved(saveFilter(name, advanced));
+  }, [advanced]);
 
-  const onApply = useCallback((f: SavedFilter) => {
-    const { q, ...rest } = f.filters;
-    setFilters(rest);
-    setSearch(q ?? "");
-  }, []);
+  const onApply = useCallback(
+    (f: SavedFilter) =>
+      patchParams((p) => {
+        ADVANCED_KEYS.forEach((k) => p.delete(k));
+        for (const [k, v] of Object.entries(f.filters)) if (v) p.set(k, v as string);
+      }),
+    [patchParams],
+  );
 
   const onDelete = useCallback((name: string) => setSaved(deleteFilter(name)), []);
 
@@ -100,9 +123,9 @@ export function Timeline() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Timeline</h1>
-          <p className="text-sm text-muted-foreground">Every change, newest first.</p>
+          <p className="text-sm text-muted-foreground">Every change in scope, newest first.</p>
         </div>
-        {hasActive && (
+        {refineActive && (
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={onClear}>
               <X className="mr-1 size-3.5" /> Clear
@@ -114,11 +137,18 @@ export function Timeline() {
         )}
       </div>
 
+      {ref && (
+        <p className="text-xs text-muted-foreground">
+          Scoped to one change ({ref.split(",")[0].slice(0, 7)}…) —{" "}
+          <button className="underline" onClick={() => patchParams((p) => p.delete("ref"))}>
+            show all
+          </button>
+        </p>
+      )}
+
       <FilterBar
-        filters={filters}
+        filters={advanced}
         onSelect={onSelect}
-        search={search}
-        onSearch={setSearch}
         facets={facets.data}
         saved={saved}
         onApply={onApply}
@@ -131,7 +161,7 @@ export function Timeline() {
         ) : events.error ? (
           <p className="p-4 text-sm text-destructive">Couldn’t load events.</p>
         ) : rows.length === 0 ? (
-          <p className="p-4 text-sm text-muted-foreground">No events match these filters.</p>
+          <p className="p-4 text-sm text-muted-foreground">No events match the current scope.</p>
         ) : (
           <div className="divide-y">
             {rows.map((e) => (

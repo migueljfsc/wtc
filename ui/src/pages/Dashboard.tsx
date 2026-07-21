@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { AlertCircle } from "lucide-react";
 import {
   Card,
@@ -7,22 +7,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
 import { EnvHealthCards } from "@/components/dashboard/EnvHealthCards";
 import { RecentChanges } from "@/components/dashboard/RecentChanges";
 import { useActivity, useDeployStats, useDORA, useRecentEvents } from "@/lib/queries";
-import { daysAgoISO, pct } from "@/lib/format";
+import { useScope } from "@/lib/scope";
+import { pct } from "@/lib/format";
 
 const asPct = (f: number) => `${(f * 100).toFixed(1)}%`;
 const asMTTR = (s?: number) =>
   s == null ? "—" : s < 3600 ? `${Math.round(s / 60)}m` : `${(s / 3600).toFixed(1)}h`;
-
-const WINDOWS = [
-  { label: "14d", days: 14 },
-  { label: "30d", days: 30 },
-  { label: "90d", days: 90 },
-];
 
 function StatTile({ label, value, tone }: { label: string; value: string; tone?: "danger" }) {
   return (
@@ -53,8 +47,8 @@ function ErrorCard({ what }: { what: string }) {
 }
 
 export function Dashboard() {
-  const [days, setDays] = useState(30);
-  const since = useMemo(() => daysAgoISO(days), [days]);
+  const { scope } = useScope();
+  const since = scope.since;
 
   const activity = useActivity(since, "day");
   const deploys = useDeployStats(since);
@@ -77,22 +71,10 @@ export function Dashboard() {
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground">Change activity across your environments.</p>
         </div>
-        <div className="flex gap-1 rounded-md border p-0.5">
-          {WINDOWS.map((w) => (
-            <Button
-              key={w.days}
-              size="sm"
-              variant={days === w.days ? "secondary" : "ghost"}
-              onClick={() => setDays(w.days)}
-            >
-              {w.label}
-            </Button>
-          ))}
-        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatTile label={`Events (${days}d)`} value={totals.events.toLocaleString()} />
+        <StatTile label={`Events (${scope.range})`} value={totals.events.toLocaleString()} />
         <StatTile label="Deploys" value={totals.deployTotal.toLocaleString()} />
         <StatTile
           label="Deploy failure rate"
