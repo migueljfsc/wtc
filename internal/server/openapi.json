@@ -94,10 +94,11 @@
     "/api/v1/diff": {
       "get": {
         "operationId": "diff",
-        "summary": "Compare what is deployed across two environments right now.",
+        "summary": "Compare what is deployed across two environments, current or as of a past instant.",
         "parameters": [
           { "name": "a", "in": "query", "required": true, "schema": { "type": "string" } },
-          { "name": "b", "in": "query", "required": true, "schema": { "type": "string" } }
+          { "name": "b", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "at", "in": "query", "description": "Point-in-time: reconstruct the comparison as of this RFC3339 instant. Omitted => current state.", "schema": { "type": "string", "format": "date-time" } }
         ],
         "responses": {
           "200": { "description": "Per-service comparison.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DiffReport" } } } },
@@ -271,12 +272,14 @@
     "/api/v1/matrix": {
       "get": {
         "operationId": "matrix",
-        "summary": "Services × environments current-deploy grid (diff visualized).",
+        "summary": "Services × environments deploy grid (diff visualized), current or as of a past instant.",
         "parameters": [
-          { "name": "envs", "in": "query", "description": "Ordered comma-separated column list. Omitted => distinct non-ephemeral envs.", "schema": { "type": "string" } }
+          { "name": "envs", "in": "query", "description": "Ordered comma-separated column list. Omitted => distinct non-ephemeral envs.", "schema": { "type": "string" } },
+          { "name": "at", "in": "query", "description": "Point-in-time: reconstruct the grid as of this RFC3339 instant. Omitted => current state.", "schema": { "type": "string", "format": "date-time" } }
         ],
         "responses": {
-          "200": { "description": "The current-deploy grid.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Matrix" } } } },
+          "200": { "description": "The deploy grid.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Matrix" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       }

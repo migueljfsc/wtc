@@ -16,7 +16,13 @@ export function Diff() {
   const [chosen, setChosen] = useState<string[] | null>(null);
   const selected = chosen ?? allEnvs;
 
-  const matrix = useMatrix(selected);
+  // Point-in-time: an empty input means "current state". datetime-local is in
+  // the viewer's local zone; new Date(...).toISOString() converts to the UTC
+  // RFC3339 instant the API expects.
+  const [atLocal, setAtLocal] = useState("");
+  const atISO = atLocal ? new Date(atLocal).toISOString() : undefined;
+
+  const matrix = useMatrix(selected, atISO);
 
   function toggle(env: string) {
     const set = new Set(selected);
@@ -30,10 +36,33 @@ export function Diff() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Diff</h1>
         <p className="text-sm text-muted-foreground">
-          Current version of every service across environments. Drift and
-          not-yet-promoted services are flagged; the rightmost column is the
-          promotion target.
+          {atISO ? "The version of every service that was running" : "Current version of every service"}{" "}
+          across environments. Drift and not-yet-promoted services are flagged;
+          the rightmost column is the promotion target.
         </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="asof" className="text-xs text-muted-foreground">
+          As of:
+        </label>
+        <input
+          id="asof"
+          type="datetime-local"
+          value={atLocal}
+          onChange={(e) => setAtLocal(e.target.value)}
+          className="rounded-md border bg-background px-2 py-0.5 text-xs"
+        />
+        {atLocal ? (
+          <button
+            onClick={() => setAtLocal("")}
+            className="rounded-full border px-2.5 py-0.5 text-xs text-muted-foreground hover:bg-accent"
+          >
+            Now
+          </button>
+        ) : (
+          <span className="text-xs text-muted-foreground">current state</span>
+        )}
       </div>
 
       {allEnvs.length > 0 && (

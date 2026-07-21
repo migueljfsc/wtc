@@ -32,8 +32,10 @@ type DiffReport struct {
 // Diff compares the latest successful deploy of every service present in
 // either env (SPEC §6). Comparison key is artifact; when a side lacks
 // artifact data the refs are compared and the row is flagged revision-only.
-func Diff(ctx context.Context, st *store.Store, envA, envB string) (*DiffReport, error) {
-	latest, err := st.LatestSucceededDeploys(ctx, []string{envA, envB})
+// A non-zero asOf reconstructs the comparison as of that instant (point-in-time
+// state); the zero value compares current state.
+func Diff(ctx context.Context, st *store.Store, envA, envB string, asOf time.Time) (*DiffReport, error) {
+	latest, err := st.LatestSucceededDeploys(ctx, []string{envA, envB}, asOf)
 	if err != nil {
 		return nil, err
 	}

@@ -157,13 +157,19 @@ export function useFacets() {
   });
 }
 
-/** Services × environments current-deploy grid (Diff view). */
-export function useMatrix(envs: string[]) {
+/**
+ * Services × environments deploy grid (Diff view). `at` (RFC3339) reconstructs
+ * the grid as of a past instant; omitted/undefined shows current state.
+ */
+export function useMatrix(envs: string[], at?: string) {
   return useQuery({
-    queryKey: ["matrix", envs],
+    queryKey: ["matrix", envs, at ?? ""],
     queryFn: async () => {
+      const query: { envs?: string; at?: string } = {};
+      if (envs.length) query.envs = envs.join(",");
+      if (at) query.at = at;
       const { data, error } = await api.GET("/api/v1/matrix", {
-        params: { query: envs.length ? { envs: envs.join(",") } : {} },
+        params: { query },
       });
       if (error) throw new Error("matrix request failed");
       return data;

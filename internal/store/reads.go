@@ -78,19 +78,25 @@ func (s *Store) EventsArtifactContaining(ctx context.Context, needle string, kin
 
 // LatestSucceededDeploys returns, for each (env, service) pair in envs, the
 // most recent successful deploy. Deploys without a service are skipped —
-// diff is per-service by definition.
-func (s *Store) LatestSucceededDeploys(ctx context.Context, envs []string) ([]model.Event, error) {
+// diff is per-service by definition. A non-zero asOf bounds the search to
+// deploys at or before that instant, reconstructing the state that was
+// running then; the zero value means "now" (no upper bound).
+func (s *Store) LatestSucceededDeploys(ctx context.Context, envs []string, asOf time.Time) ([]model.Event, error) {
 	ph := make([]string, len(envs))
 	args := make([]any, len(envs))
 	for i, e := range envs {
 		ph[i] = "?"
 		args[i] = e
 	}
-	all, err := s.queryEvents(ctx,
-		`SELECT `+eventColumns+` FROM events
+	q := `SELECT ` + eventColumns + ` FROM events
 		 WHERE kind = 'deploy' AND status = 'succeeded'
-		   AND env IN (`+strings.Join(ph, ",")+`) AND service != ''
-		 ORDER BY ts DESC`, args...)
+		   AND env IN (` + strings.Join(ph, ",") + `) AND service != ''`
+	if !asOf.IsZero() {
+		q += ` AND ts <= ?`
+		args = append(args, model.FormatTS(asOf))
+	}
+	q += ` ORDER BY ts DESC`
+	all, err := s.queryEvents(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}

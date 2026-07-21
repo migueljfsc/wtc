@@ -78,13 +78,23 @@ func newWhereCmd(flags *clientFlags) *cobra.Command {
 
 func newDiffCmd(flags *clientFlags) *cobra.Command {
 	var asJSON bool
+	var atStr string
 	cmd := &cobra.Command{
-		Use:     "diff <envA> <envB>",
-		Short:   "Compare what is running in two environments",
-		Args:    cobra.ExactArgs(2),
-		Example: "  wtc diff staging prod",
+		Use:   "diff <envA> <envB>",
+		Short: "Compare what is running in two environments",
+		Args:  cobra.ExactArgs(2),
+		Example: "  wtc diff staging prod\n" +
+			"  wtc diff staging prod --at 24h        # what differed a day ago\n" +
+			"  wtc diff staging prod --at 2026-07-01T00:00:00Z",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			r, err := flags.resolve().Diff(cmd.Context(), args[0], args[1])
+			var at time.Time
+			if atStr != "" {
+				var err error
+				if at, err = parseTimeRef(atStr, time.Now()); err != nil {
+					return fmt.Errorf("--at: %w", err)
+				}
+			}
+			r, err := flags.resolve().Diff(cmd.Context(), args[0], args[1], at)
 			if err != nil {
 				return err
 			}
@@ -92,6 +102,9 @@ func newDiffCmd(flags *clientFlags) *cobra.Command {
 				return jsonOut(cmd, r)
 			}
 			out := cmd.OutOrStdout()
+			if !at.IsZero() {
+				_, _ = fmt.Fprintf(out, "as of %s\n", at.Local().Format(time.RFC3339))
+			}
 			w := tabwriter.NewWriter(out, 2, 4, 2, ' ', 0)
 			_, _ = fmt.Fprintf(w, "SERVICE\t%s\t%s\tSTATE\tDRIFT\tLAST ACTOR\n", r.EnvA, r.EnvB)
 			revisionOnly := false
@@ -128,6 +141,7 @@ func newDiffCmd(flags *clientFlags) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
+	cmd.Flags().StringVar(&atStr, "at", "", "point-in-time: reconstruct state as of 2h, 7d, or RFC3339")
 	return cmd
 }
 

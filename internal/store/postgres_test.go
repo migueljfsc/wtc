@@ -280,7 +280,7 @@ func TestPGStatsAndMatrix(t *testing.T) {
 		t.Errorf("activity total = %d, want 2 (buckets %+v)", total, stats.Buckets)
 	}
 
-	m, err := s.Matrix(ctx, nil)
+	m, err := s.Matrix(ctx, nil, time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}

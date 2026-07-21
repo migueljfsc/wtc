@@ -140,6 +140,31 @@ func TestOpenAPINoDrift(t *testing.T) {
 	}
 }
 
+// TestDiffMatrixAtParam covers the optional point-in-time ?at= param on both
+// state-reconstruction endpoints: a bad value is a 400 (not a 500), a valid
+// RFC3339 instant is accepted. The as-of logic itself is covered in store/query.
+func TestDiffMatrixAtParam(t *testing.T) {
+	ts := newTestServer(t)
+
+	for _, path := range []string{
+		"/api/v1/diff?a=staging&b=prod&at=not-a-time",
+		"/api/v1/matrix?at=not-a-time",
+	} {
+		if resp, _ := doRequest(t, http.MethodGet, ts.URL+path, testToken, nil); resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("%s = %d, want 400", path, resp.StatusCode)
+		}
+	}
+
+	for _, path := range []string{
+		"/api/v1/diff?a=staging&b=prod&at=2026-06-01T00:00:00Z",
+		"/api/v1/matrix?at=2026-06-01T00:00:00Z",
+	} {
+		if resp, _ := doRequest(t, http.MethodGet, ts.URL+path, testToken, nil); resp.StatusCode != http.StatusOK {
+			t.Errorf("%s = %d, want 200", path, resp.StatusCode)
+		}
+	}
+}
+
 func TestStatsEndpoints(t *testing.T) {
 	ts := newTestServer(t)
 

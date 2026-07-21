@@ -96,7 +96,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Compare what is deployed across two environments right now. */
+        /** Compare what is deployed across two environments, current or as of a past instant. */
         get: operations["diff"];
         put?: never;
         post?: never;
@@ -295,7 +295,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Services × environments current-deploy grid (diff visualized). */
+        /** Services × environments deploy grid (diff visualized), current or as of a past instant. */
         get: operations["matrix"];
         put?: never;
         post?: never;
@@ -1028,6 +1028,8 @@ export interface operations {
             query: {
                 a: string;
                 b: string;
+                /** @description Point-in-time: reconstruct the comparison as of this RFC3339 instant. Omitted => current state. */
+                at?: string;
             };
             header?: never;
             path?: never;
@@ -1344,6 +1346,8 @@ export interface operations {
             query?: {
                 /** @description Ordered comma-separated column list. Omitted => distinct non-ephemeral envs. */
                 envs?: string;
+                /** @description Point-in-time: reconstruct the grid as of this RFC3339 instant. Omitted => current state. */
+                at?: string;
             };
             header?: never;
             path?: never;
@@ -1351,7 +1355,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The current-deploy grid. */
+            /** @description The deploy grid. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1360,6 +1364,7 @@ export interface operations {
                     "application/json": components["schemas"]["Matrix"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
         };
     };

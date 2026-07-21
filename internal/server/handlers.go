@@ -94,13 +94,33 @@ func (s *Server) handleWhere(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusOK, report)
 }
 
+// parseAt reads the optional ?at= point-in-time param (RFC3339). The zero
+// time means "now" (no upper bound). Writes a 400 and returns ok=false on a
+// malformed value.
+func (s *Server) parseAt(w http.ResponseWriter, r *http.Request) (at time.Time, ok bool) {
+	v := r.URL.Query().Get("at")
+	if v == "" {
+		return time.Time{}, true
+	}
+	ts, err := model.ParseTS(v)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "at: "+err.Error())
+		return time.Time{}, false
+	}
+	return ts, true
+}
+
 func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
 	a, b := r.URL.Query().Get("a"), r.URL.Query().Get("b")
 	if a == "" || b == "" || a == b {
 		s.writeError(w, http.StatusBadRequest, "diff needs two distinct envs: ?a=staging&b=prod")
 		return
 	}
-	report, err := query.Diff(r.Context(), s.store, a, b)
+	at, ok := s.parseAt(w, r)
+	if !ok {
+		return
+	}
+	report, err := query.Diff(r.Context(), s.store, a, b, at)
 	if err != nil {
 		s.log.Error("diff", "error", err)
 		s.writeError(w, http.StatusInternalServerError, "query error")

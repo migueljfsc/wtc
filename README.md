@@ -24,8 +24,8 @@ Working today, each verified against live infrastructure:
   Argo CD notifications, Alertmanager, config-declared mapping webhooks for any
   JSON source, `/ingest/generic`, `wtc record`, `wtc wrap` (helm/terraform sniffers)
 - **Queries** — `log` (FTS5 `-q`), `where` (build → intent → applied per env,
-  tag↔sha via configurable `tag_patterns`), `diff`, `handoff`, `around`,
-  `blast` (change↔alert correlation), `doctor`, `explain`
+  tag↔sha via configurable `tag_patterns`), `diff` (with `--at` point-in-time
+  state), `handoff`, `around`, `blast` (change↔alert correlation), `doctor`, `explain`
 - **Engine** — ordered env/service inference rules with globs + templates;
   strict-outrank dedup upsert (at-least-once ingestion, zero duplicates);
   PR/MR-diff enrichment; redaction before storage
@@ -68,6 +68,7 @@ export WTC_GH_API_TOKEN=<github PAT>  # read-only: Actions/Contents/PRs
 ./bin/wtc demo
 ./bin/wtc log --since 7d
 ./bin/wtc diff staging prod
+./bin/wtc diff staging prod --at 3d   # point-in-time: what differed 3 days ago?
 
 # Or record a change by hand:
 ./bin/wtc record --kind manual --env prod --title "rotated db creds"

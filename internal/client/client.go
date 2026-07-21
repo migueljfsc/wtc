@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/ingest/generic"
+	"github.com/migueljfsc/wtc/internal/model"
 	"github.com/migueljfsc/wtc/internal/query"
 	"github.com/migueljfsc/wtc/internal/server"
 	"github.com/migueljfsc/wtc/internal/store"
@@ -120,10 +121,14 @@ func (c *Client) Where(ctx context.Context, ref string) (query.WhereReport, erro
 	return out, err
 }
 
-// Diff compares two environments.
-func (c *Client) Diff(ctx context.Context, a, b string) (query.DiffReport, error) {
+// Diff compares two environments. A non-zero at reconstructs the comparison
+// as of that instant (point-in-time state).
+func (c *Client) Diff(ctx context.Context, a, b string, at time.Time) (query.DiffReport, error) {
 	var out query.DiffReport
 	params := url.Values{"a": {a}, "b": {b}}
+	if !at.IsZero() {
+		params.Set("at", model.FormatTS(at))
+	}
 	err := c.do(ctx, http.MethodGet, "/api/diff?"+params.Encode(), nil, &out)
 	return out, err
 }

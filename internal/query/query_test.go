@@ -216,7 +216,7 @@ func TestWhereFullJourney(t *testing.T) {
 
 func TestDiffStagingProd(t *testing.T) {
 	st := seed(t)
-	r, err := Diff(context.Background(), st, "staging", "prod")
+	r, err := Diff(context.Background(), st, "staging", "prod", time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,6 +250,39 @@ func TestDiffStagingProd(t *testing.T) {
 	worker := rows["demo-worker"]
 	if !worker.InSync || worker.RevisionOnly {
 		t.Errorf("demo-worker = %+v, want in-sync artifact compare", worker)
+	}
+}
+
+func TestDiffAsOf(t *testing.T) {
+	st := seed(t)
+	ctx := context.Background()
+
+	// As of +1h demo-api has reconciled to staging (+12m) but not yet to prod
+	// (+2h5m), so the later drift hasn't happened — it reads as only-in-staging.
+	r, err := Diff(ctx, st, "staging", "prod", t0.Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := map[string]DiffRow{}
+	for _, row := range r.Rows {
+		rows[row.Service] = row
+	}
+	if api, ok := rows["demo-api"]; !ok || api.OnlyIn != "staging" {
+		t.Errorf("demo-api as-of +1h = %+v, want only_in=staging (prod deploy not yet applied)", rows["demo-api"])
+	}
+	if w, ok := rows["demo-worker"]; !ok || !w.InSync {
+		t.Errorf("demo-worker as-of +1h = %+v, want in sync (deployed to both by +30m)", rows["demo-worker"])
+	}
+
+	// Before demo-api's first successful deploy (+12m) it must not appear.
+	early, err := Diff(ctx, st, "staging", "prod", t0.Add(5*time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range early.Rows {
+		if row.Service == "demo-api" {
+			t.Errorf("demo-api must be absent before its first successful deploy; got %+v", row)
+		}
 	}
 }
 

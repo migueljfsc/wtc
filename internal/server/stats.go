@@ -91,7 +91,11 @@ func (s *Server) handleMatrix(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	matrix, err := s.store.Matrix(r.Context(), envs)
+	at, ok := s.parseAt(w, r)
+	if !ok {
+		return
+	}
+	matrix, err := s.store.Matrix(r.Context(), envs, at)
 	if err != nil {
 		s.log.Error("matrix", "error", err)
 		s.writeError(w, http.StatusInternalServerError, "query error")

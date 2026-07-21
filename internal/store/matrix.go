@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"time"
+
+	"github.com/migueljfsc/wtc/internal/model"
 )
 
 // The env matrix (portal "diff visualized"): the current running version of
@@ -34,16 +36,17 @@ type Matrix struct {
 
 // Matrix returns the current-deploy grid for envs (order preserved). When envs
 // is empty it defaults to the distinct non-ephemeral (not pr-*) environments,
-// alphabetical.
-func (s *Store) Matrix(ctx context.Context, envs []string) (*Matrix, error) {
+// alphabetical. A non-zero asOf reconstructs the grid as it stood at that
+// instant (point-in-time state); the zero value means "now".
+func (s *Store) Matrix(ctx context.Context, envs []string, asOf time.Time) (*Matrix, error) {
 	if len(envs) == 0 {
 		var err error
-		if envs, err = s.defaultMatrixEnvs(ctx); err != nil {
+		if envs, err = s.defaultMatrixEnvs(ctx, asOf); err != nil {
 			return nil, err
 		}
 	}
 
-	latest, err := s.LatestSucceededDeploys(ctx, envs)
+	latest, err := s.LatestSucceededDeploys(ctx, envs, asOf)
 	if err != nil {
 		return nil, err
 	}
@@ -76,12 +79,20 @@ func (s *Store) Matrix(ctx context.Context, envs []string) (*Matrix, error) {
 	return &Matrix{Envs: envs, Services: out}, nil
 }
 
-// defaultMatrixEnvs lists the distinct mapped, non-ephemeral environments.
-func (s *Store) defaultMatrixEnvs(ctx context.Context) ([]string, error) {
-	rows, err := s.readDB.QueryContext(ctx,
-		`SELECT DISTINCT env FROM events
-		 WHERE env != '' AND env NOT LIKE 'pr-%' ESCAPE '\'
-		 ORDER BY env LIMIT ?`, maxFacetValues)
+// defaultMatrixEnvs lists the distinct mapped, non-ephemeral environments. A
+// non-zero asOf excludes envs whose activity all postdates that instant, so a
+// point-in-time grid never invents a column for an env that did not yet exist.
+func (s *Store) defaultMatrixEnvs(ctx context.Context, asOf time.Time) ([]string, error) {
+	q := `SELECT DISTINCT env FROM events
+		 WHERE env != '' AND env NOT LIKE 'pr-%' ESCAPE '\'`
+	args := []any{}
+	if !asOf.IsZero() {
+		q += ` AND ts <= ?`
+		args = append(args, model.FormatTS(asOf))
+	}
+	q += ` ORDER BY env LIMIT ?`
+	args = append(args, maxFacetValues)
+	rows, err := s.readDB.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("matrix envs: %w", err)
 	}
