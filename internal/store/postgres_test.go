@@ -268,7 +268,7 @@ func TestPGStatsAndMatrix(t *testing.T) {
 		}
 	}
 
-	stats, err := s.ActivityStats(ctx, day.Add(-time.Hour), day.Add(3*time.Hour), "hour")
+	stats, err := s.ActivityStats(ctx, day.Add(-time.Hour), day.Add(3*time.Hour), "hour", AggScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +280,7 @@ func TestPGStatsAndMatrix(t *testing.T) {
 		t.Errorf("activity total = %d, want 2 (buckets %+v)", total, stats.Buckets)
 	}
 
-	m, err := s.Matrix(ctx, nil, time.Time{})
+	m, err := s.Matrix(ctx, nil, time.Time{}, AggScope{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -216,7 +216,7 @@ func TestWhereFullJourney(t *testing.T) {
 
 func TestDiffStagingProd(t *testing.T) {
 	st := seed(t)
-	r, err := Diff(context.Background(), st, "staging", "prod", time.Time{})
+	r, err := Diff(context.Background(), st, "staging", "prod", time.Time{}, store.AggScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +259,7 @@ func TestDiffAsOf(t *testing.T) {
 
 	// As of +1h demo-api has reconciled to staging (+12m) but not yet to prod
 	// (+2h5m), so the later drift hasn't happened — it reads as only-in-staging.
-	r, err := Diff(ctx, st, "staging", "prod", t0.Add(time.Hour))
+	r, err := Diff(ctx, st, "staging", "prod", t0.Add(time.Hour), store.AggScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +275,7 @@ func TestDiffAsOf(t *testing.T) {
 	}
 
 	// Before demo-api's first successful deploy (+12m) it must not appear.
-	early, err := Diff(ctx, st, "staging", "prod", t0.Add(5*time.Minute))
+	early, err := Diff(ctx, st, "staging", "prod", t0.Add(5*time.Minute), store.AggScope{})
 	if err != nil {
 		t.Fatal(err)
 	}

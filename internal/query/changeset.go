@@ -107,7 +107,7 @@ func (a *csAccum) add(e model.Event, envReached bool) {
 // Changesets groups the window's build/merge/push/deploy events by the app
 // commit sha they carry, mirroring `where`: a deploy joins via its artifact tag
 // or via a manifests revision an intent bumped.
-func Changesets(ctx context.Context, st *store.Store, tags *normalize.TagResolver, since, until time.Time) (*ChangesetsReport, error) {
+func Changesets(ctx context.Context, st *store.Store, tags *normalize.TagResolver, since, until time.Time, scope store.AggScope) (*ChangesetsReport, error) {
 	evs, err := st.EventsInWindow(ctx, since, until,
 		[]model.Kind{model.KindBuild, model.KindMerge, model.KindPush, model.KindDeploy})
 	if err != nil {
@@ -189,6 +189,19 @@ func Changesets(ctx context.Context, st *store.Store, tags *normalize.TagResolve
 			Deployed: g.deployed,
 		})
 	}
+
+	// Scope filter, changeset-level: keep changes that reached a scoped env,
+	// touched a scoped service, and are owned by a scoped team. (Event-level
+	// filtering would wrongly drop a change's build/merge, which carry no env.)
+	if len(scope.Envs) > 0 || len(scope.Services) > 0 || len(scope.Owners) > 0 {
+		kept := make([]Changeset, 0, len(out))
+		for _, cs := range out {
+			if anyIn(scope.Envs, cs.Envs) && anyIn(scope.Services, cs.Services) && anyIn(scope.Owners, cs.Owners) {
+				kept = append(kept, cs)
+			}
+		}
+		out = kept
+	}
 	sort.Slice(out, func(i, j int) bool { return out[i].LastTS.After(out[j].LastTS) })
 
 	return &ChangesetsReport{Since: since.UTC(), Until: until.UTC(), Changesets: out}, nil
@@ -233,6 +246,24 @@ func firstBumpSha(payload string, tags *normalize.TagResolver) string {
 		}
 	}
 	return ""
+}
+
+// anyIn reports whether any wanted value appears in have. An empty want is
+// unconstrained (matches anything).
+func anyIn(want, have []string) bool {
+	if len(want) == 0 {
+		return true
+	}
+	set := make(map[string]bool, len(have))
+	for _, h := range have {
+		set[h] = true
+	}
+	for _, w := range want {
+		if set[w] {
+			return true
+		}
+	}
+	return false
 }
 
 // set is a small string set with sorted, [] (never nil) output.

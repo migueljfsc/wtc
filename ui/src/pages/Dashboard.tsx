@@ -49,10 +49,11 @@ function ErrorCard({ what }: { what: string }) {
 export function Dashboard() {
   const { scope } = useScope();
   const since = scope.since;
+  const facets = { env: scope.env, service: scope.service, owner: scope.owner };
 
-  const activity = useActivity(since, "day");
-  const deploys = useDeployStats(since);
-  const dora = useDORA(since);
+  const activity = useActivity(since, "day", facets);
+  const deploys = useDeployStats(since, facets);
+  const dora = useDORA(since, facets);
   const recent = useRecentEvents(12);
 
   const totals = useMemo(() => {

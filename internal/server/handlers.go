@@ -126,7 +126,7 @@ func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	report, err := query.Diff(r.Context(), s.store, a, b, at)
+	report, err := query.Diff(r.Context(), s.store, a, b, at, scopeSvcOwner(r))
 	if err != nil {
 		s.log.Error("diff", "error", err)
 		s.writeError(w, http.StatusInternalServerError, "query error")
@@ -170,7 +170,7 @@ func (s *Server) handleDORA(w http.ResponseWriter, r *http.Request) {
 		}
 		window = d
 	}
-	report, err := query.DORA(r.Context(), s.store, since, until, window)
+	report, err := query.DORA(r.Context(), s.store, since, until, window, scopeFrom(r))
 	if err != nil {
 		s.log.Error("dora", "error", err)
 		s.writeError(w, http.StatusInternalServerError, "query error")
@@ -186,7 +186,7 @@ func (s *Server) handleChangesets(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	report, err := query.Changesets(r.Context(), s.store, s.tags.Load(), since, until)
+	report, err := query.Changesets(r.Context(), s.store, s.tags.Load(), since, until, scopeFrom(r))
 	if err != nil {
 		s.log.Error("changesets", "error", err)
 		s.writeError(w, http.StatusInternalServerError, "query error")
@@ -328,6 +328,27 @@ func csv(v string) []string {
 		}
 	}
 	return out
+}
+
+// scopeFrom reads the global scope facets (env/service/owner) shared by the
+// dashboard, changesets and DORA endpoints.
+func scopeFrom(r *http.Request) store.AggScope {
+	q := r.URL.Query()
+	return store.AggScope{
+		Envs:     csv(q.Get("env")),
+		Services: csv(q.Get("service")),
+		Owners:   csv(q.Get("owner")),
+	}
+}
+
+// scopeSvcOwner reads only service/owner — for diff/matrix, where env is the
+// comparison axis (columns), not a scope filter.
+func scopeSvcOwner(r *http.Request) store.AggScope {
+	q := r.URL.Query()
+	return store.AggScope{
+		Services: csv(q.Get("service")),
+		Owners:   csv(q.Get("owner")),
+	}
 }
 
 func (s *Server) handleListEvents(w http.ResponseWriter, r *http.Request) {

@@ -54,7 +54,7 @@ func TestLoadSanity(t *testing.T) {
 			return err
 		}},
 		{"diff-latest-deploys", func() error {
-			_, err := s.LatestSucceededDeploys(ctx, []string{"staging", "prod"}, time.Time{})
+			_, err := s.LatestSucceededDeploys(ctx, []string{"staging", "prod"}, time.Time{}, AggScope{})
 			return err
 		}},
 	}

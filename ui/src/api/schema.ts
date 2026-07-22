@@ -1129,6 +1129,10 @@ export interface operations {
     diff: {
         parameters: {
             query: {
+                /** @description Scope facet OR-set (comma-separated). */
+                service?: string;
+                /** @description Scope facet OR-set (comma-separated). */
+                owner?: string;
                 a: string;
                 b: string;
                 /** @description Point-in-time: reconstruct the comparison as of this RFC3339 instant. Omitted => current state. */
@@ -1370,6 +1374,12 @@ export interface operations {
     statsActivity: {
         parameters: {
             query?: {
+                /** @description Scope facet OR-set (comma-separated). */
+                env?: string;
+                /** @description Scope facet OR-set (comma-separated). */
+                service?: string;
+                /** @description Scope facet OR-set (comma-separated). */
+                owner?: string;
                 /** @description Window start. Default 30 days ago. */
                 since?: string;
                 /** @description Window end. Default now. */
@@ -1399,6 +1409,12 @@ export interface operations {
     statsDeploys: {
         parameters: {
             query?: {
+                /** @description Scope facet OR-set (comma-separated). */
+                env?: string;
+                /** @description Scope facet OR-set (comma-separated). */
+                service?: string;
+                /** @description Scope facet OR-set (comma-separated). */
+                owner?: string;
                 /** @description Window start. Default 30 days ago. */
                 since?: string;
                 /** @description Window end. Default now. */
@@ -1426,6 +1442,12 @@ export interface operations {
     dora: {
         parameters: {
             query?: {
+                /** @description Scope facet OR-set (comma-separated). */
+                env?: string;
+                /** @description Scope facet OR-set (comma-separated). */
+                service?: string;
+                /** @description Scope facet OR-set (comma-separated). */
+                owner?: string;
                 /** @description Window start. Default 30 days ago. */
                 since?: string;
                 /** @description Window end. Default now. */
@@ -1455,6 +1477,12 @@ export interface operations {
     changesets: {
         parameters: {
             query?: {
+                /** @description Scope facet OR-set (comma-separated). */
+                env?: string;
+                /** @description Scope facet OR-set (comma-separated). */
+                service?: string;
+                /** @description Scope facet OR-set (comma-separated). */
+                owner?: string;
                 /** @description Window start. Default 30 days ago. */
                 since?: string;
                 /** @description Window end. Default now. */
@@ -1503,6 +1531,10 @@ export interface operations {
     matrix: {
         parameters: {
             query?: {
+                /** @description Scope facet OR-set (comma-separated). */
+                service?: string;
+                /** @description Scope facet OR-set (comma-separated). */
+                owner?: string;
                 /** @description Ordered comma-separated column list. Omitted => distinct non-ephemeral envs. */
                 envs?: string;
                 /** @description Point-in-time: reconstruct the grid as of this RFC3339 instant. Omitted => current state. */

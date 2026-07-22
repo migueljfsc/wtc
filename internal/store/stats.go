@@ -4,10 +4,63 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/model"
 )
+
+// AggScope narrows a dashboard/changeset/diff aggregation to a subset of
+// environments, services and owners — this is how the global scope bar filters
+// every view, not just the timeline. Empty slices are unconstrained.
+type AggScope struct {
+	Envs     []string
+	Services []string
+	Owners   []string
+}
+
+// sqlConds builds the ` AND col IN (…)` fragment + args for SQL-side filtering.
+// Columns are fixed literals, never user input. ("", nil) when unconstrained.
+func (a AggScope) sqlConds() (string, []any) {
+	var frags []string
+	var args []any
+	in := func(col string, vals []string) {
+		if len(vals) == 0 {
+			return
+		}
+		ph := make([]string, len(vals))
+		for i, v := range vals {
+			ph[i] = "?"
+			args = append(args, v)
+		}
+		frags = append(frags, col+" IN ("+strings.Join(ph, ",")+")")
+	}
+	in("env", a.Envs)
+	in("service", a.Services)
+	in("owner", a.Owners)
+	if len(frags) == 0 {
+		return "", nil
+	}
+	return " AND " + strings.Join(frags, " AND "), args
+}
+
+// Match reports whether (env, service, owner) is in scope — for Go-side
+// filtering (DORA/changesets, which aggregate in memory).
+func (a AggScope) Match(env, service, owner string) bool {
+	return inSet(a.Envs, env) && inSet(a.Services, service) && inSet(a.Owners, owner)
+}
+
+func inSet(set []string, v string) bool {
+	if len(set) == 0 {
+		return true
+	}
+	for _, s := range set {
+		if s == v {
+			return true
+		}
+	}
+	return false
+}
 
 // Dashboard aggregations (DORA-ish portal metrics). All grouping is
 // done in SQL over the events table; ts is stored as sortable fixed-width UTC
@@ -58,7 +111,7 @@ func bucketSpecFor(bucket string) (bucketSpec, error) {
 
 // ActivityStats returns a contiguous (gap-filled) event-count series in
 // [since, until) at day or hour granularity.
-func (s *Store) ActivityStats(ctx context.Context, since, until time.Time, bucket string) (*ActivityStats, error) {
+func (s *Store) ActivityStats(ctx context.Context, since, until time.Time, bucket string, scope AggScope) (*ActivityStats, error) {
 	spec, err := bucketSpecFor(bucket)
 	if err != nil {
 		return nil, err
@@ -73,14 +126,16 @@ func (s *Store) ActivityStats(ctx context.Context, since, until time.Time, bucke
 		return nil, fmt.Errorf("window too large for %s buckets (max %d): narrow the range", bucket, maxBuckets)
 	}
 
+	cond, cargs := scope.sqlConds()
+	args := append([]any{model.FormatTS(since), model.FormatTS(until)}, cargs...)
 	rows, err := s.readDB.QueryContext(ctx, `
 SELECT `+spec.sqlExpr+` AS bucket,
        COUNT(*),
        SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END),
        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END)
 FROM events
-WHERE ts >= ? AND ts <= ?
-GROUP BY bucket`, model.FormatTS(since), model.FormatTS(until))
+WHERE ts >= ? AND ts <= ?`+cond+`
+GROUP BY bucket`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("activity stats: %w", err)
 	}
@@ -134,13 +189,15 @@ type DeployStats struct {
 // DeployStats aggregates deploy events per (mapped) environment in
 // [since, until). Unmapped (env="") deploys are excluded — the dashboard is
 // per-environment; env="" is surfaced by doctor instead.
-func (s *Store) DeployStats(ctx context.Context, since, until time.Time) (*DeployStats, error) {
+func (s *Store) DeployStats(ctx context.Context, since, until time.Time, scope AggScope) (*DeployStats, error) {
 	since, until = since.UTC(), until.UTC()
+	cond, cargs := scope.sqlConds()
+	args := append([]any{model.FormatTS(since), model.FormatTS(until)}, cargs...)
 	rows, err := s.readDB.QueryContext(ctx, `
 SELECT env, status, ts, service
 FROM events
-WHERE kind = 'deploy' AND env != '' AND ts >= ? AND ts <= ?
-ORDER BY ts DESC`, model.FormatTS(since), model.FormatTS(until))
+WHERE kind = 'deploy' AND env != '' AND ts >= ? AND ts <= ?`+cond+`
+ORDER BY ts DESC`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("deploy stats: %w", err)
 	}

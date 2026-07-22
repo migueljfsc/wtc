@@ -36,7 +36,7 @@ func TestMatrix(t *testing.T) {
 		}
 	}
 
-	m, err := s.Matrix(ctx, []string{"dev", "staging", "prod"}, time.Time{})
+	m, err := s.Matrix(ctx, []string{"dev", "staging", "prod"}, time.Time{}, AggScope{})
 	if err != nil {
 		t.Fatalf("Matrix: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestMatrix(t *testing.T) {
 	}
 
 	// Default envs exclude ephemeral pr-*.
-	def, err := s.Matrix(ctx, nil, time.Time{})
+	def, err := s.Matrix(ctx, nil, time.Time{}, AggScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestMatrixAsOf(t *testing.T) {
 	}
 
 	// As of +3h prod is still on v1 — v2 is not deployed until +5h.
-	m, err := s.Matrix(ctx, []string{"prod"}, base.Add(3*time.Hour))
+	m, err := s.Matrix(ctx, []string{"prod"}, base.Add(3*time.Hour), AggScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestMatrixAsOf(t *testing.T) {
 		t.Errorf("prod api as-of +3h = %q, want api:v1", got)
 	}
 	// As of +6h prod has advanced to v2.
-	m2, err := s.Matrix(ctx, []string{"prod"}, base.Add(6*time.Hour))
+	m2, err := s.Matrix(ctx, []string{"prod"}, base.Add(6*time.Hour), AggScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestMatrixAsOf(t *testing.T) {
 		t.Errorf("prod api as-of +6h = %q, want api:v2", got)
 	}
 	// As of +30m nothing has deployed yet.
-	m0, err := s.Matrix(ctx, []string{"prod"}, base.Add(30*time.Minute))
+	m0, err := s.Matrix(ctx, []string{"prod"}, base.Add(30*time.Minute), AggScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,10 +126,10 @@ func TestMatrixAsOf(t *testing.T) {
 
 	// Default-env discovery before any data returns no envs, so the grid must
 	// be empty WITHOUT building `env IN ()` — a SQL syntax error on postgres.
-	if _, err := s.LatestSucceededDeploys(ctx, nil, base.Add(3*time.Hour)); err != nil {
+	if _, err := s.LatestSucceededDeploys(ctx, nil, base.Add(3*time.Hour), AggScope{}); err != nil {
 		t.Errorf("LatestSucceededDeploys with no envs must not error: %v", err)
 	}
-	early, err := s.Matrix(ctx, nil, base.Add(-time.Hour))
+	early, err := s.Matrix(ctx, nil, base.Add(-time.Hour), AggScope{})
 	if err != nil {
 		t.Fatalf("Matrix as-of before any data must not error: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestMatrixAsOf(t *testing.T) {
 	}
 	// Default env discovery is point-in-time too: staging is first seen at +8h,
 	// so an as-of +3h default grid must not invent it as a column.
-	def, err := s.Matrix(ctx, nil, base.Add(3*time.Hour))
+	def, err := s.Matrix(ctx, nil, base.Add(3*time.Hour), AggScope{})
 	if err != nil {
 		t.Fatal(err)
 	}

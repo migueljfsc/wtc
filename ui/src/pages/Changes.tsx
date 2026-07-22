@@ -31,7 +31,11 @@ function Chips({ values, to }: { values: string[]; to?: (v: string) => string })
 export function Changes() {
   const navigate = useNavigate();
   const { scope } = useScope();
-  const changes = useChangesets(scope.since);
+  const changes = useChangesets(scope.since, {
+    env: scope.env,
+    service: scope.service,
+    owner: scope.owner,
+  });
 
   return (
     <div className="mx-auto max-w-7xl space-y-4">

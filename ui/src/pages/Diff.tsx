@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { CalendarClock } from "lucide-react";
 import { useFacets, useMatrix } from "@/lib/queries";
+import { useScope } from "@/lib/scope";
 import { isEphemeral, orderEnvs } from "@/lib/envOrder";
 import { DiffMatrix } from "@/components/diff/DiffMatrix";
 import { cn } from "@/lib/utils";
 
 export function Diff() {
+  const { scope } = useScope();
   const facets = useFacets();
   const allEnvs = useMemo(
     () => orderEnvs((facets.data?.envs ?? []).filter((e) => !isEphemeral(e))),
@@ -17,13 +18,11 @@ export function Diff() {
   const [chosen, setChosen] = useState<string[] | null>(null);
   const selected = chosen ?? allEnvs;
 
-  // Point-in-time: an empty input means "current state". datetime-local is in
-  // the viewer's local zone; new Date(...).toISOString() converts to the UTC
-  // RFC3339 instant the API expects.
-  const [atLocal, setAtLocal] = useState("");
-  const atISO = atLocal ? new Date(atLocal).toISOString() : undefined;
+  // Point-in-time comes from the global time range: a custom range ending in the
+  // past reconstructs the state as of then; the presets end "now" (current).
+  const at = scope.range === "custom" ? scope.until : undefined;
 
-  const matrix = useMatrix(selected, atISO);
+  const matrix = useMatrix(selected, at, { service: scope.service, owner: scope.owner });
 
   function toggle(env: string) {
     const set = new Set(selected);
@@ -37,47 +36,10 @@ export function Diff() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Diff</h1>
         <p className="text-sm text-muted-foreground">
-          {atISO ? "The version of every service that was running" : "Current version of every service"}{" "}
+          {at ? "The version of every service that was running" : "Current version of every service"}{" "}
           across environments. Drift and not-yet-promoted services are flagged;
           the rightmost column is the promotion target.
         </p>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <label htmlFor="asof" className="text-sm font-medium">
-          As of
-        </label>
-        <div className="relative">
-          <CalendarClock className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground" />
-          <input
-            id="asof"
-            type="datetime-local"
-            value={atLocal}
-            onChange={(e) => setAtLocal(e.target.value)}
-            // Open the native picker from anywhere on the field, not just the
-            // tiny calendar glyph.
-            onClick={(e) => {
-              try {
-                e.currentTarget.showPicker();
-              } catch {
-                // showPicker() unsupported on older browsers — the field still works.
-              }
-            }}
-            // Hide the native right-side picker glyph (it's near-invisible in
-            // dark mode and leaves a gap) — our own icon + click-to-open replace it.
-            className="h-9 cursor-pointer rounded-md border bg-background pl-9 pr-3 text-sm hover:bg-accent [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden"
-          />
-        </div>
-        {atLocal ? (
-          <button
-            onClick={() => setAtLocal("")}
-            className="rounded-md border px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent"
-          >
-            Now
-          </button>
-        ) : (
-          <span className="text-sm text-muted-foreground">showing current state</span>
-        )}
       </div>
 
       {allEnvs.length > 0 && (

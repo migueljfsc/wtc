@@ -98,6 +98,8 @@
         "operationId": "diff",
         "summary": "Compare what is deployed across two environments, current or as of a past instant.",
         "parameters": [
+          { "name": "service", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
+          { "name": "owner", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "a", "in": "query", "required": true, "schema": { "type": "string" } },
           { "name": "b", "in": "query", "required": true, "schema": { "type": "string" } },
           { "name": "at", "in": "query", "description": "Point-in-time: reconstruct the comparison as of this RFC3339 instant. Omitted => current state.", "schema": { "type": "string", "format": "date-time" } }
@@ -235,6 +237,9 @@
         "operationId": "statsActivity",
         "summary": "Event counts over time (gap-filled), for the activity chart.",
         "parameters": [
+          { "name": "env", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
+          { "name": "service", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
+          { "name": "owner", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "since", "in": "query", "description": "Window start. Default 30 days ago.", "schema": { "type": "string", "format": "date-time" } },
           { "name": "until", "in": "query", "description": "Window end. Default now.", "schema": { "type": "string", "format": "date-time" } },
           { "name": "bucket", "in": "query", "description": "Time granularity. Default day.", "schema": { "type": "string", "enum": ["day", "hour"] } }
@@ -251,6 +256,9 @@
         "operationId": "statsDeploys",
         "summary": "Per-environment deploy frequency, failures and health.",
         "parameters": [
+          { "name": "env", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
+          { "name": "service", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
+          { "name": "owner", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "since", "in": "query", "description": "Window start. Default 30 days ago.", "schema": { "type": "string", "format": "date-time" } },
           { "name": "until", "in": "query", "description": "Window end. Default now.", "schema": { "type": "string", "format": "date-time" } }
         ],
@@ -266,6 +274,9 @@
         "operationId": "dora",
         "summary": "Change-failure rate and MTTR over a window (overall, per env, per owner).",
         "parameters": [
+          { "name": "env", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
+          { "name": "service", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
+          { "name": "owner", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "since", "in": "query", "description": "Window start. Default 30 days ago.", "schema": { "type": "string", "format": "date-time" } },
           { "name": "until", "in": "query", "description": "Window end. Default now.", "schema": { "type": "string", "format": "date-time" } },
           { "name": "window", "in": "query", "description": "Deploy→failure attribution span (Go duration, e.g. 60m). Default 1h.", "schema": { "type": "string" } }
@@ -282,6 +293,9 @@
         "operationId": "changesets",
         "summary": "Logical changes in a window: build → merge → per-env deploys collapsed by app sha.",
         "parameters": [
+          { "name": "env", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
+          { "name": "service", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
+          { "name": "owner", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "since", "in": "query", "description": "Window start. Default 30 days ago.", "schema": { "type": "string", "format": "date-time" } },
           { "name": "until", "in": "query", "description": "Window end. Default now.", "schema": { "type": "string", "format": "date-time" } }
         ],
@@ -307,6 +321,8 @@
         "operationId": "matrix",
         "summary": "Services × environments deploy grid (diff visualized), current or as of a past instant.",
         "parameters": [
+          { "name": "service", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
+          { "name": "owner", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "envs", "in": "query", "description": "Ordered comma-separated column list. Omitted => distinct non-ephemeral envs.", "schema": { "type": "string" } },
           { "name": "at", "in": "query", "description": "Point-in-time: reconstruct the grid as of this RFC3339 instant. Omitted => current state.", "schema": { "type": "string", "format": "date-time" } }
         ],

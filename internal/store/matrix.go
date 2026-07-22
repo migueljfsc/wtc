@@ -38,7 +38,7 @@ type Matrix struct {
 // is empty it defaults to the distinct non-ephemeral (not pr-*) environments,
 // alphabetical. A non-zero asOf reconstructs the grid as it stood at that
 // instant (point-in-time state); the zero value means "now".
-func (s *Store) Matrix(ctx context.Context, envs []string, asOf time.Time) (*Matrix, error) {
+func (s *Store) Matrix(ctx context.Context, envs []string, asOf time.Time, scope AggScope) (*Matrix, error) {
 	if len(envs) == 0 {
 		var err error
 		if envs, err = s.defaultMatrixEnvs(ctx, asOf); err != nil {
@@ -46,7 +46,7 @@ func (s *Store) Matrix(ctx context.Context, envs []string, asOf time.Time) (*Mat
 		}
 	}
 
-	latest, err := s.LatestSucceededDeploys(ctx, envs, asOf)
+	latest, err := s.LatestSucceededDeploys(ctx, envs, asOf, scope)
 	if err != nil {
 		return nil, err
 	}

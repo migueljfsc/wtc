@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/model"
+	"github.com/migueljfsc/wtc/internal/store"
 )
 
 func csContains(list []string, v string) bool {
@@ -24,7 +25,7 @@ func csContains(list []string, v string) bool {
 // carries a different manifests revision.
 func TestChangesets(t *testing.T) {
 	st := seed(t)
-	r, err := Changesets(context.Background(), st, resolver(t), t0.Add(-time.Hour), t0.Add(4*time.Hour))
+	r, err := Changesets(context.Background(), st, resolver(t), t0.Add(-time.Hour), t0.Add(4*time.Hour), store.AggScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +63,7 @@ func TestChangesetFailedRollup(t *testing.T) {
 	ingestEv(t, st, &model.Event{DedupKey: "b", Source: model.SourceGitHub, Kind: model.KindBuild, Service: "api", Ref: "abcdef1234567890abcdef1234567890abcdef12", TS: base})
 	ingestEv(t, st, &model.Event{DedupKey: "d", Source: model.SourceFlux, Kind: model.KindDeploy, Env: "prod", Service: "api", Status: model.StatusFailed, Artifact: "registry/api:sha-abcdef1", TS: base.Add(time.Minute)})
 
-	r, err := Changesets(context.Background(), st, resolver(t), base.Add(-time.Hour), base.Add(time.Hour))
+	r, err := Changesets(context.Background(), st, resolver(t), base.Add(-time.Hour), base.Add(time.Hour), store.AggScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,5 +82,39 @@ func TestChangesetFailedRollup(t *testing.T) {
 	}
 	if cs.Events != 2 {
 		t.Errorf("events = %d, want 2 (build + failed deploy)", cs.Events)
+	}
+}
+
+// The scope narrows changesets at the change level: keep changes that reached a
+// scoped env / touched a scoped service, without dropping their env-less build.
+func TestChangesetsScoped(t *testing.T) {
+	st := seed(t)
+	ctx := context.Background()
+	win := func(scope store.AggScope) []Changeset {
+		r, err := Changesets(ctx, st, resolver(t), t0.Add(-time.Hour), t0.Add(4*time.Hour), scope)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r.Changesets
+	}
+
+	// The seed's one changeset touches demo-api across dev/staging/prod.
+	if got := win(store.AggScope{Services: []string{"demo-api"}}); len(got) != 1 {
+		t.Errorf("service=demo-api => %d changesets, want 1", len(got))
+	}
+	if got := win(store.AggScope{Services: []string{"demo-web"}}); len(got) != 0 {
+		t.Errorf("service=demo-web => %d changesets, want 0 (not part of a changeset)", len(got))
+	}
+	if got := win(store.AggScope{Envs: []string{"prod"}}); len(got) != 1 {
+		t.Errorf("env=prod => %d changesets, want 1 (reached prod)", len(got))
+	}
+	if got := win(store.AggScope{Envs: []string{"canary"}}); len(got) != 0 {
+		t.Errorf("env=canary => %d changesets, want 0", len(got))
+	}
+	// Its build carries no env, but the change still survives an env scope —
+	// filtering is change-level, and the build's kind is still present.
+	cs := win(store.AggScope{Envs: []string{"prod"}})[0]
+	if !csContains(cs.Kinds, "build") {
+		t.Errorf("env-scoped change lost its build event: kinds=%v", cs.Kinds)
 	}
 }

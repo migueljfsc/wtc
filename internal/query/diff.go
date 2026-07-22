@@ -34,8 +34,8 @@ type DiffReport struct {
 // artifact data the refs are compared and the row is flagged revision-only.
 // A non-zero asOf reconstructs the comparison as of that instant (point-in-time
 // state); the zero value compares current state.
-func Diff(ctx context.Context, st *store.Store, envA, envB string, asOf time.Time) (*DiffReport, error) {
-	latest, err := st.LatestSucceededDeploys(ctx, []string{envA, envB}, asOf)
+func Diff(ctx context.Context, st *store.Store, envA, envB string, asOf time.Time, scope store.AggScope) (*DiffReport, error) {
+	latest, err := st.LatestSucceededDeploys(ctx, []string{envA, envB}, asOf, scope)
 	if err != nil {
 		return nil, err
 	}

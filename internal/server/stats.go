@@ -46,7 +46,7 @@ func (s *Server) handleStatsActivity(w http.ResponseWriter, r *http.Request) {
 	if bucket == "" {
 		bucket = "day"
 	}
-	report, err := s.store.ActivityStats(r.Context(), since, until, bucket)
+	report, err := s.store.ActivityStats(r.Context(), since, until, bucket, scopeFrom(r))
 	if err != nil {
 		// Bad bucket / oversized window are the client's problem.
 		s.writeError(w, http.StatusBadRequest, err.Error())
@@ -60,7 +60,7 @@ func (s *Server) handleStatsDeploys(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	report, err := s.store.DeployStats(r.Context(), since, until)
+	report, err := s.store.DeployStats(r.Context(), since, until, scopeFrom(r))
 	if err != nil {
 		s.log.Error("deploy stats", "error", err)
 		s.writeError(w, http.StatusInternalServerError, "query error")
@@ -95,7 +95,7 @@ func (s *Server) handleMatrix(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	matrix, err := s.store.Matrix(r.Context(), envs, at)
+	matrix, err := s.store.Matrix(r.Context(), envs, at, scopeSvcOwner(r))
 	if err != nil {
 		s.log.Error("matrix", "error", err)
 		s.writeError(w, http.StatusInternalServerError, "query error")

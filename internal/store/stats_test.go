@@ -37,7 +37,7 @@ func TestActivityStats(t *testing.T) {
 		}
 	}
 
-	got, err := s.ActivityStats(ctx, base, base.Add(72*time.Hour), "day")
+	got, err := s.ActivityStats(ctx, base, base.Add(72*time.Hour), "day", AggScope{})
 	if err != nil {
 		t.Fatalf("ActivityStats: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestActivityStatsHourBucketAndGuards(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := s.ActivityStats(ctx, base, base.Add(3*time.Hour), "hour")
+	got, err := s.ActivityStats(ctx, base, base.Add(3*time.Hour), "hour", AggScope{})
 	if err != nil {
 		t.Fatalf("hour stats: %v", err)
 	}
@@ -75,11 +75,11 @@ func TestActivityStatsHourBucketAndGuards(t *testing.T) {
 		t.Errorf("11:00 bucket total = %d, want 1", got.Buckets[1].Total)
 	}
 
-	if _, err := s.ActivityStats(ctx, base, base.Add(3*time.Hour), "week"); err == nil {
+	if _, err := s.ActivityStats(ctx, base, base.Add(3*time.Hour), "week", AggScope{}); err == nil {
 		t.Error("invalid bucket must error")
 	}
 	// Oversized: hour buckets over a decade exceeds the cap.
-	if _, err := s.ActivityStats(ctx, base, base.AddDate(10, 0, 0), "hour"); err == nil {
+	if _, err := s.ActivityStats(ctx, base, base.AddDate(10, 0, 0), "hour", AggScope{}); err == nil {
 		t.Error("oversized window must error")
 	}
 }
@@ -192,7 +192,7 @@ func TestDeployStats(t *testing.T) {
 		}
 	}
 
-	got, err := s.DeployStats(ctx, base, base.Add(24*time.Hour))
+	got, err := s.DeployStats(ctx, base, base.Add(24*time.Hour), AggScope{})
 	if err != nil {
 		t.Fatalf("DeployStats: %v", err)
 	}

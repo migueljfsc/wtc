@@ -81,7 +81,7 @@ func (s *Store) EventsArtifactContaining(ctx context.Context, needle string, kin
 // diff is per-service by definition. A non-zero asOf bounds the search to
 // deploys at or before that instant, reconstructing the state that was
 // running then; the zero value means "now" (no upper bound).
-func (s *Store) LatestSucceededDeploys(ctx context.Context, envs []string, asOf time.Time) ([]model.Event, error) {
+func (s *Store) LatestSucceededDeploys(ctx context.Context, envs []string, asOf time.Time, scope AggScope) ([]model.Event, error) {
 	// No envs => no query: `env IN ()` is a syntax error on postgres (and sqlite).
 	// This happens legitimately for a point-in-time `at` before any env existed.
 	if len(envs) == 0 {
@@ -100,6 +100,10 @@ func (s *Store) LatestSucceededDeploys(ctx context.Context, envs []string, asOf 
 		q += ` AND ts <= ?`
 		args = append(args, model.FormatTS(asOf))
 	}
+	// scope narrows by service/owner (env is the caller's column axis above).
+	cond, cargs := scope.sqlConds()
+	q += cond
+	args = append(args, cargs...)
 	q += ` ORDER BY ts DESC`
 	all, err := s.queryEvents(ctx, q, args...)
 	if err != nil {

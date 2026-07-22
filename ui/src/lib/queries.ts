@@ -25,15 +25,31 @@ function clean(f: EventFilters): EventFilters {
   );
 }
 
+/** The global scope's facet filters, shared by the dashboard/changes/diff. */
+export interface AggScope {
+  env?: string;
+  service?: string;
+  owner?: string;
+}
+
+// Non-empty facet values as query params.
+function scopeQuery(s?: AggScope): Record<string, string> {
+  const q: Record<string, string> = {};
+  if (s?.env) q.env = s.env;
+  if (s?.service) q.service = s.service;
+  if (s?.owner) q.owner = s.owner;
+  return q;
+}
+
 // Thin typed wrappers around the generated client. Each throws on transport or
 // API error so TanStack Query surfaces it via `error`.
 
-export function useActivity(sinceISO: string, bucket: "day" | "hour") {
+export function useActivity(sinceISO: string, bucket: "day" | "hour", scope?: AggScope) {
   return useQuery({
-    queryKey: ["stats", "activity", sinceISO, bucket],
+    queryKey: ["stats", "activity", sinceISO, bucket, scope],
     queryFn: async () => {
       const { data, error } = await api.GET("/api/v1/stats/activity", {
-        params: { query: { since: sinceISO, bucket } },
+        params: { query: { since: sinceISO, bucket, ...scopeQuery(scope) } },
       });
       if (error) throw new Error("activity stats request failed");
       return data;
@@ -41,12 +57,12 @@ export function useActivity(sinceISO: string, bucket: "day" | "hour") {
   });
 }
 
-export function useDeployStats(sinceISO: string) {
+export function useDeployStats(sinceISO: string, scope?: AggScope) {
   return useQuery({
-    queryKey: ["stats", "deploys", sinceISO],
+    queryKey: ["stats", "deploys", sinceISO, scope],
     queryFn: async () => {
       const { data, error } = await api.GET("/api/v1/stats/deploys", {
-        params: { query: { since: sinceISO } },
+        params: { query: { since: sinceISO, ...scopeQuery(scope) } },
       });
       if (error) throw new Error("deploy stats request failed");
       return data;
@@ -55,12 +71,12 @@ export function useDeployStats(sinceISO: string) {
 }
 
 /** Change-failure rate + MTTR over a window (DORA), overall and by env/owner. */
-export function useDORA(sinceISO: string) {
+export function useDORA(sinceISO: string, scope?: AggScope) {
   return useQuery({
-    queryKey: ["dora", sinceISO],
+    queryKey: ["dora", sinceISO, scope],
     queryFn: async () => {
       const { data, error } = await api.GET("/api/v1/dora", {
-        params: { query: { since: sinceISO } },
+        params: { query: { since: sinceISO, ...scopeQuery(scope) } },
       });
       if (error) throw new Error("dora request failed");
       return data;
@@ -69,12 +85,12 @@ export function useDORA(sinceISO: string) {
 }
 
 /** Logical changes (build → merge → per-env deploys, grouped by app sha). */
-export function useChangesets(sinceISO: string) {
+export function useChangesets(sinceISO: string, scope?: AggScope) {
   return useQuery({
-    queryKey: ["changesets", sinceISO],
+    queryKey: ["changesets", sinceISO, scope],
     queryFn: async () => {
       const { data, error } = await api.GET("/api/v1/changesets", {
-        params: { query: { since: sinceISO } },
+        params: { query: { since: sinceISO, ...scopeQuery(scope) } },
       });
       if (error) throw new Error("changesets request failed");
       return data;
@@ -193,11 +209,14 @@ export function useFacets() {
  * Services × environments deploy grid (Diff view). `at` (RFC3339) reconstructs
  * the grid as of a past instant; omitted/undefined shows current state.
  */
-export function useMatrix(envs: string[], at?: string) {
+export function useMatrix(envs: string[], at?: string, scope?: AggScope) {
   return useQuery({
-    queryKey: ["matrix", envs, at ?? ""],
+    queryKey: ["matrix", envs, at ?? "", scope],
     queryFn: async () => {
-      const query: { envs?: string; at?: string } = {};
+      // env is the column axis here; service/owner narrow the rows.
+      const query: { envs?: string; at?: string; service?: string; owner?: string } = {
+        ...scopeQuery(scope),
+      };
       if (envs.length) query.envs = envs.join(",");
       if (at) query.at = at;
       const { data, error } = await api.GET("/api/v1/matrix", {

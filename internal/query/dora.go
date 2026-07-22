@@ -64,7 +64,7 @@ func (a *doraAccum) metrics() DORAMetrics {
 // (terminal deploy) counts as a failure if it failed outright, or an alert or
 // rollback followed it in the same env within window. MTTR averages the
 // firing→resolved duration of resolved alerts. window <= 0 uses the default.
-func DORA(ctx context.Context, st *store.Store, since, until time.Time, window time.Duration) (*DORAReport, error) {
+func DORA(ctx context.Context, st *store.Store, since, until time.Time, window time.Duration, scope store.AggScope) (*DORAReport, error) {
 	if window <= 0 {
 		window = DefaultDORAWindow
 	}
@@ -81,6 +81,9 @@ func DORA(ctx context.Context, st *store.Store, since, until time.Time, window t
 	}
 	var signals []signal // alerts + rollbacks, for failure attribution
 	for _, e := range evs {
+		if !scope.Match(e.Env, e.Service, e.Owner) {
+			continue
+		}
 		switch e.Kind {
 		case model.KindDeploy:
 			if e.Status == model.StatusSucceeded || e.Status == model.StatusFailed {
