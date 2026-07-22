@@ -137,15 +137,6 @@ export function Timeline() {
         )}
       </div>
 
-      {ref && (
-        <p className="text-xs text-muted-foreground">
-          Scoped to one change ({ref.split(",")[0].slice(0, 7)}…) —{" "}
-          <button className="underline" onClick={() => patchParams((p) => p.delete("ref"))}>
-            show all
-          </button>
-        </p>
-      )}
-
       <FilterBar
         filters={advanced}
         onSelect={onSelect}

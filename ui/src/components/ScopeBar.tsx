@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Clock, Search } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Clock, Search, X } from "lucide-react";
 import { useScope, RANGE_PRESETS } from "@/lib/scope";
 import { useFacets } from "@/lib/queries";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
@@ -16,6 +17,17 @@ import { cn } from "@/lib/utils";
 export function ScopeBar({ disabled = false }: { disabled?: boolean }) {
   const { scope, setScope, clearFacets, hasFacets } = useScope();
   const facets = useFacets();
+
+  // The changeset drill-in (?ref=…, exact match) surfaces here as a clearable
+  // chip so it reads as one of the top-bar filters, not a hidden one.
+  const [params, setParams] = useSearchParams();
+  const ref = params.get("ref");
+  const clearRef = () =>
+    setParams((p) => {
+      const n = new URLSearchParams(p);
+      n.delete("ref");
+      return n;
+    });
 
   // Debounce the search box so typing doesn't churn the URL/refetch per key.
   const [search, setSearch] = useState(scope.q);
@@ -55,6 +67,19 @@ export function ScopeBar({ disabled = false }: { disabled?: boolean }) {
       <MultiSelect label="service" value={scope.service} options={facets.data?.services ?? []} onChange={(v) => setScope({ service: v })} searchable />
       <MultiSelect label="owner" value={scope.owner} options={facets.data?.owners ?? []} onChange={(v) => setScope({ owner: v })} searchable />
       <MultiSelect label="repo" value={scope.repo} options={facets.data?.repos ?? []} onChange={(v) => setScope({ repo: v })} searchable />
+
+      {ref && (
+        <span className="inline-flex items-center gap-1 rounded-full border bg-secondary py-0.5 pl-2.5 pr-1 text-xs">
+          change&nbsp;<span className="font-mono">{ref.split(",")[0].slice(0, 7)}</span>
+          <button
+            aria-label="Clear change filter"
+            onClick={clearRef}
+            className="rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+          >
+            <X className="size-3" />
+          </button>
+        </span>
+      )}
 
       {hasFacets && (
         <button

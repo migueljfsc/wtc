@@ -65,9 +65,10 @@ export function Changes() {
             : cs.deployed
               ? "text-emerald-600 dark:text-emerald-500"
               : "text-muted-foreground";
-          // Open the timeline searching for this change's sha (search matches
-          // ref/artifact/title), so the query shows in the global search box.
-          const timelineTo = `/timeline?q=${encodeURIComponent(cs.sha.slice(0, 7))}`;
+          // Open the timeline filtered precisely to this change's events by its
+          // exact refs (app sha first, for the scope-bar chip's label).
+          const refs = [cs.sha, ...cs.refs.filter((r) => r !== cs.sha)];
+          const timelineTo = `/timeline?ref=${refs.join(",")}`;
           return (
             <Card
               key={cs.sha}
