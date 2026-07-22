@@ -131,7 +131,7 @@ export function ScopeBar({ disabled = false }: { disabled?: boolean }) {
               aria-label="From"
               value={toLocalInput(scope.since)}
               onChange={(e) => e.target.value && setScope({ range: "custom", since: fromLocalInput(e.target.value) })}
-              className="h-7 rounded border bg-transparent px-2 text-foreground [color-scheme:light] dark:[color-scheme:dark]"
+              className="h-7 rounded border bg-transparent px-2 text-foreground [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:cursor-pointer"
             />
             <span aria-hidden>→</span>
             <input
@@ -139,7 +139,7 @@ export function ScopeBar({ disabled = false }: { disabled?: boolean }) {
               aria-label="To"
               value={toLocalInput(scope.until)}
               onChange={(e) => e.target.value && setScope({ range: "custom", until: fromLocalInput(e.target.value) })}
-              className="h-7 rounded border bg-transparent px-2 text-foreground [color-scheme:light] dark:[color-scheme:dark]"
+              className="h-7 rounded border bg-transparent px-2 text-foreground [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:cursor-pointer"
             />
           </div>
         )}
