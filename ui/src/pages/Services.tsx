@@ -3,28 +3,50 @@ import { useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 import { useFacets } from "@/lib/queries";
 import { ServiceDetail } from "@/components/services/ServiceDetail";
+import { useScope } from "@/lib/scope";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export function Services() {
   const facets = useFacets();
-  const services = useMemo(() => facets.data?.services ?? [], [facets.data]);
+  const { scope } = useScope();
+  // The bar's `service` facet narrows which services are pickable here; `?svc=`
+  // (this page's own param) picks the one whose detail is open — the two don't
+  // collide. env/owner/time from the bar flow into the detail below.
+  const services = useMemo(() => {
+    const all = facets.data?.services ?? [];
+    const pick = new Set(scope.service ? scope.service.split(",").filter(Boolean) : []);
+    return pick.size === 0 ? all : all.filter((s) => pick.has(s));
+  }, [facets.data, scope.service]);
 
   const [params, setParams] = useSearchParams();
-  const selected = params.get("service");
+  const selected = params.get("svc");
   const [query, setQuery] = useState("");
+
+  // Merge-write: preserve the rest of the scope (env/owner/time/…) in the URL.
+  const selectService = (svc: string, replace = false) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("svc", svc);
+        return next;
+      },
+      { replace },
+    );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return q ? services.filter((s) => s.toLowerCase().includes(q)) : services;
   }, [services, query]);
 
-  // Default to the first service once facets load.
+  // Default to the first service once facets load (or when the scope narrowing
+  // drops the currently-selected one out of the list).
   useEffect(() => {
-    if (!selected && services.length > 0) {
-      setParams({ service: services[0] }, { replace: true });
+    if (services.length > 0 && (!selected || !services.includes(selected))) {
+      selectService(services[0], true);
     }
-  }, [selected, services, setParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, services]);
 
   return (
     <div className="mx-auto max-w-7xl space-y-4">
@@ -61,7 +83,7 @@ export function Services() {
                   {filtered.map((s) => (
                     <li key={s}>
                       <button
-                        onClick={() => setParams({ service: s })}
+                        onClick={() => selectService(s)}
                         title={s}
                         className={cn(
                           "block w-full truncate px-3 py-1.5 text-left text-sm transition-colors",
@@ -80,7 +102,19 @@ export function Services() {
           </aside>
 
           <div className="min-w-0">
-            {selected && <ServiceDetail key={selected} service={selected} />}
+            {selected && (
+              <ServiceDetail
+                key={selected}
+                service={selected}
+                scope={{
+                  env: scope.env,
+                  owner: scope.owner,
+                  since: scope.since,
+                  until: scope.until,
+                  at: scope.range === "custom" ? scope.until : undefined,
+                }}
+              />
+            )}
           </div>
         </div>
       )}

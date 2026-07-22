@@ -25,14 +25,30 @@ function Tile({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function ServiceDetail({ service }: { service: string }) {
+export interface ServiceScope {
+  env: string;
+  owner: string;
+  since: string;
+  until: string;
+  at?: string;
+}
+
+export function ServiceDetail({ service, scope }: { service: string; scope: ServiceScope }) {
   const facets = useFacets();
-  const envs = useMemo(
-    () => orderEnvs((facets.data?.envs ?? []).filter((e) => !isEphemeral(e))),
-    [facets.data],
-  );
-  const matrix = useMatrix(envs);
-  const deploys = useServiceDeploys(service);
+  // Envs shown = non-ephemeral, narrowed to the scope-bar env facet when set.
+  const envs = useMemo(() => {
+    const pick = new Set(scope.env ? scope.env.split(",").filter(Boolean) : []);
+    const base = (facets.data?.envs ?? []).filter(
+      (e) => !isEphemeral(e) && (pick.size === 0 || pick.has(e)),
+    );
+    return orderEnvs(base);
+  }, [facets.data, scope.env]);
+  const matrix = useMatrix(envs, scope.at, { owner: scope.owner });
+  const deploys = useServiceDeploys(service, {
+    env: scope.env,
+    since: scope.since,
+    until: scope.until,
+  });
 
   const row = matrix.data?.services.find((s) => s.service === service);
   const events = useMemo(() => deploys.data ?? [], [deploys.data]);
@@ -43,7 +59,9 @@ export function ServiceDetail({ service }: { service: string }) {
     <div className="space-y-6">
       {/* Current version across environments */}
       <section>
-        <h2 className="mb-2 text-sm font-medium text-muted-foreground">Deployed now</h2>
+        <h2 className="mb-2 text-sm font-medium text-muted-foreground">
+          {scope.at ? "Deployed as of the range end" : "Deployed now"}
+        </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {envs.map((env) => {
             const cell = row?.cells[env];

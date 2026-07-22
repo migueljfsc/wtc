@@ -100,7 +100,7 @@ export function Changes() {
                 </div>
                 <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-[auto_1fr] sm:gap-x-4">
                   <span className="pt-0.5">services</span>
-                  <Chips values={cs.services} to={(s) => `/services?service=${encodeURIComponent(s)}`} />
+                  <Chips values={cs.services} to={(s) => `/services?svc=${encodeURIComponent(s)}`} />
                   <span className="pt-0.5">envs</span>
                   <Chips values={cs.envs} />
                   {cs.owners.length > 0 && (

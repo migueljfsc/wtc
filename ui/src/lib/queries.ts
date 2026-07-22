@@ -229,13 +229,24 @@ export function useMatrix(envs: string[], at?: string, scope?: AggScope) {
 }
 
 /** Recent deploys for one service, for the service-detail page + its metrics. */
-export function useServiceDeploys(service: string | null) {
+export function useServiceDeploys(
+  service: string | null,
+  opts?: { env?: string; since?: string; until?: string },
+) {
   return useQuery({
-    queryKey: ["events", "service-deploys", service],
+    queryKey: ["events", "service-deploys", service, opts],
     enabled: !!service,
     queryFn: async () => {
+      const query: Record<string, string | number> = {
+        service: service!,
+        kind: "deploy",
+        limit: 100,
+      };
+      if (opts?.env) query.env = opts.env;
+      if (opts?.since) query.since = opts.since;
+      if (opts?.until) query.until = opts.until;
       const { data, error } = await api.GET("/api/v1/events", {
-        params: { query: { service: service!, kind: "deploy", limit: 100 } },
+        params: { query },
       });
       if (error) throw new Error("service deploys request failed");
       return data.events ?? [];
