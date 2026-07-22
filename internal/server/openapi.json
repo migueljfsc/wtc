@@ -723,16 +723,27 @@
           { "type": "object", "required": ["key"], "properties": { "key": { "type": "string", "description": "The env or owner name." } } }
         ]
       },
+      "LeadTimeGroup": {
+        "type": "object",
+        "required": ["env", "samples"],
+        "properties": {
+          "env": { "type": "string" },
+          "samples": { "type": "integer", "description": "Changes that reached this env in the window." },
+          "median_seconds": { "type": "number", "description": "Median build/merge→deploy lead time; absent when no samples." },
+          "p90_seconds": { "type": "number", "description": "90th-percentile lead time; absent when no samples." }
+        }
+      },
       "DORAReport": {
         "type": "object",
-        "required": ["since", "until", "window_seconds", "overall", "by_env", "by_owner"],
+        "required": ["since", "until", "window_seconds", "overall", "by_env", "by_owner", "lead_time"],
         "properties": {
           "since": { "type": "string", "format": "date-time" },
           "until": { "type": "string", "format": "date-time" },
           "window_seconds": { "type": "integer", "description": "Deploy→failure attribution window." },
           "overall": { "$ref": "#/components/schemas/DORAMetrics" },
           "by_env": { "type": "array", "items": { "$ref": "#/components/schemas/DORAGroup" } },
-          "by_owner": { "type": "array", "items": { "$ref": "#/components/schemas/DORAGroup" } }
+          "by_owner": { "type": "array", "items": { "$ref": "#/components/schemas/DORAGroup" } },
+          "lead_time": { "type": "array", "items": { "$ref": "#/components/schemas/LeadTimeGroup" }, "description": "Pipeline lead time (build/merge→deploy) per env: median + p90." }
         }
       },
       "Changeset": {

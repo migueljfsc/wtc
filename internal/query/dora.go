@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/model"
+	"github.com/migueljfsc/wtc/internal/normalize"
 	"github.com/migueljfsc/wtc/internal/store"
 )
 
@@ -33,14 +34,15 @@ type DORAGroup struct {
 
 // DORAReport is deploy-quality metrics over a window: overall, per env, and per
 // owning team. Deploy frequency lives in the separate deploy-stats endpoint;
-// lead time is not yet computed (it needs the tag↔sha join `where` performs).
+// lead time is per env (build/merge → deploy).
 type DORAReport struct {
-	Since         time.Time   `json:"since"`
-	Until         time.Time   `json:"until"`
-	WindowSeconds int         `json:"window_seconds"` // failure-attribution window after a deploy
-	Overall       DORAMetrics `json:"overall"`
-	ByEnv         []DORAGroup `json:"by_env"`
-	ByOwner       []DORAGroup `json:"by_owner"`
+	Since         time.Time       `json:"since"`
+	Until         time.Time       `json:"until"`
+	WindowSeconds int             `json:"window_seconds"` // failure-attribution window after a deploy
+	Overall       DORAMetrics     `json:"overall"`
+	ByEnv         []DORAGroup     `json:"by_env"`
+	ByOwner       []DORAGroup     `json:"by_owner"`
+	LeadTime      []LeadTimeGroup `json:"lead_time"` // build/merge → deploy, per env: median + p90
 }
 
 type doraAccum struct {
@@ -64,7 +66,7 @@ func (a *doraAccum) metrics() DORAMetrics {
 // (terminal deploy) counts as a failure if it failed outright, or an alert or
 // rollback followed it in the same env within window. MTTR averages the
 // firing→resolved duration of resolved alerts. window <= 0 uses the default.
-func DORA(ctx context.Context, st *store.Store, since, until time.Time, window time.Duration, scope store.AggScope) (*DORAReport, error) {
+func DORA(ctx context.Context, st *store.Store, tags *normalize.TagResolver, since, until time.Time, window time.Duration, scope store.AggScope) (*DORAReport, error) {
 	if window <= 0 {
 		window = DefaultDORAWindow
 	}
@@ -163,6 +165,11 @@ func DORA(ctx context.Context, st *store.Store, since, until time.Time, window t
 		}
 	}
 
+	lead, err := leadTime(ctx, st, tags, since, until, scope)
+	if err != nil {
+		return nil, err
+	}
+
 	return &DORAReport{
 		Since:         since.UTC(),
 		Until:         until.UTC(),
@@ -170,6 +177,7 @@ func DORA(ctx context.Context, st *store.Store, since, until time.Time, window t
 		Overall:       overall.metrics(),
 		ByEnv:         doraGroups(byEnv),
 		ByOwner:       doraGroups(byOwner),
+		LeadTime:      lead,
 	}, nil
 }
 

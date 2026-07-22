@@ -718,6 +718,15 @@ export interface components {
             /** @description The env or owner name. */
             key: string;
         };
+        LeadTimeGroup: {
+            env: string;
+            /** @description Changes that reached this env in the window. */
+            samples: number;
+            /** @description Median build/merge→deploy lead time; absent when no samples. */
+            median_seconds?: number;
+            /** @description 90th-percentile lead time; absent when no samples. */
+            p90_seconds?: number;
+        };
         DORAReport: {
             /** Format: date-time */
             since: string;
@@ -728,6 +737,8 @@ export interface components {
             overall: components["schemas"]["DORAMetrics"];
             by_env: components["schemas"]["DORAGroup"][];
             by_owner: components["schemas"]["DORAGroup"][];
+            /** @description Pipeline lead time (build/merge→deploy) per env: median + p90. */
+            lead_time: components["schemas"]["LeadTimeGroup"][];
         };
         Changeset: {
             /** @description Longest known form of the app commit sha. */

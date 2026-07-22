@@ -62,7 +62,7 @@ func TestDORA(t *testing.T) {
 	// A resolved alert 10m after d3 in prod → makes d3 a failure; 30-min MTTR.
 	ingestEv(t, st, &model.Event{DedupKey: "a1", Source: model.SourceAlertmanager, Kind: model.KindAlert, Env: "prod", Owner: "platform", TS: base.Add(2*time.Hour + 10*time.Minute), DurationMS: ms(30 * 60 * 1000)})
 
-	r, err := DORA(context.Background(), st, base.Add(-time.Hour), base.Add(4*time.Hour), time.Hour, store.AggScope{})
+	r, err := DORA(context.Background(), st, resolver(t), base.Add(-time.Hour), base.Add(4*time.Hour), time.Hour, store.AggScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestDORAWindowBoundary(t *testing.T) {
 	// Alert 90 min later — outside a 60-min window.
 	ingestEv(t, st, &model.Event{DedupKey: "a", Source: model.SourceAlertmanager, Kind: model.KindAlert, Env: "prod", TS: base.Add(90 * time.Minute)})
 
-	r, err := DORA(context.Background(), st, base.Add(-time.Hour), base.Add(3*time.Hour), time.Hour, store.AggScope{})
+	r, err := DORA(context.Background(), st, resolver(t), base.Add(-time.Hour), base.Add(3*time.Hour), time.Hour, store.AggScope{})
 	if err != nil {
 		t.Fatal(err)
 	}

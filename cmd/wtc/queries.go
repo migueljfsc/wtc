@@ -161,8 +161,8 @@ func newDoraCmd(flags *clientFlags) *cobra.Command {
 		Short: "Deploy-quality metrics: change-failure rate and MTTR, by env and team",
 		Long: `Change-failure rate (deploys that failed or were followed by an alert or
 rollback in the same env within --window) and MTTR (mean alert firing→resolved),
-overall and grouped by env and owning team. Deploy frequency lives in the
-dashboard; lead time is not yet computed.`,
+overall and grouped by env and owning team, plus lead time (build/merge →
+deploy) per env. Deploy frequency lives in the dashboard.`,
 		Example: "  wtc dora --since 30d\n  wtc dora --since 90d --window 2h --json",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			now := time.Now()
@@ -212,6 +212,17 @@ dashboard; lead time is not yet computed.`,
 			}
 			table("BY ENV", r.ByEnv)
 			table("BY TEAM", r.ByOwner)
+
+			if len(r.LeadTime) > 0 {
+				_, _ = fmt.Fprintf(out, "\nLEAD TIME (build/merge → deploy)\n")
+				w := tabwriter.NewWriter(out, 2, 4, 2, ' ', 0)
+				_, _ = fmt.Fprintln(w, "\tSAMPLES\tMEDIAN\tP90")
+				for _, g := range r.LeadTime {
+					_, _ = fmt.Fprintf(w, "%s\t%d\t%s\t%s\n",
+						g.Env, g.Samples, doraDur(g.MedianSeconds), doraDur(g.P90Seconds))
+				}
+				_ = w.Flush()
+			}
 			return nil
 		},
 	}
@@ -224,12 +235,15 @@ dashboard; lead time is not yet computed.`,
 
 func doraPct(f float64) string { return fmt.Sprintf("%.1f%%", f*100) }
 
-func doraMTTR(secs *float64) string {
+// doraDur formats a *seconds duration (MTTR, lead time); "-" when absent.
+func doraDur(secs *float64) string {
 	if secs == nil {
 		return "-"
 	}
 	return (time.Duration(*secs) * time.Second).Round(time.Second).String()
 }
+
+func doraMTTR(secs *float64) string { return doraDur(secs) }
 
 func newDiffCmd(flags *clientFlags) *cobra.Command {
 	var asJSON bool

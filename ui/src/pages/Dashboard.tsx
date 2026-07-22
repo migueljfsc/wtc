@@ -12,11 +12,13 @@ import { EnvHealthCards } from "@/components/dashboard/EnvHealthCards";
 import { RecentChanges } from "@/components/dashboard/RecentChanges";
 import { useActivity, useDeployStats, useDORA, useRecentEvents } from "@/lib/queries";
 import { useScope } from "@/lib/scope";
-import { pct } from "@/lib/format";
+import { isEphemeral, orderEnvs } from "@/lib/envOrder";
+import { duration, pct } from "@/lib/format";
 
 const asPct = (f: number) => `${(f * 100).toFixed(1)}%`;
 const asMTTR = (s?: number) =>
   s == null ? "—" : s < 3600 ? `${Math.round(s / 60)}m` : `${(s / 3600).toFixed(1)}h`;
+const asLead = (s?: number) => (s == null ? "—" : duration(s * 1000));
 
 function StatTile({ label, value, tone }: { label: string; value: string; tone?: "danger" }) {
   return (
@@ -65,6 +67,16 @@ export function Dashboard() {
     return { events, deployTotal, deployFailed };
   }, [activity.data, deploys.data]);
 
+  // Lead time is per-env; the headline uses the production env (rightmost in
+  // promotion order among the non-ephemeral envs that reported lead time).
+  const lead = useMemo(() => {
+    const groups = dora.data?.lead_time ?? [];
+    const byEnv = new Map(groups.map((g) => [g.env, g.median_seconds]));
+    const ordered = orderEnvs(groups.map((g) => g.env).filter((e) => !isEphemeral(e)));
+    const prodEnv = ordered.length ? ordered[ordered.length - 1] : undefined;
+    return { byEnv, prodEnv, toProd: prodEnv ? byEnv.get(prodEnv) : undefined };
+  }, [dora.data]);
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div className="flex items-center justify-between">
@@ -111,11 +123,15 @@ export function Dashboard() {
         {dora.error && <ErrorCard what="DORA metrics" />}
         {dora.data && (
           <>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <StatTile
                 label="Change-failure rate"
                 value={asPct(dora.data.overall.change_failure_rate)}
                 tone={dora.data.overall.failures > 0 ? "danger" : undefined}
+              />
+              <StatTile
+                label={lead.prodEnv ? `Lead time (to ${lead.prodEnv})` : "Lead time"}
+                value={asLead(lead.toProd)}
               />
               <StatTile label="MTTR" value={asMTTR(dora.data.overall.mttr_seconds)} />
               <StatTile label="Incidents" value={dora.data.overall.incidents.toLocaleString()} />
@@ -130,6 +146,7 @@ export function Dashboard() {
                         <th className="pb-1 text-right font-medium">deploys</th>
                         <th className="pb-1 text-right font-medium">CFR</th>
                         <th className="pb-1 text-right font-medium">MTTR</th>
+                        <th className="pb-1 text-right font-medium">lead time</th>
                       </tr>
                     </thead>
                     <tbody className="tabular-nums">
@@ -141,6 +158,7 @@ export function Dashboard() {
                             {asPct(g.change_failure_rate)}
                           </td>
                           <td className="py-1 text-right">{asMTTR(g.mttr_seconds)}</td>
+                          <td className="py-1 text-right">{asLead(lead.byEnv.get(g.key))}</td>
                         </tr>
                       ))}
                     </tbody>

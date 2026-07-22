@@ -4,6 +4,19 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — DORA: lead time
+
+- **Lead time per environment** completes the DORA set. For each change (events
+  grouped by the app commit sha they carry — the same tag↔sha join `wtc where`
+  performs), wtc measures from when it first entered the pipeline (earliest
+  `build`/`merge`/`push`) to its first succeeded deploy in each env, and reports
+  the **median** and **p90**. Pipeline lead time, not literal
+  first-commit→deploy (that needs commit-time enrichment); windowed like the
+  rest of DORA.
+- **Surfaces** — `lead_time[]` on `GET /api/v1/dora`; a `LEAD TIME` table in
+  `wtc dora`; a *Lead time (to prod)* headline tile and a per-env `lead time`
+  column in the dashboard's Delivery-quality section. Docs: `docs/setup/dora.md`.
+
 ### Added — awareness: notifications + Atom feed (P21)
 
 - **`notifications:` config** — subscriptions over the ledger:

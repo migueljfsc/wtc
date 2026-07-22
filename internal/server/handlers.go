@@ -170,7 +170,7 @@ func (s *Server) handleDORA(w http.ResponseWriter, r *http.Request) {
 		}
 		window = d
 	}
-	report, err := query.DORA(r.Context(), s.store, since, until, window, scopeFrom(r))
+	report, err := query.DORA(r.Context(), s.store, s.tags.Load(), since, until, window, scopeFrom(r))
 	if err != nil {
 		s.log.Error("dora", "error", err)
 		s.writeError(w, http.StatusInternalServerError, "query error")
