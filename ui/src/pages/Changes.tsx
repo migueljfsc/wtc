@@ -65,11 +65,9 @@ export function Changes() {
             : cs.deployed
               ? "text-emerald-600 dark:text-emerald-500"
               : "text-muted-foreground";
-          // Scope the timeline to exactly this change's events by its refs (the
-          // app sha + every per-env manifests revision).
-          const timelineTo = cs.refs.length
-            ? `/timeline?ref=${cs.refs.join(",")}`
-            : "/timeline";
+          // Open the timeline searching for this change's sha (search matches
+          // ref/artifact/title), so the query shows in the global search box.
+          const timelineTo = `/timeline?q=${encodeURIComponent(cs.sha.slice(0, 7))}`;
           return (
             <Card
               key={cs.sha}

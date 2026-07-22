@@ -19,6 +19,14 @@ export function ScopeBar({ disabled = false }: { disabled?: boolean }) {
 
   // Debounce the search box so typing doesn't churn the URL/refetch per key.
   const [search, setSearch] = useState(scope.q);
+  // Reflect an externally-set q (e.g. clicking a change) back into the box —
+  // the "adjust state when a value changes" pattern, no effect needed. The
+  // debounce always pushes the current search, so this never clobbers typing.
+  const [prevQ, setPrevQ] = useState(scope.q);
+  if (scope.q !== prevQ) {
+    setPrevQ(scope.q);
+    setSearch(scope.q);
+  }
   const debounced = useDebouncedValue(search, 350);
   useEffect(() => {
     if (debounced !== scope.q) setScope({ q: debounced });
