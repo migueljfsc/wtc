@@ -4,6 +4,7 @@ import { Clock, Search, X } from "lucide-react";
 import { useScope, RANGE_PRESETS } from "@/lib/scope";
 import { useFacets } from "@/lib/queries";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
+import { toLocalInput, fromLocalInput } from "@/lib/format";
 import { MultiSelect } from "@/components/timeline/MultiSelect";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -90,23 +91,58 @@ export function ScopeBar({ disabled = false }: { disabled?: boolean }) {
         </button>
       )}
 
-      {/* Time range — right-aligned, Grafana-style. */}
-      <div className="ml-auto flex items-center gap-0.5 rounded-md border p-0.5">
-        <Clock className="mx-1 size-3.5 text-muted-foreground" />
-        {RANGE_PRESETS.map((p) => (
+      {/* Time range — right-aligned, Grafana-style. Custom reveals two
+          datetime inputs; a custom range ending in the past drives the
+          point-in-time views (Diff "as of"). */}
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
+        <div className="flex items-center gap-0.5 rounded-md border p-0.5">
+          <Clock className="mx-1 size-3.5 text-muted-foreground" />
+          {RANGE_PRESETS.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setScope({ range: p.key })}
+              className={cn(
+                "rounded px-2 py-0.5 text-xs font-medium transition-colors",
+                scope.range === p.key
+                  ? "bg-secondary text-secondary-foreground"
+                  : "text-muted-foreground hover:bg-accent",
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
           <button
-            key={p.key}
-            onClick={() => setScope({ range: p.key })}
+            onClick={() => setScope({ range: "custom", since: scope.since, until: scope.until })}
             className={cn(
               "rounded px-2 py-0.5 text-xs font-medium transition-colors",
-              scope.range === p.key
+              scope.range === "custom"
                 ? "bg-secondary text-secondary-foreground"
                 : "text-muted-foreground hover:bg-accent",
             )}
           >
-            {p.label}
+            Custom
           </button>
-        ))}
+        </div>
+
+        {scope.range === "custom" && (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <input
+              type="datetime-local"
+              aria-label="From"
+              value={toLocalInput(scope.since)}
+              onChange={(e) => e.target.value && setScope({ range: "custom", since: fromLocalInput(e.target.value) })}
+              className="h-7 rounded border bg-transparent px-2 text-foreground [color-scheme:light] dark:[color-scheme:dark]"
+            />
+            <span aria-hidden>→</span>
+            <input
+              type="datetime-local"
+              aria-label="To"
+              value={toLocalInput(scope.until)}
+              onChange={(e) => e.target.value && setScope({ range: "custom", until: fromLocalInput(e.target.value) })}
+              className="h-7 rounded border bg-transparent px-2 text-foreground [color-scheme:light] dark:[color-scheme:dark]"
+            />
+          </div>
+        )}
       </div>
     </div>
   );

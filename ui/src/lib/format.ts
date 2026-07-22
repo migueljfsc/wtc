@@ -41,6 +41,17 @@ export function daysAgoISO(days: number): string {
   return new Date(Date.now() - days * DAY).toISOString();
 }
 
+/** ISO (UTC) → `YYYY-MM-DDTHH:mm` in local wall-clock, for a datetime-local input. */
+export function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+/** `YYYY-MM-DDTHH:mm` local (from a datetime-local input) → ISO UTC. */
+export function fromLocalInput(local: string): string {
+  return new Date(local).toISOString();
+}
+
 /** Human byte size: 1536 => "1.5 KB". */
 export function bytes(n: number): string {
   const units = ["B", "KB", "MB", "GB", "TB"];
