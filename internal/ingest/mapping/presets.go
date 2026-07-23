@@ -58,16 +58,6 @@ func Preset(name string) (Webhook, bool) {
 	return w, ok
 }
 
-// PresetNames lists the shipped preset names (for docs/CLI listing).
-func PresetNames() []string {
-	presetsOnce.Do(loadPresets)
-	names := make([]string, 0, len(presets))
-	for n := range presets {
-		names = append(names, n)
-	}
-	return names
-}
-
 // Resolved returns the webhooks with presets applied — the effective
 // declarations that Compile validates and serves. An unknown preset passes
 // through unchanged: Compile is where that errors, and every caller of

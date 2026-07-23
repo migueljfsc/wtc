@@ -83,9 +83,6 @@ type Mapper struct {
 	facts  map[string]*template.Template // fact name → template
 }
 
-// Name returns the source name (also the stored Event.Source).
-func (m *Mapper) Name() string { return m.name }
-
 // AuthConfig exposes the compiled auth so the server can verify a request.
 func (m *Mapper) AuthConfig() Auth { return m.auth }
 
