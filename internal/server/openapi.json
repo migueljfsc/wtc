@@ -59,6 +59,7 @@
         "parameters": [
           { "name": "source", "in": "query", "description": "Facet OR-set (comma-separated): github/gitlab/flux/argocd/… or mapping-webhook names.", "schema": { "type": "string" } },
           { "name": "env", "in": "query", "description": "Facet OR-set (comma-separated).", "schema": { "type": "string" } },
+          { "name": "cluster", "in": "query", "description": "Facet OR-set (comma-separated): deploy cluster (many per env).", "schema": { "type": "string" } },
           { "name": "service", "in": "query", "description": "Facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "repo", "in": "query", "description": "Facet OR-set (comma-separated): source repo (owner/name).", "schema": { "type": "string" } },
           { "name": "owner", "in": "query", "description": "Facet OR-set (comma-separated): owning team.", "schema": { "type": "string" } },
@@ -186,6 +187,7 @@
         "parameters": [
           { "name": "source", "in": "query", "description": "Source(s), comma-separated.", "schema": { "type": "string" } },
           { "name": "env", "in": "query", "description": "Env(s), comma-separated.", "schema": { "type": "string" } },
+          { "name": "cluster", "in": "query", "description": "Cluster(s), comma-separated.", "schema": { "type": "string" } },
           { "name": "service", "in": "query", "description": "Service(s), comma-separated.", "schema": { "type": "string" } },
           { "name": "repo", "in": "query", "description": "Repo(s), comma-separated.", "schema": { "type": "string" } },
           { "name": "kind", "in": "query", "description": "Kind(s), comma-separated.", "schema": { "type": "string" } },
@@ -238,6 +240,7 @@
         "summary": "Event counts over time (gap-filled), for the activity chart.",
         "parameters": [
           { "name": "env", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
+          { "name": "cluster", "in": "query", "description": "Scope facet OR-set (comma-separated): deploy cluster (many per env).", "schema": { "type": "string" } },
           { "name": "service", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "owner", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "since", "in": "query", "description": "Window start. Default 30 days ago.", "schema": { "type": "string", "format": "date-time" } },
@@ -257,6 +260,7 @@
         "summary": "Per-environment deploy frequency, failures and health.",
         "parameters": [
           { "name": "env", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
+          { "name": "cluster", "in": "query", "description": "Scope facet OR-set (comma-separated): deploy cluster (many per env).", "schema": { "type": "string" } },
           { "name": "service", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "owner", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "since", "in": "query", "description": "Window start. Default 30 days ago.", "schema": { "type": "string", "format": "date-time" } },
@@ -275,6 +279,7 @@
         "summary": "Change-failure rate and MTTR over a window (overall, per env, per owner).",
         "parameters": [
           { "name": "env", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
+          { "name": "cluster", "in": "query", "description": "Scope facet OR-set (comma-separated): deploy cluster (many per env).", "schema": { "type": "string" } },
           { "name": "service", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "owner", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "since", "in": "query", "description": "Window start. Default 30 days ago.", "schema": { "type": "string", "format": "date-time" } },
@@ -294,6 +299,7 @@
         "summary": "Logical changes in a window: build → merge → per-env deploys collapsed by app sha.",
         "parameters": [
           { "name": "env", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
+          { "name": "cluster", "in": "query", "description": "Scope facet OR-set (comma-separated): deploy cluster (many per env).", "schema": { "type": "string" } },
           { "name": "service", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "owner", "in": "query", "description": "Scope facet OR-set (comma-separated).", "schema": { "type": "string" } },
           { "name": "since", "in": "query", "description": "Window start. Default 30 days ago.", "schema": { "type": "string", "format": "date-time" } },
@@ -748,12 +754,13 @@
       },
       "Changeset": {
         "type": "object",
-        "required": ["sha", "title", "services", "envs", "owners", "repos", "actors", "kinds", "refs", "first_ts", "last_ts", "events", "failed", "deployed"],
+        "required": ["sha", "title", "services", "envs", "clusters", "owners", "repos", "actors", "kinds", "refs", "first_ts", "last_ts", "events", "failed", "deployed"],
         "properties": {
           "sha": { "type": "string", "description": "Longest known form of the app commit sha." },
           "title": { "type": "string", "description": "Representative title (merge > build > other)." },
           "services": { "type": "array", "items": { "type": "string" } },
           "envs": { "type": "array", "items": { "type": "string" }, "description": "Envs with a succeeded deploy of this sha." },
+          "clusters": { "type": "array", "items": { "type": "string" }, "description": "Clusters with a succeeded deploy of this sha." },
           "owners": { "type": "array", "items": { "type": "string" } },
           "repos": { "type": "array", "items": { "type": "string" } },
           "actors": { "type": "array", "items": { "type": "string" } },
@@ -777,10 +784,11 @@
       },
       "Facets": {
         "type": "object",
-        "required": ["sources", "envs", "services", "repos", "owners", "actors"],
+        "required": ["sources", "envs", "clusters", "services", "repos", "owners", "actors"],
         "properties": {
           "sources": { "type": "array", "items": { "type": "string" } },
           "envs": { "type": "array", "items": { "type": "string" } },
+          "clusters": { "type": "array", "items": { "type": "string" } },
           "services": { "type": "array", "items": { "type": "string" } },
           "repos": { "type": "array", "items": { "type": "string" } },
           "owners": { "type": "array", "items": { "type": "string" } },

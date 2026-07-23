@@ -19,6 +19,7 @@ type Changeset struct {
 	Title    string    `json:"title"`    // representative (merge > build > other)
 	Services []string  `json:"services"` // distinct services touched
 	Envs     []string  `json:"envs"`     // envs with a succeeded deploy of this sha
+	Clusters []string  `json:"clusters"` // clusters with a succeeded deploy of this sha
 	Owners   []string  `json:"owners"`   // distinct owning teams
 	Repos    []string  `json:"repos"`    // distinct source repos
 	Actors   []string  `json:"actors"`   // distinct actors
@@ -46,6 +47,7 @@ type csAccum struct {
 	titleRank int
 	services  set
 	envs      set
+	clusters  set
 	owners    set
 	repos     set
 	actors    set
@@ -88,6 +90,7 @@ func (a *csAccum) add(e model.Event, envReached bool) {
 	a.refs.add(e.Ref)
 	if envReached {
 		a.envs.add(e.Env)
+		a.clusters.add(e.Cluster)
 	}
 	if a.firstTS.IsZero() || e.TS.Before(a.firstTS) {
 		a.firstTS = e.TS
@@ -118,7 +121,7 @@ func Changesets(ctx context.Context, st *store.Store, tags *normalize.TagResolve
 	get := func(key, full string) *csAccum {
 		g := groups[key]
 		if g == nil {
-			g = &csAccum{sha: full, services: set{}, envs: set{}, owners: set{}, repos: set{}, actors: set{}, kinds: set{}, refs: set{}}
+			g = &csAccum{sha: full, services: set{}, envs: set{}, clusters: set{}, owners: set{}, repos: set{}, actors: set{}, kinds: set{}, refs: set{}}
 			groups[key] = g
 		}
 		return g
@@ -177,6 +180,7 @@ func Changesets(ctx context.Context, st *store.Store, tags *normalize.TagResolve
 			Title:    g.title,
 			Services: g.services.sorted(),
 			Envs:     g.envs.sorted(),
+			Clusters: g.clusters.sorted(),
 			Owners:   g.owners.sorted(),
 			Repos:    g.repos.sorted(),
 			Actors:   g.actors.sorted(),
@@ -190,13 +194,15 @@ func Changesets(ctx context.Context, st *store.Store, tags *normalize.TagResolve
 		})
 	}
 
-	// Scope filter, changeset-level: keep changes that reached a scoped env,
-	// touched a scoped service, and are owned by a scoped team. (Event-level
-	// filtering would wrongly drop a change's build/merge, which carry no env.)
-	if len(scope.Envs) > 0 || len(scope.Services) > 0 || len(scope.Owners) > 0 {
+	// Scope filter, changeset-level: keep changes that reached a scoped env or
+	// cluster, touched a scoped service, and are owned by a scoped team.
+	// (Event-level filtering would wrongly drop a change's build/merge, which
+	// carry no env/cluster.)
+	if len(scope.Envs) > 0 || len(scope.Clusters) > 0 || len(scope.Services) > 0 || len(scope.Owners) > 0 {
 		kept := make([]Changeset, 0, len(out))
 		for _, cs := range out {
-			if anyIn(scope.Envs, cs.Envs) && anyIn(scope.Services, cs.Services) && anyIn(scope.Owners, cs.Owners) {
+			if anyIn(scope.Envs, cs.Envs) && anyIn(scope.Clusters, cs.Clusters) &&
+				anyIn(scope.Services, cs.Services) && anyIn(scope.Owners, cs.Owners) {
 				kept = append(kept, cs)
 			}
 		}

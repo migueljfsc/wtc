@@ -24,9 +24,11 @@ type Facts struct {
 	ObjectName string `json:"object_name,omitempty"`
 	Namespace  string `json:"namespace,omitempty"`
 	Reason     string `json:"reason,omitempty"`
-	// ArgoCD facts. One Argo instance manages many clusters and its
-	// "cluster" is a destination server URL — env inference for argocd runs
-	// off EnvLabel/Namespace/ObjectName, never cluster=env.
+	// ArgoCD facts. Argo can't emit its own destination cluster identity (its
+	// "cluster" is a server URL, never an env), so cluster above is "" unless an
+	// Argo-per-env install sets a static label in its notification template.
+	// Env inference for argocd runs off EnvLabel/Namespace/ObjectName; a
+	// cluster→env rule is opt-in, never automatic cluster=env.
 	Project    string   `json:"project,omitempty"`
 	DestServer string   `json:"dest_server,omitempty"`
 	SourcePath string   `json:"source_path,omitempty"`

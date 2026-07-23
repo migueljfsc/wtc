@@ -51,7 +51,7 @@ function ErrorCard({ what }: { what: string }) {
 export function Dashboard() {
   const { scope } = useScope();
   const since = scope.since;
-  const facets = { env: scope.env, service: scope.service, owner: scope.owner };
+  const facets = { env: scope.env, cluster: scope.cluster, service: scope.service, owner: scope.owner };
 
   const activity = useActivity(since, "day", facets);
   const deploys = useDeployStats(since, facets);

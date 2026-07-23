@@ -748,6 +748,8 @@ export interface components {
             services: string[];
             /** @description Envs with a succeeded deploy of this sha. */
             envs: string[];
+            /** @description Clusters with a succeeded deploy of this sha. */
+            clusters: string[];
             owners: string[];
             repos: string[];
             actors: string[];
@@ -776,6 +778,7 @@ export interface components {
         Facets: {
             sources: string[];
             envs: string[];
+            clusters: string[];
             services: string[];
             repos: string[];
             owners: string[];
@@ -1071,6 +1074,8 @@ export interface operations {
                 source?: string;
                 /** @description Facet OR-set (comma-separated). */
                 env?: string;
+                /** @description Facet OR-set (comma-separated): deploy cluster (many per env). */
+                cluster?: string;
                 /** @description Facet OR-set (comma-separated). */
                 service?: string;
                 /** @description Facet OR-set (comma-separated): source repo (owner/name). */
@@ -1291,6 +1296,8 @@ export interface operations {
                 source?: string;
                 /** @description Env(s), comma-separated. */
                 env?: string;
+                /** @description Cluster(s), comma-separated. */
+                cluster?: string;
                 /** @description Service(s), comma-separated. */
                 service?: string;
                 /** @description Repo(s), comma-separated. */
@@ -1387,6 +1394,8 @@ export interface operations {
             query?: {
                 /** @description Scope facet OR-set (comma-separated). */
                 env?: string;
+                /** @description Scope facet OR-set (comma-separated): deploy cluster (many per env). */
+                cluster?: string;
                 /** @description Scope facet OR-set (comma-separated). */
                 service?: string;
                 /** @description Scope facet OR-set (comma-separated). */
@@ -1422,6 +1431,8 @@ export interface operations {
             query?: {
                 /** @description Scope facet OR-set (comma-separated). */
                 env?: string;
+                /** @description Scope facet OR-set (comma-separated): deploy cluster (many per env). */
+                cluster?: string;
                 /** @description Scope facet OR-set (comma-separated). */
                 service?: string;
                 /** @description Scope facet OR-set (comma-separated). */
@@ -1455,6 +1466,8 @@ export interface operations {
             query?: {
                 /** @description Scope facet OR-set (comma-separated). */
                 env?: string;
+                /** @description Scope facet OR-set (comma-separated): deploy cluster (many per env). */
+                cluster?: string;
                 /** @description Scope facet OR-set (comma-separated). */
                 service?: string;
                 /** @description Scope facet OR-set (comma-separated). */
@@ -1490,6 +1503,8 @@ export interface operations {
             query?: {
                 /** @description Scope facet OR-set (comma-separated). */
                 env?: string;
+                /** @description Scope facet OR-set (comma-separated): deploy cluster (many per env). */
+                cluster?: string;
                 /** @description Scope facet OR-set (comma-separated). */
                 service?: string;
                 /** @description Scope facet OR-set (comma-separated). */

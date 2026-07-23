@@ -92,6 +92,7 @@ func (s *Server) handleFeed(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	set(&f.Envs, "env")
+	set(&f.Clusters, "cluster")
 	set(&f.Services, "service")
 	set(&f.Repos, "repo")
 	set(&f.Kinds, "kind")

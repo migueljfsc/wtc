@@ -83,7 +83,7 @@ func DORA(ctx context.Context, st *store.Store, tags *normalize.TagResolver, sin
 	}
 	var signals []signal // alerts + rollbacks, for failure attribution
 	for _, e := range evs {
-		if !scope.Match(e.Env, e.Service, e.Owner) {
+		if !scope.Match(e.Env, e.Cluster, e.Service, e.Owner) {
 			continue
 		}
 		switch e.Kind {

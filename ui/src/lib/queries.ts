@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 export interface EventFilters {
   source?: string;
   env?: string;
+  cluster?: string;
   service?: string;
   repo?: string;
   owner?: string;
@@ -28,6 +29,7 @@ function clean(f: EventFilters): EventFilters {
 /** The global scope's facet filters, shared by the dashboard/changes/diff. */
 export interface AggScope {
   env?: string;
+  cluster?: string;
   service?: string;
   owner?: string;
 }
@@ -36,6 +38,7 @@ export interface AggScope {
 function scopeQuery(s?: AggScope): Record<string, string> {
   const q: Record<string, string> = {};
   if (s?.env) q.env = s.env;
+  if (s?.cluster) q.cluster = s.cluster;
   if (s?.service) q.service = s.service;
   if (s?.owner) q.owner = s.owner;
   return q;

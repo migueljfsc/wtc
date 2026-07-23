@@ -330,12 +330,13 @@ func csv(v string) []string {
 	return out
 }
 
-// scopeFrom reads the global scope facets (env/service/owner) shared by the
-// dashboard, changesets and DORA endpoints.
+// scopeFrom reads the global scope facets (env/cluster/service/owner) shared by
+// the dashboard, changesets and DORA endpoints.
 func scopeFrom(r *http.Request) store.AggScope {
 	q := r.URL.Query()
 	return store.AggScope{
 		Envs:     csv(q.Get("env")),
+		Clusters: csv(q.Get("cluster")),
 		Services: csv(q.Get("service")),
 		Owners:   csv(q.Get("owner")),
 	}
@@ -356,6 +357,7 @@ func (s *Server) handleListEvents(w http.ResponseWriter, r *http.Request) {
 	f := store.Filter{
 		Sources:  csv(q.Get("source")),
 		Envs:     csv(q.Get("env")),
+		Clusters: csv(q.Get("cluster")),
 		Services: csv(q.Get("service")),
 		Repos:    csv(q.Get("repo")),
 		Owners:   csv(q.Get("owner")),

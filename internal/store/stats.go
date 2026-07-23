@@ -15,6 +15,7 @@ import (
 // every view, not just the timeline. Empty slices are unconstrained.
 type AggScope struct {
 	Envs     []string
+	Clusters []string
 	Services []string
 	Owners   []string
 }
@@ -36,6 +37,7 @@ func (a AggScope) sqlConds() (string, []any) {
 		frags = append(frags, col+" IN ("+strings.Join(ph, ",")+")")
 	}
 	in("env", a.Envs)
+	in("cluster", a.Clusters)
 	in("service", a.Services)
 	in("owner", a.Owners)
 	if len(frags) == 0 {
@@ -44,10 +46,11 @@ func (a AggScope) sqlConds() (string, []any) {
 	return " AND " + strings.Join(frags, " AND "), args
 }
 
-// Match reports whether (env, service, owner) is in scope — for Go-side
-// filtering (DORA/changesets, which aggregate in memory).
-func (a AggScope) Match(env, service, owner string) bool {
-	return inSet(a.Envs, env) && inSet(a.Services, service) && inSet(a.Owners, owner)
+// Match reports whether (env, cluster, service, owner) is in scope — for
+// Go-side filtering (DORA/changesets, which aggregate in memory).
+func (a AggScope) Match(env, cluster, service, owner string) bool {
+	return inSet(a.Envs, env) && inSet(a.Clusters, cluster) &&
+		inSet(a.Services, service) && inSet(a.Owners, owner)
 }
 
 func inSet(set []string, v string) bool {
@@ -251,10 +254,11 @@ ORDER BY ts DESC`, args...)
 
 // Facets are the distinct dimension values present in the ledger, for the
 // timeline's filter dropdowns. Kind and status are fixed enums (the client
-// knows them); env/service/actor are dynamic.
+// knows them); env/cluster/service/actor are dynamic.
 type Facets struct {
 	Sources  []string `json:"sources"`
 	Envs     []string `json:"envs"`
+	Clusters []string `json:"clusters"`
 	Services []string `json:"services"`
 	Repos    []string `json:"repos"`
 	Owners   []string `json:"owners"`
@@ -265,7 +269,7 @@ type Facets struct {
 // actors/ephemeral envs) can't return an unbounded list.
 const maxFacetValues = 500
 
-// Facets returns the sorted distinct non-empty source/env/service/repo/owner/actor values.
+// Facets returns the sorted distinct non-empty source/env/cluster/service/repo/owner/actor values.
 func (s *Store) Facets(ctx context.Context) (*Facets, error) {
 	distinct := func(col string) ([]string, error) {
 		// col is a fixed literal from the call sites below, never user input.
@@ -293,6 +297,9 @@ func (s *Store) Facets(ctx context.Context) (*Facets, error) {
 		return nil, err
 	}
 	if f.Envs, err = distinct("env"); err != nil {
+		return nil, err
+	}
+	if f.Clusters, err = distinct("cluster"); err != nil {
 		return nil, err
 	}
 	if f.Services, err = distinct("service"); err != nil {

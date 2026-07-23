@@ -226,8 +226,8 @@ func TestFacetsAndActorFilter(t *testing.T) {
 	}
 
 	for _, ev := range []string{
-		`{"kind":"deploy","env":"prod","service":"api","actor":"alice","title":"a","dedup_key":"fa:1"}`,
-		`{"kind":"deploy","env":"dev","service":"web","actor":"bob","title":"b","dedup_key":"fa:2"}`,
+		`{"kind":"deploy","env":"dev","cluster":"dev-a","service":"api","actor":"alice","title":"a","dedup_key":"fa:1"}`,
+		`{"kind":"deploy","env":"dev","cluster":"tools","service":"web","actor":"bob","title":"b","dedup_key":"fa:2"}`,
 	} {
 		if resp, body := doRequest(t, http.MethodPost, ts.URL+"/ingest/generic", testToken, []byte(ev)); resp.StatusCode != http.StatusCreated {
 			t.Fatalf("seed = %d %s", resp.StatusCode, body)
@@ -236,13 +236,14 @@ func TestFacetsAndActorFilter(t *testing.T) {
 
 	_, body := doRequest(t, http.MethodGet, ts.URL+"/api/v1/facets", testToken, nil)
 	var facets struct {
-		Envs, Services, Actors []string
+		Envs, Clusters, Services, Actors []string
 	}
 	if err := json.Unmarshal(body, &facets); err != nil {
 		t.Fatal(err)
 	}
-	if len(facets.Envs) != 2 || len(facets.Services) != 2 || len(facets.Actors) != 2 {
-		t.Fatalf("facets = %+v, want 2 of each", facets)
+	// Two clusters under one env: an env is a grouping, cluster stays distinct.
+	if len(facets.Envs) != 1 || len(facets.Clusters) != 2 || len(facets.Services) != 2 || len(facets.Actors) != 2 {
+		t.Fatalf("facets = %+v, want 1 env / 2 clusters / 2 services / 2 actors", facets)
 	}
 
 	// actor= filters to exact match.
@@ -253,6 +254,15 @@ func TestFacetsAndActorFilter(t *testing.T) {
 	}
 	if len(list.Events) != 1 || list.Events[0].Actor != "alice" {
 		t.Fatalf("actor filter returned %d events, want 1 alice", len(list.Events))
+	}
+
+	// cluster= narrows to one cluster within the shared env.
+	_, body = doRequest(t, http.MethodGet, ts.URL+"/api/v1/events?cluster=tools", testToken, nil)
+	if err := json.Unmarshal(body, &list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Events) != 1 || list.Events[0].Cluster != "tools" {
+		t.Fatalf("cluster filter returned %d events, want 1 in tools", len(list.Events))
 	}
 }
 

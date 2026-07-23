@@ -95,8 +95,17 @@ data:
             "startedAt": {{if .app.status.operationState}}{{.app.status.operationState.startedAt | toJson}}{{else}}null{{end}},
             "finishedAt": {{if and .app.status.operationState .app.status.operationState.finishedAt}}{{.app.status.operationState.finishedAt | toJson}}{{else}}null{{end}},
             "triggeredBy": {{if .app.status.operationState}}{{.app.status.operationState.operation.initiatedBy.username | toJson}}{{else}}null{{end}},
-            "envLabel": {{if .app.metadata.labels}}{{index .app.metadata.labels "env" | toJson}}{{else}}null{{end}}
+            "envLabel": {{if .app.metadata.labels}}{{index .app.metadata.labels "env" | toJson}}{{else}}null{{end}},
+            "cluster": "CHANGEME-argo-instance-name"
           }
+  # `cluster` is a STATIC per-instance literal you set when installing this
+  # config — Argo's own destServer is a URL, never an env, so it can't identify
+  # the instance for you. Give each Argo a distinct, stable name (`argo-dev`,
+  # `argo-prod`, …). On the hub it lands in Event.cluster (a facet you can slice
+  # by) and in the rule facts, so a team running one Argo per env can map env
+  # off it: `- match: { source: argocd, cluster: argo-dev } → set: { env: dev }`.
+  # Leave it out entirely if a single Argo manages every env and you rely on the
+  # per-app `env` label instead.
 
   # Triggers wtc cares about. `send` always points at the single shared
   # template above — the trigger only decides WHEN, never the payload shape.

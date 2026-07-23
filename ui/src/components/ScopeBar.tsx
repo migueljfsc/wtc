@@ -65,6 +65,7 @@ export function ScopeBar({ disabled = false }: { disabled?: boolean }) {
       </div>
 
       <MultiSelect label="env" value={scope.env} options={facets.data?.envs ?? []} onChange={(v) => setScope({ env: v })} />
+      <MultiSelect label="cluster" value={scope.cluster} options={facets.data?.clusters ?? []} onChange={(v) => setScope({ cluster: v })} searchable />
       <MultiSelect label="service" value={scope.service} options={facets.data?.services ?? []} onChange={(v) => setScope({ service: v })} searchable />
       <MultiSelect label="owner" value={scope.owner} options={facets.data?.owners ?? []} onChange={(v) => setScope({ owner: v })} searchable />
       <MultiSelect label="repo" value={scope.repo} options={facets.data?.repos ?? []} onChange={(v) => setScope({ repo: v })} searchable />

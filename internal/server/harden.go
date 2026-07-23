@@ -119,6 +119,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	f := store.Filter{
 		Sources:  csv(q.Get("source")),
 		Envs:     csv(q.Get("env")),
+		Clusters: csv(q.Get("cluster")),
 		Services: csv(q.Get("service")),
 		Repos:    csv(q.Get("repo")),
 		Kinds:    csv(q.Get("kind")),

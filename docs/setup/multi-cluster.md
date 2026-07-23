@@ -82,6 +82,15 @@ If your cluster names already equal your env names, one rule does it:
 from the portal's Configuration tab — no restart. Events from an unmapped
 cluster land with `env=""` and surface in `wtc doctor`, never guessed.
 
+**Many clusters per env is native.** An env is a logical grouping, not one
+cluster — a `dev` env can span a `dev` cluster, a `tools` cluster, a `ci`
+cluster, whatever you run. Map each to the same env and they aggregate as one
+`dev` for the dashboard, `diff` and DORA. `cluster` is itself a first-class
+**facet**: the scope bar, timeline, changes and `wtc log --cluster <name>`
+all slice by it, so you can narrow any view to one cluster within an env
+without splitting the env. The physical cluster is always preserved on the
+event even when several share an env.
+
 > Keep the physical cluster distinct from the logical env when they differ:
 > two `prod-*` clusters both map to `env: prod`, and `wtc diff staging prod`
 > then compares them as one prod. If you want to compare the two prod clusters
@@ -89,12 +98,21 @@ cluster land with `env=""` and surface in `wtc doctor`, never guessed.
 
 ## 4. Argo CD
 
-One Argo CD usually manages many clusters already (each Application's
-destination is a cluster URL), so a **single** Argo notifications config
-pointing at the hub's `/ingest/argocd` covers all of them — see
-[argocd.md](argocd.md). Argo env inference uses the Application's `env` label,
-destination namespace, then name suffix — never the cluster, because Argo's
-"cluster" is a destination server URL, not an environment.
+Two topologies, both supported:
+
+- **One Argo, many clusters** (the common case): a **single** Argo
+  notifications config pointing at the hub's `/ingest/argocd` covers every
+  managed cluster — see [argocd.md](argocd.md). Env inference uses the
+  Application's `env` label, destination namespace, then name suffix — never
+  the destination cluster URL, which is not an environment.
+- **One Argo per env** (a team runs a `dev` Argo, a `prod` Argo, …): set the
+  `cluster` field in each instance's notification template to a distinct,
+  stable name (`argo-dev`, `argo-prod`, …). Unlike Flux's `eventMetadata`,
+  Argo can't emit its own instance identity, so this is a static literal you
+  fill in per install (the shipped template carries a `CHANGEME-…`
+  placeholder). It lands in `Event.cluster` — a facet like any other — and in
+  the rule facts, so an env fallback for apps that carry no `env` label is one
+  rule: `- match: { source: argocd, cluster: argo-dev } → set: { env: dev }`.
 
 ## 5. Verify
 

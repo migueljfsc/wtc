@@ -4,6 +4,24 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added — cluster as a first-class facet
+
+- **`cluster` facet** — the deploy cluster is now a filterable dimension
+  everywhere env is: the scope bar, timeline, changes, DORA/dashboard scope,
+  `GET /api/v1/facets` (new `clusters[]`), `wtc log --cluster <name>`, and
+  free-text search. An env is a logical grouping, so **many clusters per env**
+  (`dev` + `tools` + `ci` all mapped to `dev`) aggregate as one env while each
+  cluster stays sliceable. Changesets carry `clusters[]` (clusters a sha
+  reached). No migration — the `cluster` column already existed; this exposes
+  it. `diff`/matrix stay env-axis and are unaffected.
+- **Argo-per-env instance identity** — teams running one Argo CD per env can set
+  a static `cluster` label in the notification template (Argo can't emit its own
+  destination identity — its "cluster" is a server URL). It flows to
+  `Event.cluster` and the rule facts, enabling a `cluster → env` fallback for
+  apps without an `env` label: `match: {source: argocd, cluster: argo-dev} →
+  set: {env: dev}`. Single-Argo installs leave it unset and are unchanged.
+  Docs: `docs/setup/multi-cluster.md`, `docs/setup/argocd.md`.
+
 ### Added — DORA: lead time
 
 - **Lead time per environment** completes the DORA set. For each change (events

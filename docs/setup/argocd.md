@@ -86,6 +86,13 @@ The shipped tiers: explicit `env` app label > destination namespace >
 app-name suffix. Unmatched apps land `env=""` and show up in `wtc doctor` —
 wtc never guesses.
 
+If you run **one Argo per env** instead of one Argo for all, set the template's
+`cluster` field to a stable per-instance name (`argo-dev`, …) — it's a static
+literal you fill in, since Argo can't emit its own identity. That gives a
+cluster tier for env inference (`match: { source: argocd, cluster: argo-dev }
+→ set: { env: dev }`) and populates the `cluster` facet. See
+[multi-cluster.md](multi-cluster.md) §4. A single-Argo install leaves it unset.
+
 ```yaml
 rules:
   - match: { source: argocd }
@@ -99,7 +106,8 @@ rules:
 ```
 
 (Repeat the namespace/suffix pairs for staging/dev — full block in SPEC §2.)
-Also available to templates: `.Project`, `.DestServer`, `.SourcePath`.
+Also available to templates: `.Project`, `.DestServer`, `.SourcePath`,
+`.Cluster` (the per-instance label above, empty unless set).
 
 ## 4. Verify
 

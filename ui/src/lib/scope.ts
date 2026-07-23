@@ -21,6 +21,7 @@ const DEFAULT_RANGE: RangePreset = "7d";
 
 export interface Scope {
   env: string;
+  cluster: string;
   service: string;
   owner: string;
   repo: string;
@@ -32,7 +33,7 @@ export interface Scope {
 
 /** The scope keys owned in the URL. Other params (e.g. a changeset `ref`, the
  *  Where `ref`) are preserved untouched. */
-const FACET_KEYS = ["env", "service", "owner", "repo", "q"] as const;
+const FACET_KEYS = ["env", "cluster", "service", "owner", "repo", "q"] as const;
 type FacetKey = (typeof FACET_KEYS)[number];
 
 function resolve(params: URLSearchParams): Scope {
@@ -49,6 +50,7 @@ function resolve(params: URLSearchParams): Scope {
   }
   return {
     env: params.get("env") ?? "",
+    cluster: params.get("cluster") ?? "",
     service: params.get("service") ?? "",
     owner: params.get("owner") ?? "",
     repo: params.get("repo") ?? "",
@@ -61,6 +63,7 @@ function resolve(params: URLSearchParams): Scope {
 
 export interface ScopePatch {
   env?: string;
+  cluster?: string;
   service?: string;
   owner?: string;
   repo?: string;

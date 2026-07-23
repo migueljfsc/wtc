@@ -40,6 +40,7 @@ export function Timeline() {
   const effective = useMemo<EventFilters>(
     () => ({
       env: scope.env || undefined,
+      cluster: scope.cluster || undefined,
       service: scope.service || undefined,
       owner: scope.owner || undefined,
       repo: scope.repo || undefined,

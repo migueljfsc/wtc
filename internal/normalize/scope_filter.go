@@ -24,13 +24,13 @@ import (
 
 // ScopeMatch selects events by raw facts. Empty fields are unconstrained;
 // each non-empty field is a glob. For ArgoCD, ObjectName is the app name and
-// Cluster is unused (its destination is a server URL, never an env); for Flux,
-// Project is unused.
+// Cluster is the operator-set instance/cluster label (empty unless the
+// notification template sets it); for Flux, Project is unused.
 type ScopeMatch struct {
 	Namespace  string `yaml:"namespace" json:"namespace,omitempty"`
 	ObjectName string `yaml:"object_name" json:"object_name,omitempty"` // Flux involvedObject.name / Argo app
 	ObjectKind string `yaml:"object_kind" json:"object_kind,omitempty"` // e.g. Kustomization, HelmRelease, Application
-	Cluster    string `yaml:"cluster" json:"cluster,omitempty"`         // Flux only
+	Cluster    string `yaml:"cluster" json:"cluster,omitempty"`         // Flux eventMetadata / Argo template label
 	Project    string `yaml:"project" json:"project,omitempty"`         // ArgoCD only
 }
 

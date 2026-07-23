@@ -29,6 +29,7 @@ type Notification struct {
 	OperationPhase string    `json:"operationPhase"` // Running | Succeeded | Failed | Error; null before the first sync
 	DestServer     string    `json:"destServer"`     // destination *server URL* — NOT an env (never cluster=env for argocd)
 	DestNamespace  string    `json:"destNamespace"`
+	Cluster        string    `json:"cluster"` // operator-set instance/cluster label (template literal); env fallback for Argo-per-env, "" when unset
 	RepoURL        string    `json:"repoURL"`
 	SourcePath     string    `json:"sourcePath"`
 	TargetRevision string    `json:"targetRevision"`
@@ -151,6 +152,7 @@ func Normalize(n *Notification, now time.Time) (*model.Event, normalize.Facts, s
 		Source:     model.SourceArgoCD,
 		Kind:       model.KindDeploy,
 		Status:     status,
+		Cluster:    n.Cluster,
 		Namespace:  n.DestNamespace,
 		Actor:      actor,
 		Ref:        ref,
@@ -162,6 +164,7 @@ func Normalize(n *Notification, now time.Time) (*model.Event, normalize.Facts, s
 	facts := normalize.Facts{
 		Source:     "argocd",
 		Repo:       n.RepoURL,
+		Cluster:    n.Cluster,
 		ObjectKind: "Application",
 		ObjectName: n.App,
 		Namespace:  n.DestNamespace,

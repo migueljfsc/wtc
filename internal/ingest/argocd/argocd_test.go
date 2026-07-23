@@ -73,6 +73,28 @@ func TestGoldenSyncSucceeded(t *testing.T) {
 	}
 }
 
+// TestGoldenSyncSucceededCluster covers an Argo-per-env instance whose
+// notification template sets a `cluster` label. The label is the only signal
+// tying an event to its Argo instance/cluster (destServer is a URL, never an
+// env), so it must reach both Event.Cluster and the rule facts — where a
+// cluster→env rule can then map an unlabeled app's env.
+func TestGoldenSyncSucceededCluster(t *testing.T) {
+	ev, facts, _ := Normalize(loadNotification(t, "sync_succeeded_cluster.json"), testNow)
+	if err := ev.Validate(); err != nil {
+		t.Fatalf("invalid: %v", err)
+	}
+	if ev.Cluster != "argo-dev" {
+		t.Errorf("cluster = %q — must carry the template's cluster label", ev.Cluster)
+	}
+	if facts.Cluster != "argo-dev" {
+		t.Errorf("facts.cluster = %q — cluster→env rules key on it", facts.Cluster)
+	}
+	// No env label on this app: env is left to a cluster→env rule downstream.
+	if facts.EnvLabel != "" {
+		t.Errorf("facts.envLabel = %q, want empty", facts.EnvLabel)
+	}
+}
+
 func TestGoldenSyncRunning(t *testing.T) {
 	ev, _, suppress := Normalize(loadNotification(t, "sync_running.json"), testNow)
 	if ev.Status != model.StatusStarted {

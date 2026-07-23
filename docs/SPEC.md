@@ -36,7 +36,7 @@ CREATE INDEX idx_events_ref        ON events(ref);
 CREATE INDEX idx_events_kind_ts    ON events(kind, ts);
 ```
 
-Full-text search: FTS5 external-content table over `(title, service, actor, artifact)` maintained by triggers, plus a substring match on the facet columns `ref/env/repo/owner` (so a query also matches a sha, environment, repo or owning team); backs `wtc log -q <text>`.
+Full-text search: FTS5 external-content table over `(title, service, actor, artifact)` maintained by triggers, plus a substring match on the facet columns `ref/env/cluster/repo/owner` (so a query also matches a sha, environment, cluster, repo or owning team); backs `wtc log -q <text>`.
 
 Upsert rule: `INSERT ... ON CONFLICT(dedup_key) DO UPDATE` — only when the incoming status **strictly outranks** the stored one (`unknown < started < succeeded|failed < degraded`; equal rank never overwrites, so a stale terminal replay cannot flip `succeeded↔failed` or move `ts` backward). `degraded` (argocd on-health-degraded) outranks the terminal pair by design: a health regression is observed AFTER the sync operation's row already completed and must win the upsert; a fix arrives as a new revision (or a retry — a new operation, hence a new row), so recovery stays visible. On update: `status`, `ts`, `title` always; `duration_ms`, `payload`, `url`, and identity fields (`env`, `cluster`, `namespace`, `service`, `repo`, `actor`, `ref`, `artifact`) follow **non-empty-wins merge** — a later event enriches the row but never blanks what an earlier event recorded. `kind` and `source` are set by the first event and never updated.
 
@@ -205,7 +205,7 @@ GET /api/v1/doctor
 GET /api/v1/auth/verify          # 200 if the bearer token is valid, else 401 (portal login)
 GET /api/v1/stats/activity?since=&until=&bucket=day|hour   # gap-filled event-count buckets (portal dashboard)
 GET /api/v1/stats/deploys?since=&until=                    # per-env deploy count/failures/health
-GET /api/v1/facets                                          # distinct env/service/actor values (filter dropdowns)
+GET /api/v1/facets                                          # distinct source/env/cluster/service/repo/owner/actor values (filter dropdowns)
 GET /api/v1/matrix?envs=dev,staging,prod                    # services × envs current-deploy grid (portal diff view)
 GET    /api/v1/stream            # SSE: newly-stored events pushed live (text/event-stream; consume with fetch)
 GET    /api/v1/config            # effective rules + tag_patterns (+ overridden flags)

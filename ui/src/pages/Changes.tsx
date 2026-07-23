@@ -33,6 +33,7 @@ export function Changes() {
   const { scope } = useScope();
   const changes = useChangesets(scope.since, {
     env: scope.env,
+    cluster: scope.cluster,
     service: scope.service,
     owner: scope.owner,
   });
