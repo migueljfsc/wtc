@@ -18,7 +18,7 @@ CREATE TABLE events (
   cluster     TEXT NOT NULL DEFAULT '',
   namespace   TEXT NOT NULL DEFAULT '',
   service     TEXT NOT NULL DEFAULT '',    -- deploy unit; '' when a change maps to no single service (e.g. a cross-app monorepo PR)
-  repo        TEXT NOT NULL DEFAULT '',    -- source repo owner/name; '' for cluster-side events (flux/argo carry no source repo)
+  repo        TEXT NOT NULL DEFAULT '',    -- source repo owner/name; '' for flux (its payloads name no source repo)
   actor       TEXT NOT NULL DEFAULT '',    -- human login, bot name, or 'flux'
   ref         TEXT NOT NULL DEFAULT '',    -- git sha / revision (manifest repo revision for flux events)
   artifact    TEXT NOT NULL DEFAULT '',    -- primary artifact, e.g. registry/app:tag or chart@version

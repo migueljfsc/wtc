@@ -31,7 +31,10 @@ function Chips({ values, to }: { values: string[]; to?: (v: string) => string })
 export function Changes() {
   const navigate = useNavigate();
   const { scope } = useScope();
-  const changes = useChangesets(scope.since, {
+  // Only a custom range carries a real end; the presets end "now", which is
+  // what the server assumes when `until` is omitted.
+  const until = scope.range === "custom" ? scope.until : undefined;
+  const changes = useChangesets(scope.since, until, {
     env: scope.env,
     cluster: scope.cluster,
     service: scope.service,
