@@ -343,3 +343,51 @@ func TestZeroStartedAtOmitsSegment(t *testing.T) {
 		t.Errorf("ts = %v, want receipt time", ev.TS)
 	}
 }
+
+// TestRepoSlug: the repo facet must hold owner/name so an Argo deploy joins the
+// same facet value as the github/gitlab build that produced it. A raw clone URL
+// beside those would split one codebase into two entries that never match.
+func TestRepoSlug(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"https://github.com/argoproj/argocd-example-apps.git", "argoproj/argocd-example-apps"},
+		{"https://github.com/org/app", "org/app"},
+		{"git@gitlab.com:grp/sub/app.git", "grp/sub/app"},
+		{"ssh://git@github.com/org/app.git", "org/app"},
+		{"https://gitlab.example.com:8443/grp/app.git", "grp/app"},
+		{"org/app", "org/app"}, // already slug-shaped
+		{"", ""},
+		{"https://github.com/", ""}, // no owner/name pair — never guessed
+		{"not-a-url", ""},           // ditto
+	}
+	for _, tt := range tests {
+		if got := repoSlug(tt.in); got != tt.want {
+			t.Errorf("repoSlug(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+// TestRepoSlugDropsCredentials: a clone URL may embed user:password. It must
+// never reach a stored column.
+func TestRepoSlugDropsCredentials(t *testing.T) {
+	got := repoSlug("https://user:ghp_secrettokenvalue@github.com/org/app.git")
+	if got != "org/app" {
+		t.Fatalf("repoSlug = %q, want org/app", got)
+	}
+}
+
+// TestNormalizeSetsRepoSlug: end-to-end, the event's repo column carries the
+// slug while Facts keeps the raw URL (rules matching on it are unaffected).
+func TestNormalizeSetsRepoSlug(t *testing.T) {
+	n, err := Parse([]byte(`{"app":"web","revision":"` + fixtureSha +
+		`","operationPhase":"Succeeded","repoURL":"https://github.com/acme/storefront.git"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ev, facts, _ := Normalize(n, testNow)
+	if ev.Repo != "acme/storefront" {
+		t.Errorf("ev.Repo = %q, want acme/storefront (facet joins github's owner/name)", ev.Repo)
+	}
+	if facts.Repo != "https://github.com/acme/storefront.git" {
+		t.Errorf("facts.Repo = %q, want the raw URL kept for rule matching", facts.Repo)
+	}
+}

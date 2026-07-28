@@ -47,12 +47,24 @@ function scopeQuery(s?: AggScope): Record<string, string> {
 // Thin typed wrappers around the generated client. Each throws on transport or
 // API error so TanStack Query surfaces it via `error`.
 
-export function useActivity(sinceISO: string, bucket: "day" | "hour", scope?: AggScope) {
+// The window params every aggregation endpoint takes. untilISO is undefined for
+// the preset ranges (which end "now" — the server's own default) and set for a
+// custom range, whose end may sit in the past.
+function windowQuery(sinceISO: string, untilISO?: string): Record<string, string> {
+  return untilISO ? { since: sinceISO, until: untilISO } : { since: sinceISO };
+}
+
+export function useActivity(
+  sinceISO: string,
+  untilISO: string | undefined,
+  bucket: "day" | "hour",
+  scope?: AggScope,
+) {
   return useQuery({
-    queryKey: ["stats", "activity", sinceISO, bucket, scope],
+    queryKey: ["stats", "activity", sinceISO, untilISO, bucket, scope],
     queryFn: async () => {
       const { data, error } = await api.GET("/api/v1/stats/activity", {
-        params: { query: { since: sinceISO, bucket, ...scopeQuery(scope) } },
+        params: { query: { ...windowQuery(sinceISO, untilISO), bucket, ...scopeQuery(scope) } },
       });
       if (error) throw new Error("activity stats request failed");
       return data;
@@ -60,12 +72,12 @@ export function useActivity(sinceISO: string, bucket: "day" | "hour", scope?: Ag
   });
 }
 
-export function useDeployStats(sinceISO: string, scope?: AggScope) {
+export function useDeployStats(sinceISO: string, untilISO?: string, scope?: AggScope) {
   return useQuery({
-    queryKey: ["stats", "deploys", sinceISO, scope],
+    queryKey: ["stats", "deploys", sinceISO, untilISO, scope],
     queryFn: async () => {
       const { data, error } = await api.GET("/api/v1/stats/deploys", {
-        params: { query: { since: sinceISO, ...scopeQuery(scope) } },
+        params: { query: { ...windowQuery(sinceISO, untilISO), ...scopeQuery(scope) } },
       });
       if (error) throw new Error("deploy stats request failed");
       return data;
@@ -74,12 +86,12 @@ export function useDeployStats(sinceISO: string, scope?: AggScope) {
 }
 
 /** Change-failure rate + MTTR over a window (DORA), overall and by env/owner. */
-export function useDORA(sinceISO: string, scope?: AggScope) {
+export function useDORA(sinceISO: string, untilISO?: string, scope?: AggScope) {
   return useQuery({
-    queryKey: ["dora", sinceISO, scope],
+    queryKey: ["dora", sinceISO, untilISO, scope],
     queryFn: async () => {
       const { data, error } = await api.GET("/api/v1/dora", {
-        params: { query: { since: sinceISO, ...scopeQuery(scope) } },
+        params: { query: { ...windowQuery(sinceISO, untilISO), ...scopeQuery(scope) } },
       });
       if (error) throw new Error("dora request failed");
       return data;
@@ -88,12 +100,12 @@ export function useDORA(sinceISO: string, scope?: AggScope) {
 }
 
 /** Logical changes (build → merge → per-env deploys, grouped by app sha). */
-export function useChangesets(sinceISO: string, scope?: AggScope) {
+export function useChangesets(sinceISO: string, untilISO?: string, scope?: AggScope) {
   return useQuery({
-    queryKey: ["changesets", sinceISO, scope],
+    queryKey: ["changesets", sinceISO, untilISO, scope],
     queryFn: async () => {
       const { data, error } = await api.GET("/api/v1/changesets", {
-        params: { query: { since: sinceISO, ...scopeQuery(scope) } },
+        params: { query: { ...windowQuery(sinceISO, untilISO), ...scopeQuery(scope) } },
       });
       if (error) throw new Error("changesets request failed");
       return data;
