@@ -144,7 +144,7 @@ type Event struct {
 	Cluster    string    `json:"cluster"`
 	Namespace  string    `json:"namespace"`
 	Service    string    `json:"service"`
-	Repo       string    `json:"repo"`  // source repo (owner/name); "" for cluster-side events (flux/argo)
+	Repo       string    `json:"repo"`  // source repo (owner/name); "" for flux (its payloads name no repo)
 	Owner      string    `json:"owner"` // owning team, inferred from service via the catalog; "" when unmapped
 	Actor      string    `json:"actor"`
 	Ref        string    `json:"ref"`      // git sha / revision

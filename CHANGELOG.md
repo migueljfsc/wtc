@@ -4,6 +4,29 @@ Notable changes to wtc. Format loosely follows [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Fixed
+
+- **The scope bar's custom range end was ignored on Dashboard and Changes.** Both
+  pages sent only `since`, so a custom window ending in the past silently
+  reported everything up to now. `until` is now threaded into
+  `/stats/activity`, `/stats/deploys`, `/dora` and `/changesets` (which all
+  already accepted it). Preset ranges still omit it — they end "now", which is
+  the server default — so their cache keys are unchanged.
+- **argocd events carried the raw clone URL in `repo`.** They landed as
+  `https://github.com/org/app.git` while github/gitlab report `org/app`, so one
+  codebase split into two facet entries and a repo filter never joined an Argo
+  deploy to the build that produced it. The argocd normalizer now reduces
+  `repoURL` to the same `owner/name` slug (https, `ssh://`, and scp-style
+  `git@host:path`, with any embedded credentials dropped). `Facts.Repo` keeps
+  the raw URL, so rules matching on it are unaffected. New events only.
+- **Glob patterns containing non-ASCII characters never matched.** Both glob
+  compilers (`normalize.CompileGlob`, backing rule matching, poller repo scope
+  and notification subscriptions, and retention's ephemeral-env pattern on
+  postgres) converted each pattern *byte* to a rune and re-encoded it, mangling
+  every multi-byte UTF-8 sequence into mojibake.
+- **`GET /api/v1/export` ignored the `owner` and `ref` filters** despite
+  documenting that its filters mirror `/events`.
+
 ### Added — cluster as a first-class facet
 
 - **`cluster` facet** — the deploy cluster is now a filterable dimension
