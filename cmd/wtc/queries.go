@@ -195,7 +195,7 @@ deploy) per env. Deploy frequency lives in the dashboard.`,
 			_, _ = fmt.Fprintf(out, "%s → %s   (failure window %s)\n\n",
 				r.Since.Local().Format("2006-01-02"), r.Until.Local().Format("2006-01-02"), win)
 			_, _ = fmt.Fprintf(out, "overall: %d deploys · %s change-failure rate · %s MTTR (%d incidents)\n",
-				r.Overall.Deploys, doraPct(r.Overall.ChangeFailureRate), doraMTTR(r.Overall.MTTRSeconds), r.Overall.Incidents)
+				r.Overall.Deploys, doraPct(r.Overall.ChangeFailureRate), doraDur(r.Overall.MTTRSeconds), r.Overall.Incidents)
 
 			table := func(header string, groups []query.DORAGroup) {
 				if len(groups) == 0 {
@@ -206,7 +206,7 @@ deploy) per env. Deploy frequency lives in the dashboard.`,
 				_, _ = fmt.Fprintln(w, "\tDEPLOYS\tCFR\tMTTR\tINCIDENTS")
 				for _, g := range groups {
 					_, _ = fmt.Fprintf(w, "%s\t%d\t%s\t%s\t%d\n",
-						g.Key, g.Deploys, doraPct(g.ChangeFailureRate), doraMTTR(g.MTTRSeconds), g.Incidents)
+						g.Key, g.Deploys, doraPct(g.ChangeFailureRate), doraDur(g.MTTRSeconds), g.Incidents)
 				}
 				_ = w.Flush()
 			}
@@ -242,8 +242,6 @@ func doraDur(secs *float64) string {
 	}
 	return (time.Duration(*secs) * time.Second).Round(time.Second).String()
 }
-
-func doraMTTR(secs *float64) string { return doraDur(secs) }
 
 func newDiffCmd(flags *clientFlags) *cobra.Command {
 	var asJSON bool

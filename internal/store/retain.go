@@ -97,13 +97,15 @@ func globToRegex(pattern string) string {
 	var b strings.Builder
 	b.WriteString("^")
 	for i := 0; i < len(pattern); i++ {
-		switch c := pattern[i]; c {
+		switch pattern[i] {
 		case '*':
 			b.WriteString(".*")
 		case '?':
 			b.WriteString(".")
 		default:
-			b.WriteString(regexp.QuoteMeta(string(c)))
+			// Slice, never string(pattern[i]): that converts the BYTE to a rune
+			// and re-encodes it, mangling every multi-byte UTF-8 sequence.
+			b.WriteString(regexp.QuoteMeta(pattern[i : i+1]))
 		}
 	}
 	b.WriteString("$")

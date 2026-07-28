@@ -122,9 +122,11 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		Clusters: csv(q.Get("cluster")),
 		Services: csv(q.Get("service")),
 		Repos:    csv(q.Get("repo")),
+		Owners:   csv(q.Get("owner")),
 		Kinds:    csv(q.Get("kind")),
 		Statuses: csv(q.Get("status")),
 		Actors:   csv(q.Get("actor")),
+		Refs:     csv(q.Get("ref")),
 		Query:    q.Get("q"),
 		Limit:    1000, // page size, not a cap — the loop drains the range
 	}

@@ -51,11 +51,14 @@ function ErrorCard({ what }: { what: string }) {
 export function Dashboard() {
   const { scope } = useScope();
   const since = scope.since;
+  // Only a custom range carries a real end; the presets end "now", which is
+  // what the server assumes when `until` is omitted.
+  const until = scope.range === "custom" ? scope.until : undefined;
   const facets = { env: scope.env, cluster: scope.cluster, service: scope.service, owner: scope.owner };
 
-  const activity = useActivity(since, "day", facets);
-  const deploys = useDeployStats(since, facets);
-  const dora = useDORA(since, facets);
+  const activity = useActivity(since, until, "day", facets);
+  const deploys = useDeployStats(since, until, facets);
+  const dora = useDORA(since, until, facets);
   const recent = useRecentEvents(12);
 
   const totals = useMemo(() => {

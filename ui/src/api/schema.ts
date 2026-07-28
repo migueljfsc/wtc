@@ -443,7 +443,7 @@ export interface components {
             cluster: string;
             namespace: string;
             service: string;
-            /** @description Source repo (owner/name); empty for cluster-side events (flux/argo). */
+            /** @description Source repo (owner/name); empty for flux (its payloads name no repo). */
             repo: string;
             /** @description Owning team, inferred from service via the catalog; empty when unmapped. */
             owner: string;
@@ -1302,12 +1302,16 @@ export interface operations {
                 service?: string;
                 /** @description Repo(s), comma-separated. */
                 repo?: string;
+                /** @description Owning team(s), comma-separated. */
+                owner?: string;
                 /** @description Kind(s), comma-separated. */
                 kind?: string;
                 /** @description Status(es), comma-separated. */
                 status?: string;
                 /** @description Actor(s), comma-separated. */
                 actor?: string;
+                /** @description Exact git sha / revision OR-set, comma-separated. */
+                ref?: string;
                 /** @description Free-text search over title/service/actor/artifact. */
                 q?: string;
                 /** @description Window start. */

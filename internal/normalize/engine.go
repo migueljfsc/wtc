@@ -210,8 +210,9 @@ func (e *Engine) Apply(ev *model.Event, f Facts) error {
 		}
 	}
 	// repo is a raw source-side fact (owner/name), not an inference — persist it
-	// verbatim as the facet dimension. Rules never set it; cluster-side sources
-	// (flux/argo) leave it empty. A normalizer that already set repo wins.
+	// verbatim as the facet dimension. Rules never set it; flux leaves it empty
+	// (its payloads name no repo). A normalizer that already set repo wins —
+	// argocd does, reducing its clone URL to the same owner/name slug.
 	if ev.Repo == "" {
 		ev.Repo = f.Repo
 	}
@@ -309,7 +310,9 @@ func CompileGlob(pattern string) (*regexp.Regexp, error) {
 		case pattern[i] == '*':
 			b.WriteString("[^/]*")
 		default:
-			b.WriteString(regexp.QuoteMeta(string(pattern[i])))
+			// Slice, never string(pattern[i]): that converts the BYTE to a rune
+			// and re-encodes it, mangling every multi-byte UTF-8 sequence.
+			b.WriteString(regexp.QuoteMeta(pattern[i : i+1]))
 		}
 	}
 	b.WriteString("$")

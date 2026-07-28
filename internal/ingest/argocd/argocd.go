@@ -9,7 +9,9 @@ package argocd
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/migueljfsc/wtc/internal/model"
@@ -56,6 +58,38 @@ func Parse(raw []byte) (*Notification, error) {
 
 // shaLike matches a resolved git revision — same shape the where join keys on.
 var shaLike = regexp.MustCompile(`^[0-9a-f]{7,40}$`)
+
+// repoSlug reduces a git clone URL to the owner/name slug the repo facet holds,
+// so an Argo deploy lands under the SAME repo value as the build that produced
+// it — github/gitlab report owner/name (gitlab including subgroups), and a raw
+// clone URL beside those would split one codebase into two facet entries that
+// never join. Handles https/ssh URLs, scp-style git@host:path, and an input
+// that is already slug-shaped. Returns "" when no owner/name pair is left:
+// unrecognized is unrecognized, never a guess. The raw URL stays on
+// Facts.Repo, so rules matching on it are unaffected.
+func repoSlug(repoURL string) string {
+	s := strings.TrimSpace(repoURL)
+	switch {
+	case s == "":
+		return ""
+	case strings.Contains(s, "://"):
+		// A real URL: the parser drops the scheme, host:port, and any embedded
+		// user:password — credentials must never reach a stored column.
+		u, err := url.Parse(s)
+		if err != nil {
+			return ""
+		}
+		s = u.Path
+	case strings.Contains(s, ":"):
+		// scp-style git@host:owner/name — not a parseable URL.
+		_, s, _ = strings.Cut(s, ":")
+	}
+	s = strings.TrimSuffix(strings.Trim(s, "/"), ".git")
+	if !strings.Contains(s, "/") {
+		return "" // no owner/name pair — nothing the repo facet can join on
+	}
+	return s
+}
 
 // Normalize maps a notification onto the Event schema + facts, and derives
 // the suppression key (Argo can re-notify on resyncs — though its own
@@ -154,6 +188,9 @@ func Normalize(n *Notification, now time.Time) (*model.Event, normalize.Facts, s
 		Status:     status,
 		Cluster:    n.Cluster,
 		Namespace:  n.DestNamespace,
+		// Set here (not left to the engine's Facts.Repo default) so the facet
+		// gets owner/name, matching github/gitlab, never the raw clone URL.
+		Repo:       repoSlug(n.RepoURL),
 		Actor:      actor,
 		Ref:        ref,
 		Title:      title,

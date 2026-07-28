@@ -156,6 +156,10 @@ func TestCompileGlob(t *testing.T) {
 		{"exact", "exact", true},
 		{"exact", "exact-not", false},
 		{"a.b", "aXb", false}, // dot is literal
+		// Multi-byte UTF-8 must survive compilation byte-for-byte: converting a
+		// byte to a rune instead of slicing re-encodes it and nothing matches.
+		{"org/café-*", "org/café-api", true},
+		{"org/café-*", "org/cafe-api", false},
 	}
 	for _, tt := range tests {
 		re, err := CompileGlob(tt.pattern)
