@@ -69,6 +69,13 @@ updates:
       include: scope
     cooldown:
       default-days: 7
+    # openapi-typescript (gen:api) peers typescript@^5.x, so a TS major bump
+    # fails `npm ci` with ERESOLVE.
+    # TODO: drop this ignore once openapi-typescript accepts typescript 7.
+    ignore:
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
     groups:
       npm:
         patterns:
